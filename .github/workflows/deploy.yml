@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - codex/add-bullmq-review-queue
   workflow_dispatch:
 
 concurrency:
