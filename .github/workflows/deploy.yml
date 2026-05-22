@@ -1,4 +1,4 @@
-name: Deploy Firmcode to Coolify
+name: Deploy Firmcodetest to Coolify
 
 on:
   push:
