@@ -5,6 +5,7 @@ const VALID_ENV = {
   NODE_ENV: "development",
   DATABASE_URL: "postgresql://firmcode:secret@localhost:5432/firmcode",
   DATABASE_SSL: "false",
+  REDIS_URL: "redis://:secret@localhost:6379",
   CLERK_SECRET_KEY: "sk_test_example"
 };
 
@@ -14,6 +15,7 @@ describe("API runtime config", () => {
 
     expect(config.database.url).toBe(VALID_ENV.DATABASE_URL);
     expect(config.database.ssl).toBe(false);
+    expect(config.queue.redactedRedisUrl).toBe("redis://:REDACTED@localhost:6379");
     expect(config.clerk.secretKey).toBe("sk_test_example");
     expect(config.port).toBe(3001);
   });
@@ -67,5 +69,16 @@ describe("database connection smoke check", () => {
         DATABASE_SSL: "false"
       })
     ).toThrow(/PostgreSQL connection string/);
+  });
+});
+
+describe("queue config", () => {
+  it("rejects non-Redis connection strings", () => {
+    expect(() =>
+      createApiRuntimeConfig({
+        ...VALID_ENV,
+        REDIS_URL: "http://localhost:6379"
+      })
+    ).toThrow(/Redis connection string/);
   });
 });

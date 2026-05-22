@@ -39,7 +39,7 @@ Add configuration conventions for Clerk authentication, Clerk Billing, and NeonD
 Read AGENTS.md first and follow it strictly.
 Relevant planning docs: docs/ENVIRONMENT.md, docs/LOCAL_DEVELOPMENT.md, docs/DEPLOYMENT.md, docs/RELEASE_CHECKLIST.md.
 Acceptance/test criteria: Follow the acceptance criteria and tests for this task in docs/TASKS.md; add or update automated tests and do not declare the task done until those checks pass or any inability to run them is documented.
-Create .env.example files and local development setup docs based on docs/ENVIRONMENT.md and docs/LOCAL_DEVELOPMENT.md. Document Clerk, NeonDB or local PostgreSQL, GitHub App, webhook tunnel, Redis, worker, LLM provider, Semgrep, Tree-sitter, and dry-run fixture setup. Ensure no secrets are committed. Add config validation tests for missing required variables and document or automate a database connection smoke test. Acceptance criteria are in docs/TASKS.md Task 0.4.
+Create .env.example files and local development setup docs based on docs/ENVIRONMENT.md and docs/LOCAL_DEVELOPMENT.md. Document Clerk, NeonDB, GitHub App, webhook tunnel, Redis, worker, LLM provider, Semgrep, Tree-sitter, and dry-run fixture setup. Ensure no secrets are committed. Add config validation tests for missing required variables and document or automate a NeonDB connection smoke test. Acceptance criteria are in docs/TASKS.md Task 0.4.
 ```
 
 ## Task 0.2: Add Docker Compose
@@ -48,7 +48,7 @@ Create .env.example files and local development setup docs based on docs/ENVIRON
 Read AGENTS.md first and follow it strictly.
 Relevant planning docs: docs/ADR.md, docs/DEPLOYMENT.md, docs/LOCAL_DEVELOPMENT.md, docs/ENVIRONMENT.md, docs/RELEASE_CHECKLIST.md.
 Acceptance/test criteria: Follow the acceptance criteria and tests for this task in docs/TASKS.md; add or update automated tests and do not declare the task done until those checks pass or any inability to run them is documented.
-Implement Docker-first local development for Firmcode because the API and worker will deploy as Docker containers on Coolify, while the Next.js dashboard will deploy to Vercel. Include api, web, worker, postgres, and redis services in local Compose. Add production-minded Dockerfiles for API and worker, plus a web Dockerfile for Compose/fallback confidence. Wire DATABASE_URL, REDIS_URL, service ports, health checks, CORS origins, and container networking. Ensure the worker image includes Semgrep CLI and Tree-sitter runtime dependencies. Add smoke tests or documented commands proving API, web, and worker images build and the API/worker can reach dependencies from inside Docker. Acceptance criteria are in docs/TASKS.md Task 0.2.
+Implement Docker-first local development for Firmcode because the API and worker will deploy as Docker containers on Coolify, while the Next.js dashboard will run independently with Next.js dev locally and deploy to Vercel in production. Include api, worker, and redis services in local Compose. Use NeonDB through `DATABASE_URL`; do not add a local PostgreSQL service. Add production-minded Dockerfiles for API and worker. Wire DATABASE_URL, REDIS_URL, service ports, health checks, CORS origins, and container networking. Ensure the worker image includes Semgrep CLI and Tree-sitter runtime dependencies. Add smoke tests or documented commands proving API and worker images build and the API/worker can reach NeonDB and Redis from inside Docker. Acceptance criteria are in docs/TASKS.md Task 0.2.
 ```
 
 ## Task 0.2a: Hybrid Deployment Notes

@@ -1,6 +1,6 @@
 # Local Development
 
-Firmcode should be developed Docker-first. Docker Compose is the canonical local integration path because the API and worker will run as Docker containers on Coolify, while the web dashboard will deploy to Vercel. Host-native commands can exist for fast inner-loop work, but every feature should be validated in the local full-stack Compose path before it is considered done.
+Firmcode should be developed Docker-first for API and worker runtime behavior. Docker Compose is the canonical local integration path for the API, worker, and Redis because the API and worker will run as Docker containers on Coolify, while the web dashboard runs independently with Next.js dev locally and deploys to Vercel. Host-native commands can exist for fast inner-loop work, but every API or worker feature should be validated in the local Compose path before it is considered done.
 
 ## Prerequisites
 
@@ -9,7 +9,7 @@ Firmcode should be developed Docker-first. Docker Compose is the canonical local
 - Docker Desktop or compatible Docker runtime
 - GitHub account
 - Clerk development application
-- NeonDB development database or local PostgreSQL
+- NeonDB development database
 - Redis through Docker Compose
 - LLM provider API key
 - Optional webhook tunnel such as ngrok
@@ -18,14 +18,15 @@ Firmcode should be developed Docker-first. Docker Compose is the canonical local
 
 1. Copy `.env.example` to `.env`.
 2. Create Clerk application and fill Clerk env vars.
-3. Create NeonDB database or use local Compose PostgreSQL and set `DATABASE_URL`.
+3. Create a NeonDB database and set `DATABASE_URL`.
 4. Create GitHub App with required permissions and webhook secret.
 5. Set `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, and `GITHUB_WEBHOOK_SECRET`.
 6. Set LLM provider/model variables.
 7. Start services with Docker Compose.
 8. Run migrations.
-9. Start API, web, and worker.
-10. Use webhook tunnel for GitHub App webhook URL.
+9. Start API and worker with Docker Compose.
+10. Start the web dashboard independently with Next.js dev.
+11. Use webhook tunnel for GitHub App webhook URL.
 
 ## Docker-First Workflow
 
@@ -35,27 +36,45 @@ Default local workflow:
 docker compose up --build
 ```
 
+Task 0.2 smoke workflow:
+
+```bash
+bash infra/docker/smoke.sh
+```
+
 The Compose stack should include:
 
 - `api`
-- `web`
 - `worker`
-- `postgres` for local development when not using NeonDB
 - `redis`
 
-The API and worker containers should use the same production entrypoints planned for Coolify wherever practical. The web container exists for local integration and fallback deployment confidence; production web deploys to Vercel. Development-only bind mounts and hot reload are acceptable, but the project must also support clean image builds without relying on host-installed dependencies.
+The API and worker containers should use the same production entrypoints planned for Coolify wherever practical. The web dashboard runs independently with `npm run dev --workspace @firmcode/web` for local development and deploys to Vercel in production.
 
 Before merging implementation work, verify:
 
 - API image builds.
-- Web image builds.
 - Worker image builds.
 - Worker image includes Semgrep CLI and Tree-sitter runtime dependencies.
-- API can reach Redis and the configured database from inside the container network.
-- Worker can reach Redis and the configured database from inside the container network.
-- Web can reach the API through configured environment variables.
+- API can reach Redis and NeonDB from inside the container network.
+- Worker can reach Redis and NeonDB from inside the container network.
+- Local Next.js dev can reach the API through `NEXT_PUBLIC_API_URL`.
 - API CORS accepts local web origin and planned Vercel origins.
 - Health/readiness checks pass inside containers.
+
+Compose uses the host-provided NeonDB `DATABASE_URL` and `REDIS_URL=redis://redis:6379` inside API and worker containers. The web dashboard uses `NEXT_PUBLIC_API_URL=http://localhost:3001` when run locally.
+
+If a host port is already occupied, override only the host binding while leaving container DNS and ports unchanged:
+
+```bash
+API_PORT=3301 docker compose up --build api
+REDIS_PORT=56379 docker compose up redis
+```
+
+Run the web dashboard locally outside Docker:
+
+```bash
+npm run dev --workspace @firmcode/web
+```
 
 ## Hybrid Deployment Shape
 
@@ -65,7 +84,7 @@ Production deployment should be split:
 - Coolify deploys the API service.
 - Coolify deploys the worker service.
 - Redis runs on Coolify or a managed Redis provider.
-- NeonDB is external managed PostgreSQL.
+- NeonDB is external managed PostgreSQL for local development and production-like deployments.
 
 Deployment documentation should live in `infra/deploy/vercel.md` and `infra/deploy/coolify.md` once the scaffold exists. It should include:
 
@@ -140,7 +159,7 @@ npm run lint
 npm run build
 pytest apps/worker/tests
 docker compose up -d
-docker compose up --build
+DATABASE_URL="postgresql://..." docker compose up --build
 docker compose run --rm api npm run test
 docker compose run --rm worker pytest
 ```

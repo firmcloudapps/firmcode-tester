@@ -188,7 +188,6 @@ infra/
   docker/
     docker-compose.yml
     api.Dockerfile
-    web.Dockerfile
     worker.Dockerfile
   deploy/
     vercel.md
@@ -542,19 +541,16 @@ Environment variables:
 Services:
 
 - `api`: NestJS API.
-- `web`: Next.js dashboard.
 - `worker`: Python review worker with Semgrep and Tree-sitter dependencies.
-- `postgres`: PostgreSQL 16.
 - `redis`: Redis 7.
 
 Local ports:
 
 - API: `3001`.
 - Web: `3000`.
-- Postgres: `5432`.
 - Redis: `6379`.
 
-The local setup should support webhook testing with a tunnel such as ngrok or GitHub webhook redelivery.
+The local setup should use NeonDB through `DATABASE_URL`; Docker Compose must not run a local PostgreSQL service. The web dashboard should run with Next.js dev locally and deploy to Vercel in production. The local setup should support webhook testing with a tunnel such as ngrok or GitHub webhook redelivery.
 
 ## 18. Example AI Review Prompt
 

@@ -131,3 +131,24 @@ Implications:
 - Build, migration, worker startup, and Semgrep availability must be validated in containers.
 - API CORS must explicitly allow Vercel production, Vercel preview, and local development origins.
 - Local host-only development can exist for speed, but Docker Compose is the canonical integration path.
+
+## ADR-011: NeonDB-Only Database And Vercel-First Web
+
+Status: Accepted
+
+Decision: Use NeonDB for PostgreSQL in local development and deployed environments. Do not run a local PostgreSQL service in Docker Compose. Run the Next.js dashboard independently with `next dev` for local development and deploy it to Vercel for production; do not run the web app as a Compose service.
+
+Rationale:
+
+- Keeps local development aligned with the managed database that will be used outside a developer machine.
+- Avoids drift between local Postgres containers and NeonDB connection behavior, especially SSL and pooling assumptions.
+- Keeps Docker Compose focused on the long-running services that deploy to Coolify: API, worker, and Redis.
+- Keeps the dashboard aligned with Vercel as the production runtime.
+
+Implications:
+
+- `DATABASE_URL` must be provided before starting API or worker in Docker Compose.
+- `DATABASE_SSL=true` is the local and deployed default.
+- Compose smoke checks verify API and worker reach NeonDB from inside Docker.
+- Local web development uses `npm run dev --workspace @firmcode/web` and `NEXT_PUBLIC_API_URL=http://localhost:3001`.
+- This supersedes ADR-005's local PostgreSQL allowance and ADR-010's earlier local full-stack web Compose implication.

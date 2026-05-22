@@ -88,16 +88,16 @@ Tests:
 
 ### Task 0.2: Add Docker Compose
 
-Add local Compose services for API, web, worker, PostgreSQL, and Redis.
+Add local Compose services for API, worker, and Redis. API and worker must use NeonDB through `DATABASE_URL`; do not add a local PostgreSQL service. The Next.js dashboard runs independently with Next.js dev locally and deploys to Vercel in production.
 
 Acceptance criteria:
 
-- `docker compose up` starts all services.
-- `docker compose up --build` builds API, web, and worker images from clean Dockerfiles.
-- API can connect to Postgres and Redis.
+- `docker compose up` starts API, worker, and Redis.
+- `docker compose up --build` builds API and worker images from clean Dockerfiles.
+- API can connect to NeonDB and Redis.
 - Worker can connect to Redis and read environment variables.
 - Worker container includes Semgrep CLI and Tree-sitter runtime dependencies.
-- Web container can reach the API through configured env.
+- Local Next.js dev can reach the API through `NEXT_PUBLIC_API_URL`.
 - Health endpoints are reachable.
 - API and worker Compose entrypoints are close to Coolify production entrypoints where practical.
 
@@ -105,7 +105,7 @@ Tests:
 
 - Compose smoke test checks API `/health`.
 - Worker startup test logs successful queue connection.
-- Container build smoke test for API, web, and worker.
+- Container build smoke test for API and worker.
 
 ### Task 0.2a: Hybrid Deployment Notes
 

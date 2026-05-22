@@ -1,0 +1,17 @@
+**/.env
+**/.next
+**/.pytest_cache
+**/.turbo
+**/.venv
+**/__pycache__
+**/coverage
+**/dist
+**/node_modules
+*.pyc
+*.tsbuildinfo
+.git
+.gitignore
+docker-compose.yml
+pr-agent
+semgrep
+tree-sitter

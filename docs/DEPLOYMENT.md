@@ -98,9 +98,9 @@ GitHub Webhook
 
 ## Local Development
 
-Local development remains Docker-first using Docker Compose for the full stack, including the web app. This catches container, environment, network, and worker issues early and gives a fallback path if the web app is ever moved from Vercel to Coolify.
+Local development remains Docker-first for the API and worker using Docker Compose, while the web app runs independently with Next.js dev. API and worker use NeonDB through `DATABASE_URL`; Compose does not run a PostgreSQL container.
 
-Host-native web development is allowed for speed, but every feature should pass the Docker Compose smoke path before it is considered done.
+Every feature that touches API or worker runtime behavior should pass the Docker Compose smoke path before it is considered done. Dashboard changes should pass the local Next.js and Vercel build paths.
 
 ## Required URLs
 

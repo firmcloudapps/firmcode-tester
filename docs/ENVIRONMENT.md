@@ -20,10 +20,18 @@ Firmcode should use typed configuration validation in every runtime. Missing req
 | Variable | Required | Description |
 | --- | --- | --- |
 | `DATABASE_URL` | yes | NeonDB/PostgreSQL connection string using the `postgres://` or `postgresql://` scheme and a database name. |
-| `DATABASE_SSL` | production | Enable SSL for NeonDB. Must be `true` in production. Use `false` only for local PostgreSQL. |
+| `DATABASE_SSL` | api/worker | Enable SSL for NeonDB. Default to `true` locally and in production. |
 | `REDIS_URL` | yes | Redis connection string for BullMQ. |
 
-Local development can use `postgresql://firmcode:firmcode@localhost:5432/firmcode` with `DATABASE_SSL=false`. NeonDB connection strings should keep the provider's SSL mode and set `DATABASE_SSL=true` in deployed API and worker environments.
+Local development uses NeonDB, not a local PostgreSQL container. NeonDB connection strings should keep the provider's SSL mode and set `DATABASE_SSL=true` in API and worker environments.
+
+Inside Docker Compose, API and worker receive the same external NeonDB URL from the host environment:
+
+```text
+DATABASE_URL=postgresql://firmcode_owner:<password>@ep-example.us-east-2.aws.neon.tech/firmcode?sslmode=require
+DATABASE_SSL=true
+REDIS_URL=redis://redis:6379
+```
 
 ## Clerk
 
@@ -101,6 +109,6 @@ The API validates `NODE_ENV`, `DATABASE_URL`, `DATABASE_SSL`, and `CLERK_SECRET_
 
 ## Deployment Targets
 
-- Vercel web needs `NEXT_PUBLIC_API_URL`, Clerk publishable key, and any public dashboard config.
+- Local and Vercel web need `NEXT_PUBLIC_API_URL`, Clerk publishable key, and any public dashboard config.
 - Coolify API needs `DATABASE_URL`, `REDIS_URL`, Clerk secret, GitHub App credentials, CORS origins, and webhook secret.
 - Coolify worker needs `DATABASE_URL`, `REDIS_URL`, LLM credentials, Semgrep settings, Tree-sitter settings, and GitHub App credentials if publishing from worker.

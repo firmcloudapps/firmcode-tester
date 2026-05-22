@@ -28,15 +28,13 @@ Use this checklist before deploying or enabling real GitHub publishing.
 ## Docker, Vercel, And Coolify
 
 - API Docker image builds locally.
-- Web Docker image builds locally for Compose/fallback, even though production web deploys to Vercel.
 - Worker Docker image builds locally.
-- `docker compose up --build` starts the full local stack.
+- `docker compose up --build` starts API, worker, and Redis with NeonDB configured through `DATABASE_URL`.
 - API health/readiness checks pass in Docker.
-- Web health check or smoke route passes in Docker.
 - Worker starts and connects to Redis/database in Docker.
 - Worker image includes Semgrep CLI.
 - Worker image includes required Tree-sitter dependencies.
-- Vercel build for `apps/web` succeeds.
+- Local Next.js dev and Vercel build for `apps/web` succeed.
 - Vercel preview deployment can call the API if preview origins are enabled.
 - Coolify API and worker build context and Dockerfile paths are documented.
 - Coolify API and worker service ports and health checks are configured.

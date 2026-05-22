@@ -23,6 +23,11 @@ export interface DatabaseConfig {
   redactedUrl: string;
 }
 
+export interface QueueConfig {
+  redisUrl: string;
+  redactedRedisUrl: string;
+}
+
 export interface DatabaseConnectionSmokeCheck {
   host: string;
   database: string;
@@ -46,6 +51,7 @@ export interface ApiRuntimeConfig {
   port: number;
   corsAllowedOrigins: string[];
   database: DatabaseConfig;
+  queue: QueueConfig;
   clerk: ClerkApiConfig;
 }
 
@@ -60,10 +66,11 @@ export function createApiRuntimeConfig(env: EnvironmentVariables): ApiRuntimeCon
   const issues: ConfigValidationIssue[] = [];
   const nodeEnv = readRuntimeEnvironment(env, issues);
   const database = readDatabaseConfig(env, nodeEnv, issues);
+  const queue = readQueueConfig(env, issues);
   const clerk = readClerkApiConfig(env, issues);
   const port = readPort(env.PORT, 3001, issues);
 
-  if (issues.length > 0 || database === null || clerk === null) {
+  if (issues.length > 0 || database === null || queue === null || clerk === null) {
     throw new ConfigValidationError("API runtime", issues);
   }
 
@@ -72,6 +79,7 @@ export function createApiRuntimeConfig(env: EnvironmentVariables): ApiRuntimeCon
     port,
     corsAllowedOrigins: readList(env.CORS_ALLOWED_ORIGINS),
     database,
+    queue,
     clerk
   };
 }
@@ -112,6 +120,14 @@ export function createDatabaseConnectionSmokeCheck(env: EnvironmentVariables): D
 }
 
 export function redactDatabaseUrl(value: string): string {
+  return redactUrlPassword(value);
+}
+
+export function redactRedisUrl(value: string): string {
+  return redactUrlPassword(value);
+}
+
+function redactUrlPassword(value: string): string {
   const url = new URL(value);
 
   if (url.password) {
@@ -173,6 +189,19 @@ function readClerkApiConfig(env: EnvironmentVariables, issues: ConfigValidationI
   return {
     secretKey,
     webhookSecret: readOptional(env, "CLERK_WEBHOOK_SECRET")
+  };
+}
+
+function readQueueConfig(env: EnvironmentVariables, issues: ConfigValidationIssue[]): QueueConfig | null {
+  const redisUrl = readRequired(env, "REDIS_URL", issues);
+
+  if (redisUrl === null || readRedisUrl(redisUrl, issues) === null) {
+    return null;
+  }
+
+  return {
+    redisUrl,
+    redactedRedisUrl: redactRedisUrl(redisUrl)
   };
 }
 
@@ -238,6 +267,24 @@ function readPostgresUrl(value: string, issues: ConfigValidationIssue[]): URL | 
   issues.push({
     variable: "DATABASE_URL",
     message: "must be a PostgreSQL connection string with a database name"
+  });
+  return null;
+}
+
+function readRedisUrl(value: string, issues: ConfigValidationIssue[]): URL | null {
+  try {
+    const url = new URL(value);
+
+    if ((url.protocol === "redis:" || url.protocol === "rediss:") && url.hostname) {
+      return url;
+    }
+  } catch {
+    // Reported below with a stable message.
+  }
+
+  issues.push({
+    variable: "REDIS_URL",
+    message: "must be a Redis connection string"
   });
   return null;
 }

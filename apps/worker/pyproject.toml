@@ -9,6 +9,9 @@ description = "Python worker package for Firmcode review pipeline stages."
 requires-python = ">=3.9"
 dependencies = []
 
+[project.scripts]
+firmcode-worker = "firmcode_worker.runtime:main"
+
 [project.optional-dependencies]
 dev = [
   "pytest>=8.0.0"
