@@ -4,6 +4,7 @@ import { NestFactory } from "@nestjs/core";
 import { type NestExpressApplication } from "@nestjs/platform-express";
 import { type ApiRuntimeConfig } from "@firmcode/shared";
 import { loadApiConfig } from "./config/api-config";
+import { logRuntimeEnvDiagnostics } from "./config/runtime-env-diagnostics";
 import { AppModule } from "./modules/app.module";
 
 type ExpressBodyParserFactory = (options: Record<string, unknown>) => unknown;
@@ -35,7 +36,15 @@ export function configureApiApplication(app: INestApplication, config: ApiRuntim
 }
 
 async function bootstrap() {
-  const config = loadApiConfig();
+  let config: ApiRuntimeConfig;
+
+  try {
+    config = loadApiConfig();
+  } catch (error) {
+    logRuntimeEnvDiagnostics();
+    throw error;
+  }
+
   const app = await createApiApplication(config);
 
   await app.listen(config.port);
