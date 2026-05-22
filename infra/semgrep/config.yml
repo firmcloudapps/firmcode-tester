@@ -1,0 +1,157 @@
+rules:
+  - id: firmcode.infra.kubernetes.privileged-container
+    message: >-
+      Kubernetes container runs privileged. Remove privileged mode and grant only
+      the specific Linux capabilities or volume access the workload requires.
+    severity: ERROR
+    languages:
+      - yaml
+    metadata:
+      category: infra
+      technology:
+        - kubernetes
+      remediation: >-
+        Set securityContext.privileged to false or omit it, and use least-privilege
+        capabilities, read-only mounts, or a dedicated security policy instead.
+    patterns:
+      - pattern-either:
+          - pattern-inside: |
+              containers:
+                ...
+          - pattern-inside: |
+              initContainers:
+                ...
+      - pattern: |
+          securityContext:
+            ...
+            privileged: true
+    paths:
+      include:
+        - "*.yaml"
+        - "*.yml"
+
+  - id: firmcode.infra.kubernetes.missing-resource-limits
+    message: >-
+      Kubernetes container has no resource limits. Add CPU and memory limits so
+      a runaway workload cannot starve the node or neighboring pods.
+    severity: WARNING
+    languages:
+      - yaml
+    metadata:
+      category: infra
+      technology:
+        - kubernetes
+      remediation: >-
+        Add resources.limits.cpu and resources.limits.memory for each container,
+        and set requests that reflect normal expected usage.
+    patterns:
+      - pattern-either:
+          - pattern-inside: |
+              containers:
+                ...
+          - pattern-inside: |
+              initContainers:
+                ...
+      - pattern: |
+          - name: $NAME
+            image: $IMAGE
+            ...
+      - pattern-not: |
+          - name: $NAME
+            image: $IMAGE
+            ...
+            resources:
+              ...
+              limits:
+                ...
+    paths:
+      include:
+        - "*.yaml"
+        - "*.yml"
+
+  - id: firmcode.infra.github-actions.unpinned-action
+    message: >-
+      GitHub Action is not pinned to a full commit SHA. Pin third-party actions
+      to a reviewed commit to reduce supply-chain drift.
+    severity: WARNING
+    languages:
+      - yaml
+    metadata:
+      category: ci
+      technology:
+        - github-actions
+      remediation: >-
+        Replace the tag or branch after @ with the action commit SHA, and update
+        it through a dependency update workflow.
+    patterns:
+      - pattern-inside: |
+          steps:
+            ...
+      - pattern: |
+          uses: $ACTION
+      - metavariable-regex:
+          metavariable: $ACTION
+          regex: ^(?!["']?\./)(?!["']?docker://)(?!["']?[^@]+@[a-fA-F0-9]{40}["']?$).+@.+$
+    paths:
+      include:
+        - ".github/workflows/*.yml"
+        - ".github/workflows/*.yaml"
+
+  - id: firmcode.infra.dockerfile.root-user
+    message: >-
+      Dockerfile switches to the root user. Run the final image as an
+      unprivileged user to limit the impact of container breakout or app bugs.
+    severity: WARNING
+    languages:
+      - generic
+    metadata:
+      category: infra
+      technology:
+        - docker
+      remediation: >-
+        Create or select a non-root user and set USER to that account in the
+        final runtime stage.
+    pattern-either:
+      - pattern: USER root
+      - pattern: USER 0
+    paths:
+      include:
+        - "*Dockerfile*"
+        - "*dockerfile*"
+
+  - id: firmcode.infra.terraform.broad-iam-permissions
+    message: >-
+      Terraform grants wildcard IAM permissions over wildcard resources. Narrow
+      actions and resources to the smallest set the workload needs.
+    severity: ERROR
+    languages:
+      - hcl
+    metadata:
+      category: infra
+      technology:
+        - terraform
+        - aws-iam
+      remediation: >-
+        Replace Action/Resource "*" with explicit AWS actions and ARNs, or split
+        administrative permissions into a tightly controlled break-glass role.
+    pattern-either:
+      - pattern: |
+          policy = jsonencode({
+            ...
+            Action = "*"
+            ...
+            Resource = "*"
+            ...
+          })
+      - pattern: |
+          statement {
+            ...
+            actions = ["*"]
+            ...
+            resources = ["*"]
+            ...
+          }
+    paths:
+      include:
+        - "*.tf"
+        - "*.hcl"
