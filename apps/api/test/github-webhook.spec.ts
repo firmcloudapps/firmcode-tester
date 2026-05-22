@@ -200,8 +200,129 @@ describe("GitHubWebhookService", () => {
       jobId: null
     });
     expect(store.deliveries.size).toBe(1);
+    expect(store.deliveries.get("delivery-duplicate")).toMatchObject({
+      deliveryId: "delivery-duplicate",
+      status: "processed",
+      processedAt: expect.any(Date)
+    });
     expect(store.reviewRuns).toHaveLength(1);
     expect(store.reviewJobs.size).toBe(1);
+  });
+
+  it("supersedes queued older runs when the same PR receives a new head SHA", async () => {
+    const openedRawBody = await readFixture("pull_request.opened.json");
+    const synchronizeRawBody = await readFixture("pull_request.synchronize.json");
+    const openedReceipt = service.acceptDelivery({
+      rawBody: openedRawBody,
+      signature: signPayload(openedRawBody),
+      eventName: "pull_request",
+      deliveryId: "delivery-old-head"
+    });
+    const synchronizeReceipt = service.acceptDelivery({
+      rawBody: synchronizeRawBody,
+      signature: signPayload(synchronizeRawBody),
+      eventName: "pull_request",
+      deliveryId: "delivery-new-head"
+    });
+
+    expect(openedReceipt.reviewRunId).toEqual(expect.any(String));
+    expect(synchronizeReceipt).toMatchObject({
+      duplicate: false,
+      ignored: false,
+      jobId: "delivery-new-head"
+    });
+    expect(store.reviewRuns).toHaveLength(2);
+    expect(store.findReviewRun(openedReceipt.reviewRunId ?? "")).toMatchObject({
+      headSha: "abc123def456",
+      status: "superseded",
+      errorCode: "superseded_by_new_head",
+      finishedAt: expect.any(Date)
+    });
+    expect(store.findReviewRun(synchronizeReceipt.reviewRunId ?? "")).toMatchObject({
+      headSha: "fed456cba123",
+      status: "queued"
+    });
+    expect(Array.from(store.pullRequests.values())[0]).toMatchObject({
+      number: 7,
+      headSha: "fed456cba123"
+    });
+    expect(store.reviewJobs.size).toBe(2);
+  });
+
+  it("prevents publishing from an old run when the current PR head SHA changed", async () => {
+    const openedRawBody = await readFixture("pull_request.opened.json");
+    const synchronizeRawBody = await readFixture("pull_request.synchronize.json");
+    const openedReceipt = service.acceptDelivery({
+      rawBody: openedRawBody,
+      signature: signPayload(openedRawBody),
+      eventName: "pull_request",
+      deliveryId: "delivery-publish-old-head"
+    });
+    const oldReviewRunId = openedReceipt.reviewRunId ?? "";
+
+    expect(store.updateReviewRunStatus({ reviewRunId: oldReviewRunId, status: "succeeded" })).toMatchObject({
+      status: "succeeded",
+      headSha: "abc123def456"
+    });
+
+    service.acceptDelivery({
+      rawBody: synchronizeRawBody,
+      signature: signPayload(synchronizeRawBody),
+      eventName: "pull_request",
+      deliveryId: "delivery-publish-new-head"
+    });
+
+    expect(store.findReviewRun(oldReviewRunId)).toMatchObject({
+      status: "succeeded",
+      headSha: "abc123def456"
+    });
+
+    expect(
+      store.verifyReviewRunHeadBeforePublishing({
+        reviewRunId: oldReviewRunId,
+        currentHeadSha: "fed456cba123"
+      })
+    ).toMatchObject({
+      publishable: false,
+      reason: "head_sha_changed",
+      currentHeadSha: "fed456cba123",
+      reviewRun: {
+        id: oldReviewRunId,
+        status: "superseded",
+        errorCode: "current_head_sha_changed"
+      }
+    });
+    expect(store.findReviewRun(oldReviewRunId)).toMatchObject({
+      status: "superseded",
+      errorCode: "current_head_sha_changed",
+      finishedAt: expect.any(Date)
+    });
+  });
+
+  it("allows publishing when the current PR head SHA still matches the review run", async () => {
+    const rawBody = await readFixture("pull_request.opened.json");
+    const receipt = service.acceptDelivery({
+      rawBody,
+      signature: signPayload(rawBody),
+      eventName: "pull_request",
+      deliveryId: "delivery-publish-current-head"
+    });
+
+    expect(
+      store.verifyReviewRunHeadBeforePublishing({
+        reviewRunId: receipt.reviewRunId ?? "",
+        currentHeadSha: "abc123def456"
+      })
+    ).toMatchObject({
+      publishable: true,
+      reason: null,
+      currentHeadSha: "abc123def456",
+      reviewRun: {
+        id: receipt.reviewRunId,
+        status: "queued",
+        headSha: "abc123def456"
+      }
+    });
   });
 
   it("upserts draft pull requests but skips review jobs by default", async () => {
