@@ -1,0 +1,43 @@
+{
+  "action": "reopened",
+  "installation": {
+    "id": 101,
+    "account": {
+      "login": "openclaw",
+      "type": "Organization"
+    },
+    "permissions": {
+      "contents": "read",
+      "pull_requests": "write"
+    }
+  },
+  "repository": {
+    "id": 202,
+    "name": "firmcode-fixture",
+    "full_name": "openclaw/firmcode-fixture",
+    "private": true,
+    "default_branch": "main",
+    "owner": {
+      "login": "openclaw",
+      "type": "Organization"
+    }
+  },
+  "pull_request": {
+    "id": 303,
+    "number": 7,
+    "title": "Add webhook normalization",
+    "state": "open",
+    "draft": false,
+    "user": {
+      "login": "octocat"
+    },
+    "base": {
+      "ref": "main",
+      "sha": "base123"
+    },
+    "head": {
+      "ref": "feature/webhooks",
+      "sha": "abc123def456"
+    }
+  }
+}

@@ -29,6 +29,11 @@ services:
       CLERK_WEBHOOK_SECRET: ${CLERK_WEBHOOK_SECRET:-whsec_local_placeholder}
       LOG_LEVEL: info
       DRY_RUN: "true"
+      GITHUB_APP_ID: ${GITHUB_APP_ID:-12345}
+      GITHUB_APP_PRIVATE_KEY: ${GITHUB_APP_PRIVATE_KEY:-LS0tLS1CRUdJTiBSU0EgUFJJVkFURSBLRVktLS0tLQpsb2NhbF9wbGFjZWhvbGRlcgotLS0tLUVORCBSU0EgUFJJVkFURSBLRVktLS0tLQ==}
+      GITHUB_WEBHOOK_SECRET: ${GITHUB_WEBHOOK_SECRET:-github_webhook_local_placeholder}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-github_client_id_local_placeholder}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-github_client_secret_local_placeholder}
     ports:
       - "${API_PORT:-3001}:3001"
     depends_on:

@@ -105,7 +105,7 @@ Implementation should add:
 
 No secrets should be committed.
 
-The API validates `NODE_ENV`, `DATABASE_URL`, `DATABASE_SSL`, and `CLERK_SECRET_KEY` during startup. The web package has Clerk config validation for `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_BILLING_PORTAL_URL`; the current provider boundary is ready to be replaced with `ClerkProvider` from `@clerk/nextjs` once the dependency is added.
+The API validates `NODE_ENV`, `DATABASE_URL`, `DATABASE_SSL`, `CLERK_SECRET_KEY`, and GitHub App credentials during startup. GitHub private keys may be raw PEM, escaped-newline PEM, or base64-encoded PEM. The web package has Clerk config validation for `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_BILLING_PORTAL_URL`; the current provider boundary is ready to be replaced with `ClerkProvider` from `@clerk/nextjs` once the dependency is added.
 
 ## Deployment Targets
 

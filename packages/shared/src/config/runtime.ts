@@ -46,6 +46,24 @@ export interface ClerkApiConfig {
   webhookSecret: string | null;
 }
 
+export interface RedactedGitHubAppConfig {
+  appId: "REDACTED";
+  privateKey: "REDACTED";
+  webhookSecret: "REDACTED";
+  clientId: "REDACTED";
+  clientSecret: "REDACTED";
+}
+
+export interface GitHubAppConfig {
+  readonly appId: number;
+  readonly privateKey: string;
+  readonly webhookSecret: string;
+  readonly clientId: string;
+  readonly clientSecret: string;
+  readonly redacted: RedactedGitHubAppConfig;
+  toJSON(): RedactedGitHubAppConfig;
+}
+
 export interface ApiRuntimeConfig {
   nodeEnv: RuntimeEnvironment;
   port: number;
@@ -53,6 +71,12 @@ export interface ApiRuntimeConfig {
   database: DatabaseConfig;
   queue: QueueConfig;
   clerk: ClerkApiConfig;
+  github: GitHubAppConfig | null;
+  review: ReviewConfig;
+}
+
+export interface ReviewConfig {
+  skipDraftPullRequests: boolean;
 }
 
 const BOOLEAN_VALUES = new Map<string, boolean>([
@@ -68,6 +92,8 @@ export function createApiRuntimeConfig(env: EnvironmentVariables): ApiRuntimeCon
   const database = readDatabaseConfig(env, nodeEnv, issues);
   const queue = readQueueConfig(env, issues);
   const clerk = readClerkApiConfig(env, issues);
+  const github = readGitHubAppConfig(env, nodeEnv, issues);
+  const review = readReviewConfig(env, issues);
   const port = readPort(env.PORT, 3001, issues);
 
   if (issues.length > 0 || database === null || queue === null || clerk === null) {
@@ -80,7 +106,9 @@ export function createApiRuntimeConfig(env: EnvironmentVariables): ApiRuntimeCon
     corsAllowedOrigins: readList(env.CORS_ALLOWED_ORIGINS),
     database,
     queue,
-    clerk
+    clerk,
+    github,
+    review
   };
 }
 
@@ -125,6 +153,26 @@ export function redactDatabaseUrl(value: string): string {
 
 export function redactRedisUrl(value: string): string {
   return redactUrlPassword(value);
+}
+
+export function normalizeGitHubAppPrivateKey(value: string): string {
+  const candidate = normalizePrivateKeyText(value);
+
+  if (isPrivateKeyPem(candidate)) {
+    return candidate;
+  }
+
+  try {
+    const decoded = normalizePrivateKeyText(Buffer.from(value.trim(), "base64").toString("utf8"));
+
+    if (isPrivateKeyPem(decoded)) {
+      return decoded;
+    }
+  } catch {
+    // Reported below with a stable message.
+  }
+
+  throw new Error("must be a PEM private key, escaped-newline PEM, or base64-encoded PEM");
 }
 
 function redactUrlPassword(value: string): string {
@@ -192,6 +240,109 @@ function readClerkApiConfig(env: EnvironmentVariables, issues: ConfigValidationI
   };
 }
 
+function readGitHubAppConfig(
+  env: EnvironmentVariables,
+  nodeEnv: RuntimeEnvironment,
+  issues: ConfigValidationIssue[]
+): GitHubAppConfig | null {
+  const hasAnyGitHubValue = [
+    env.GITHUB_APP_ID,
+    env.GITHUB_APP_PRIVATE_KEY,
+    env.GITHUB_WEBHOOK_SECRET,
+    env.GITHUB_CLIENT_ID,
+    env.GITHUB_CLIENT_SECRET
+  ].some((value) => value?.trim());
+
+  if (nodeEnv === "test" && !hasAnyGitHubValue) {
+    return null;
+  }
+
+  const appId = readGitHubAppId(env, issues);
+  const privateKey = readGitHubPrivateKey(env, issues);
+  const webhookSecret = readRequired(env, "GITHUB_WEBHOOK_SECRET", issues);
+  const clientId = readRequired(env, "GITHUB_CLIENT_ID", issues);
+  const clientSecret = readRequired(env, "GITHUB_CLIENT_SECRET", issues);
+
+  if (
+    appId === null ||
+    privateKey === null ||
+    webhookSecret === null ||
+    clientId === null ||
+    clientSecret === null
+  ) {
+    return null;
+  }
+
+  return createGitHubAppConfig({
+    appId,
+    privateKey,
+    webhookSecret,
+    clientId,
+    clientSecret
+  });
+}
+
+function createGitHubAppConfig(values: Omit<GitHubAppConfig, "redacted" | "toJSON">): GitHubAppConfig {
+  const redacted: RedactedGitHubAppConfig = {
+    appId: "REDACTED",
+    privateKey: "REDACTED",
+    webhookSecret: "REDACTED",
+    clientId: "REDACTED",
+    clientSecret: "REDACTED"
+  };
+  const config = {} as GitHubAppConfig;
+
+  Object.defineProperties(config, {
+    appId: { value: values.appId, enumerable: false },
+    privateKey: { value: values.privateKey, enumerable: false },
+    webhookSecret: { value: values.webhookSecret, enumerable: false },
+    clientId: { value: values.clientId, enumerable: false },
+    clientSecret: { value: values.clientSecret, enumerable: false },
+    redacted: { value: redacted, enumerable: true },
+    toJSON: { value: () => redacted, enumerable: false }
+  });
+
+  return Object.freeze(config);
+}
+
+function readGitHubAppId(env: EnvironmentVariables, issues: ConfigValidationIssue[]): number | null {
+  const value = readRequired(env, "GITHUB_APP_ID", issues);
+
+  if (value === null) {
+    return null;
+  }
+
+  const appId = Number(value);
+
+  if (Number.isInteger(appId) && appId > 0) {
+    return appId;
+  }
+
+  issues.push({
+    variable: "GITHUB_APP_ID",
+    message: "must be a positive integer"
+  });
+  return null;
+}
+
+function readGitHubPrivateKey(env: EnvironmentVariables, issues: ConfigValidationIssue[]): string | null {
+  const value = readRequired(env, "GITHUB_APP_PRIVATE_KEY", issues);
+
+  if (value === null) {
+    return null;
+  }
+
+  try {
+    return normalizeGitHubAppPrivateKey(value);
+  } catch (error) {
+    issues.push({
+      variable: "GITHUB_APP_PRIVATE_KEY",
+      message: error instanceof Error ? error.message : "is invalid"
+    });
+    return null;
+  }
+}
+
 function readQueueConfig(env: EnvironmentVariables, issues: ConfigValidationIssue[]): QueueConfig | null {
   const redisUrl = readRequired(env, "REDIS_URL", issues);
 
@@ -203,6 +354,37 @@ function readQueueConfig(env: EnvironmentVariables, issues: ConfigValidationIssu
     redisUrl,
     redactedRedisUrl: redactRedisUrl(redisUrl)
   };
+}
+
+function readReviewConfig(env: EnvironmentVariables, issues: ConfigValidationIssue[]): ReviewConfig {
+  return {
+    skipDraftPullRequests: readOptionalBoolean(env, "REVIEW_SKIP_DRAFT_PRS", true, issues)
+  };
+}
+
+function readOptionalBoolean(
+  env: EnvironmentVariables,
+  variable: string,
+  fallback: boolean,
+  issues: ConfigValidationIssue[]
+): boolean {
+  const rawValue = env[variable]?.trim().toLowerCase();
+
+  if (!rawValue) {
+    return fallback;
+  }
+
+  const parsed = BOOLEAN_VALUES.get(rawValue);
+
+  if (parsed === undefined) {
+    issues.push({
+      variable,
+      message: "must be true, false, 1, or 0"
+    });
+    return fallback;
+  }
+
+  return parsed;
 }
 
 function readRequired(env: EnvironmentVariables, variable: string, issues: ConfigValidationIssue[]): string | null {
@@ -354,4 +536,12 @@ function readList(value: string | undefined): string[] {
       .map((item) => item.trim())
       .filter(Boolean) ?? []
   );
+}
+
+function normalizePrivateKeyText(value: string): string {
+  return value.trim().replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/\\n/g, "\n");
+}
+
+function isPrivateKeyPem(value: string): boolean {
+  return /^-----BEGIN (?:RSA )?PRIVATE KEY-----\n[\s\S]+\n-----END (?:RSA )?PRIVATE KEY-----$/.test(value);
 }
