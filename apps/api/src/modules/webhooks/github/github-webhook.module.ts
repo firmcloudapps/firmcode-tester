@@ -2,6 +2,11 @@ import { Module } from "@nestjs/common";
 import { Pool } from "pg";
 import { type ApiRuntimeConfig } from "@firmcode/shared";
 import { API_RUNTIME_CONFIG, apiRuntimeConfigProvider } from "../../../config/api-config.provider";
+import {
+  GITHUB_PR_ACTIVITY_PUBLISHER,
+  GitHubAppPullRequestActivityPublisher,
+  NoopGitHubPullRequestActivityPublisher
+} from "../../../infrastructure/github/github-pr-activity-publisher";
 import { BullMqReviewQueueProducer, InMemoryReviewQueueProducer, REVIEW_QUEUE } from "../../queues/review-queue";
 import { GitHubWebhookController } from "./github-webhook.controller";
 import { GITHUB_WEBHOOK_SECRET, GitHubWebhookService } from "./github-webhook.service";
@@ -47,6 +52,17 @@ import { PostgresGitHubWebhookStore } from "./postgres-github-webhook.store";
         }
 
         return new BullMqReviewQueueProducer(config.queue.redisUrl);
+      },
+      inject: [API_RUNTIME_CONFIG]
+    },
+    {
+      provide: GITHUB_PR_ACTIVITY_PUBLISHER,
+      useFactory: (config: ApiRuntimeConfig) => {
+        if (config.nodeEnv === "test") {
+          return new NoopGitHubPullRequestActivityPublisher();
+        }
+
+        return GitHubAppPullRequestActivityPublisher.fromConfig(config);
       },
       inject: [API_RUNTIME_CONFIG]
     },
