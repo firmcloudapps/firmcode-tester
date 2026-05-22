@@ -1,0 +1,7 @@
+rules:
+  - id: firmcode.test.dangerous-eval
+    message: Avoid eval on untrusted input.
+    severity: ERROR
+    languages:
+      - python
+    pattern: eval(...)
