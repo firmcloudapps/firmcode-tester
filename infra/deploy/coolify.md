@@ -7,8 +7,8 @@ Firmcode uses Coolify for long-running Docker services: the NestJS API in `apps/
 | Service | Coolify type | Image or build source | Exposed port | Health check |
 | --- | --- | --- | --- | --- |
 | Compose stack | Docker Compose | `docker-compose.prod.yml` | API `3001` only | service health checks |
-| API | Compose service | `${DOCKERHUB_NAMESPACE}/firmcode-api:${IMAGE_TAG:-latest}` | `3001` | `GET /health` on port `3001` |
-| Worker | Compose service | `${DOCKERHUB_NAMESPACE}/firmcode-worker:${IMAGE_TAG:-latest}` | none | `python -m firmcode_worker.runtime --check` |
+| API | Compose service | `obehiaye/firmcode-api:latest` | `3001` | `GET /health` on port `3001` |
+| Worker | Compose service | `obehiaye/firmcode-worker:latest` | none | `python -m firmcode_worker.runtime --check` |
 | Redis | Compose internal Redis or external managed Redis | `redis:7-alpine` or provider-managed | internal only | Redis `PING` |
 | NeonDB | external managed PostgreSQL | provider-managed | provider-managed | connection smoke from API and worker |
 
@@ -22,7 +22,7 @@ Coolify settings:
 
 | Setting | Value |
 | --- | --- |
-| Image | `${DOCKERHUB_NAMESPACE}/firmcode-api:${IMAGE_TAG:-latest}` |
+| Image | `obehiaye/firmcode-api:latest` |
 | Container port | `3001` |
 | Public domain | `https://firmcodeapi.firmoncloud.com` |
 | Health check path | `/health` |
@@ -55,14 +55,14 @@ API CORS must use explicit origins:
 CORS_ALLOWED_ORIGINS=https://firmcode.example.com,https://firmcode-git-main-owner.vercel.app,http://localhost:3000
 ```
 
-Coolify Compose compatibility note: `docker-compose.prod.yml` intentionally uses plain `${VARIABLE}` interpolation instead of `${VARIABLE:?message}`. Firmcode validates missing or malformed values at process startup, while plain interpolation avoids Coolify passing literal shell-expression strings into the container.
+Coolify Compose compatibility note: `docker-compose.prod.yml` uses `env_file: .env` for API and worker application settings. Coolify should generate this `.env` file from runtime-enabled environment variables for the Compose app.
 
-`docker-compose.prod.yml` explicitly passes required runtime variables through each service `environment` block. Do not commit `.env`; keep secrets in Coolify environment variables and let Compose interpolate them at deploy time. If Coolify does not provide a variable, the API's safe runtime diagnostics will report the unresolved or missing shape without printing secret values.
+The Compose `environment` blocks intentionally keep only fixed container-local values such as `NODE_ENV`, `PORT`, internal `REDIS_URL`, `DATABASE_SSL`, and `REVIEW_QUEUE_NAME`. Do not commit `.env`; keep secrets in Coolify environment variables and let Coolify write them to the Compose env file. If Coolify does not provide a variable, the API's safe runtime diagnostics will report the unresolved or missing shape without printing secret values.
 
 If the API exits with `ConfigValidationError` for missing `DATABASE_URL`, `GITHUB_APP_ID`, or `GITHUB_APP_PRIVATE_KEY`, check these Coolify settings before changing application code:
 
 - Deploy from `docker-compose.prod.yml`, not the standalone local compose file.
-- If using a standalone Dockerfile resource instead of the Compose stack, attach the variables to that exact API resource; Compose service-level variables will not apply.
+- If using a standalone Dockerfile resource instead of the Compose stack, attach the variables to that exact API resource; Compose `env_file` settings will not apply.
 - Confirm each variable is enabled for runtime, not build-only.
 - Redeploy or recreate the containers after editing variables; already-running containers will not pick up changed values.
 - Keep `GITHUB_APP_PRIVATE_KEY` as a single-line escaped-newline PEM or base64-encoded PEM in Coolify.
@@ -74,7 +74,7 @@ Coolify settings:
 
 | Setting | Value |
 | --- | --- |
-| Image | `${DOCKERHUB_NAMESPACE}/firmcode-worker:${IMAGE_TAG:-latest}` |
+| Image | `obehiaye/firmcode-worker:latest` |
 | Container port | none |
 | Public domain | none |
 | Health check command | `python -m firmcode_worker.runtime --check` |
@@ -145,7 +145,7 @@ The command builds the API package and applies pending migrations against `DATAB
 4. Configure Docker Hub credentials and image-publish secrets in GitHub Actions.
 5. Push to `main` and confirm the deploy workflow pushed `firmcode-api` and `firmcode-worker`.
 6. Create the Coolify Compose application from `docker-compose.prod.yml`.
-7. Configure production environment variables, including `DOCKERHUB_NAMESPACE` and optional `IMAGE_TAG`.
+7. Configure production environment variables for the Compose app so Coolify writes them to `.env`.
 8. Deploy API, worker, and Redis.
 9. Run the migration command from the API service.
 10. Keep one worker replica until live webhook processing is stable.

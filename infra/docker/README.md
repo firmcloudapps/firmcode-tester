@@ -45,7 +45,7 @@ API_PORT=3301 docker compose up --build api
 For a production/Coolify Compose render:
 
 ```bash
-DOCKERHUB_NAMESPACE=firmcloudapps IMAGE_TAG=latest docker compose -f docker-compose.prod.yml config --quiet
+docker compose -f docker-compose.prod.yml config --quiet
 ```
 
 Production Compose intentionally excludes PostgreSQL and the Next.js web app. NeonDB remains external, and the dashboard deploys separately to Vercel.
