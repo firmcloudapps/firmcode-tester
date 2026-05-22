@@ -2,6 +2,7 @@ import { BadRequestException, Inject, Injectable, UnauthorizedException } from "
 import { createHmac, timingSafeEqual } from "crypto";
 import { type ApiRuntimeConfig } from "@firmcode/shared";
 import { API_RUNTIME_CONFIG } from "../../../config/api-config.provider";
+import { REVIEW_QUEUE, type ReviewQueueProducer } from "../../queues/review-queue";
 import { isSupportedGitHubWebhookEvent } from "./github-webhook.events";
 import { GITHUB_WEBHOOK_STORE, type GitHubWebhookStore } from "./github-webhook.store";
 import { normalizePullRequestEvent, readPullRequestEventMetadata } from "./pull-request-event.normalizer";
@@ -41,10 +42,11 @@ export class GitHubWebhookService {
   constructor(
     @Inject(GITHUB_WEBHOOK_SECRET) private readonly webhookSecret: string,
     @Inject(GITHUB_WEBHOOK_STORE) private readonly store: GitHubWebhookStore,
+    @Inject(REVIEW_QUEUE) private readonly reviewQueue: ReviewQueueProducer,
     @Inject(API_RUNTIME_CONFIG) private readonly config: ApiRuntimeConfig
   ) {}
 
-  acceptDelivery(input: GitHubWebhookDeliveryInput): GitHubWebhookReceipt {
+  async acceptDelivery(input: GitHubWebhookDeliveryInput): Promise<GitHubWebhookReceipt> {
     this.verifySignature(input.signature, input.rawBody);
 
     if (input.rawBody === null) {
@@ -57,7 +59,7 @@ export class GitHubWebhookService {
     const deliveryId = this.readDeliveryId(input.deliveryId);
     const supported = isSupportedGitHubWebhookEvent({ eventName, action });
     const metadata = eventName === "pull_request" ? readPullRequestEventMetadata(payload) : null;
-    const deliveryResult = this.store.createDelivery({
+    const deliveryResult = await this.store.createDelivery({
       deliveryId,
       eventName,
       action,
@@ -89,7 +91,7 @@ export class GitHubWebhookService {
     }
 
     if (!supported) {
-      this.store.markDeliveryProcessed(deliveryId, "ignored");
+      await this.store.markDeliveryProcessed(deliveryId, "ignored");
 
       return {
         status: "accepted",
@@ -106,7 +108,7 @@ export class GitHubWebhookService {
     }
 
     if (eventName !== "pull_request") {
-      this.store.markDeliveryProcessed(deliveryId, "ignored");
+      await this.store.markDeliveryProcessed(deliveryId, "ignored");
 
       return {
         status: "accepted",
@@ -124,19 +126,19 @@ export class GitHubWebhookService {
 
     try {
       const normalized = normalizePullRequestEvent(payload);
-      const installation = this.store.upsertInstallation(normalized.installation);
-      const repository = this.store.upsertRepository({
+      const installation = await this.store.upsertInstallation(normalized.installation);
+      const repository = await this.store.upsertRepository({
         ...normalized.repository,
         installationId: installation.id,
         enabled: true
       });
-      const pullRequest = this.store.upsertPullRequest({
+      const pullRequest = await this.store.upsertPullRequest({
         ...normalized.pullRequest,
         repositoryId: repository.id
       });
 
       if (pullRequest.draft && this.config.review.skipDraftPullRequests) {
-        this.store.markDeliveryProcessed(deliveryId, "ignored");
+        await this.store.markDeliveryProcessed(deliveryId, "ignored");
 
         return {
           status: "accepted",
@@ -153,7 +155,7 @@ export class GitHubWebhookService {
       }
 
       if (action === "synchronize") {
-        this.store.supersedeQueuedOrRunningReviewRuns({
+        await this.store.supersedeQueuedOrRunningReviewRuns({
           pullRequestId: pullRequest.id,
           headSha: pullRequest.headSha,
           supersededByDeliveryId: deliveryId
@@ -161,14 +163,14 @@ export class GitHubWebhookService {
       }
 
       const triggerEvent = `${eventName}.${action}`;
-      const reviewRun = this.store.createReviewRun({
+      const reviewRun = await this.store.createReviewRun({
         repositoryId: repository.id,
         pullRequestId: pullRequest.id,
         deliveryId,
         triggerEvent,
         headSha: pullRequest.headSha
       });
-      const job = this.store.enqueuePullRequestReview({
+      const job = await this.reviewQueue.enqueuePullRequestReview({
         deliveryId,
         reviewRunId: reviewRun.id,
         repositoryId: repository.id,
@@ -178,7 +180,7 @@ export class GitHubWebhookService {
         triggerEvent
       });
 
-      this.store.markDeliveryProcessed(deliveryId, "processed");
+      await this.store.markDeliveryProcessed(deliveryId, "processed");
 
       return {
         status: "accepted",
@@ -193,7 +195,7 @@ export class GitHubWebhookService {
         jobId: job.id
       };
     } catch (error) {
-      this.store.markDeliveryProcessed(deliveryId, "failed", error instanceof Error ? error.message : "unknown error");
+      await this.store.markDeliveryProcessed(deliveryId, "failed", error instanceof Error ? error.message : "unknown error");
       throw error;
     }
   }

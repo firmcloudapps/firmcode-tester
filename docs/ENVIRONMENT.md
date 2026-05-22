@@ -22,6 +22,7 @@ Firmcode should use typed configuration validation in every runtime. Missing req
 | `DATABASE_URL` | yes | NeonDB/PostgreSQL connection string using the `postgres://` or `postgresql://` scheme and a database name. |
 | `DATABASE_SSL` | api/worker | Enable SSL for NeonDB. Default to `true` locally and in production. |
 | `REDIS_URL` | yes | Redis connection string for BullMQ. |
+| `REVIEW_QUEUE_NAME` | worker | BullMQ review queue to consume. Defaults to `review-runs`. |
 
 Local development uses NeonDB, not a local PostgreSQL container. NeonDB connection strings should keep the provider's SSL mode and set `DATABASE_SSL=true` in API and worker environments.
 

@@ -1,6 +1,8 @@
 import { randomUUID } from "crypto";
 import type { ReviewRunStatus } from "@firmcode/shared";
 
+type MaybePromise<T> = T | Promise<T>;
+
 export type GitHubDeliveryStatus = "processing" | "processed" | "ignored" | "failed";
 
 export interface GitHubDeliveryInput {
@@ -119,34 +121,21 @@ export interface ReviewRunPublishCheck {
   currentHeadSha: string;
 }
 
-export interface ReviewJobInput {
-  deliveryId: string;
-  reviewRunId: string;
-  repositoryId: string;
-  pullRequestId: string;
-  pullRequestNumber: number;
-  headSha: string;
-  triggerEvent: string;
-}
-
-export interface ReviewJobRecord extends ReviewJobInput {
-  id: string;
-  name: "review.pull_request";
-  createdAt: Date;
-}
-
 export interface GitHubWebhookStore {
-  createDelivery(input: GitHubDeliveryInput): { created: boolean; delivery: GitHubDeliveryRecord };
-  markDeliveryProcessed(deliveryId: string, status: Exclude<GitHubDeliveryStatus, "processing">, error?: string): void;
-  upsertInstallation(input: GitHubInstallationUpsert): GitHubInstallationRecord;
-  upsertRepository(input: RepositoryUpsert): RepositoryRecord;
-  upsertPullRequest(input: PullRequestUpsert): PullRequestRecord;
-  createReviewRun(input: ReviewRunInput): ReviewRunRecord;
-  findReviewRun(reviewRunId: string): ReviewRunRecord | null;
-  updateReviewRunStatus(input: ReviewRunStatusUpdate): ReviewRunRecord | null;
-  supersedeQueuedOrRunningReviewRuns(input: SupersedeReviewRunsInput): ReviewRunRecord[];
-  verifyReviewRunHeadBeforePublishing(input: ReviewRunPublishCheckInput): ReviewRunPublishCheck;
-  enqueuePullRequestReview(input: ReviewJobInput): ReviewJobRecord;
+  createDelivery(input: GitHubDeliveryInput): MaybePromise<{ created: boolean; delivery: GitHubDeliveryRecord }>;
+  markDeliveryProcessed(
+    deliveryId: string,
+    status: Exclude<GitHubDeliveryStatus, "processing">,
+    error?: string
+  ): MaybePromise<void>;
+  upsertInstallation(input: GitHubInstallationUpsert): MaybePromise<GitHubInstallationRecord>;
+  upsertRepository(input: RepositoryUpsert): MaybePromise<RepositoryRecord>;
+  upsertPullRequest(input: PullRequestUpsert): MaybePromise<PullRequestRecord>;
+  createReviewRun(input: ReviewRunInput): MaybePromise<ReviewRunRecord>;
+  findReviewRun(reviewRunId: string): MaybePromise<ReviewRunRecord | null>;
+  updateReviewRunStatus(input: ReviewRunStatusUpdate): MaybePromise<ReviewRunRecord | null>;
+  supersedeQueuedOrRunningReviewRuns(input: SupersedeReviewRunsInput): MaybePromise<ReviewRunRecord[]>;
+  verifyReviewRunHeadBeforePublishing(input: ReviewRunPublishCheckInput): MaybePromise<ReviewRunPublishCheck>;
 }
 
 export const GITHUB_WEBHOOK_STORE = Symbol("GITHUB_WEBHOOK_STORE");
@@ -160,7 +149,6 @@ export class InMemoryGitHubWebhookStore implements GitHubWebhookStore {
   readonly repositories = new Map<number, RepositoryRecord>();
   readonly pullRequests = new Map<string, PullRequestRecord>();
   readonly reviewRuns: ReviewRunRecord[] = [];
-  readonly reviewJobs = new Map<string, ReviewJobRecord>();
 
   createDelivery(input: GitHubDeliveryInput): { created: boolean; delivery: GitHubDeliveryRecord } {
     const existing = this.deliveries.get(input.deliveryId);
@@ -346,24 +334,6 @@ export class InMemoryGitHubWebhookStore implements GitHubWebhookStore {
       reviewRun,
       currentHeadSha: input.currentHeadSha
     };
-  }
-
-  enqueuePullRequestReview(input: ReviewJobInput): ReviewJobRecord {
-    const existing = this.reviewJobs.get(input.deliveryId);
-
-    if (existing !== undefined) {
-      return existing;
-    }
-
-    const job: ReviewJobRecord = {
-      id: input.deliveryId,
-      name: "review.pull_request",
-      ...input,
-      createdAt: new Date()
-    };
-    this.reviewJobs.set(input.deliveryId, job);
-
-    return job;
   }
 
   private replaceReviewRun(updatedReviewRun: ReviewRunRecord): ReviewRunRecord {

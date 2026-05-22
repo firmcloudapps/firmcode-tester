@@ -11,8 +11,6 @@ import type {
   PullRequestUpsert,
   RepositoryRecord,
   RepositoryUpsert,
-  ReviewJobInput,
-  ReviewJobRecord,
   ReviewRunInput,
   ReviewRunPublishCheck,
   ReviewRunPublishCheckInput,
@@ -390,15 +388,6 @@ RETURNING *
       reason: null,
       reviewRun,
       currentHeadSha: input.currentHeadSha
-    };
-  }
-
-  enqueuePullRequestReview(input: ReviewJobInput): ReviewJobRecord {
-    return {
-      id: input.deliveryId,
-      name: "review.pull_request",
-      ...input,
-      createdAt: new Date()
     };
   }
 }

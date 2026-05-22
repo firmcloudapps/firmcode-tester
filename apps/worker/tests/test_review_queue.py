@@ -1,0 +1,103 @@
+from __future__ import annotations
+
+import asyncio
+from dataclasses import dataclass, field
+
+import pytest
+
+from firmcode_worker.review_queue import (
+    ReviewJobPayload,
+    ReviewWorkerError,
+    process_review_pull_request_job,
+    review_job_payload_from_mapping,
+)
+
+
+class RecordingReviewRunRepository:
+    def __init__(self) -> None:
+        self.events: list[tuple[str, str, str | None, str | None]] = []
+
+    async def mark_running(self, review_run_id: str) -> None:
+        self.events.append(("running", review_run_id, None, None))
+
+    async def mark_succeeded(self, review_run_id: str) -> None:
+        self.events.append(("succeeded", review_run_id, None, None))
+
+    async def mark_failed(self, review_run_id: str, error_code: str, error_message: str) -> None:
+        self.events.append(("failed", review_run_id, error_code, error_message))
+
+
+@dataclass
+class StubReviewPipeline:
+    error: Exception | None = None
+    payloads: list[ReviewJobPayload] = field(default_factory=list)
+
+    async def run(self, payload: ReviewJobPayload) -> None:
+        self.payloads.append(payload)
+        if self.error is not None:
+            raise self.error
+
+
+def test_review_job_payload_from_mapping_validates_required_fields() -> None:
+    payload = review_job_payload_from_mapping(
+        {
+            "deliveryId": "delivery-1",
+            "reviewRunId": "run-1",
+            "repositoryId": "repo-1",
+            "pullRequestId": "pr-1",
+            "pullRequestNumber": 7,
+            "headSha": "abc123",
+            "triggerEvent": "pull_request.opened",
+        }
+    )
+
+    assert payload.review_run_id == "run-1"
+    assert payload.pull_request_number == 7
+
+
+def test_review_job_payload_rejects_missing_fields() -> None:
+    with pytest.raises(ReviewWorkerError) as error:
+        review_job_payload_from_mapping({"deliveryId": "delivery-1"})
+
+    assert error.value.error_code == "invalid_job_payload"
+    assert "reviewRunId" in str(error.value)
+
+
+def test_review_worker_lifecycle_marks_run_succeeded() -> None:
+    repository = RecordingReviewRunRepository()
+    pipeline = StubReviewPipeline()
+    payload = _payload()
+
+    asyncio.run(process_review_pull_request_job(payload, repository, pipeline))
+
+    assert pipeline.payloads == [payload]
+    assert repository.events == [
+        ("running", "run-1", None, None),
+        ("succeeded", "run-1", None, None),
+    ]
+
+
+def test_review_worker_lifecycle_marks_run_failed_and_reraises() -> None:
+    repository = RecordingReviewRunRepository()
+    pipeline = StubReviewPipeline(error=ReviewWorkerError("transient_github_error", "GitHub timed out"))
+    payload = _payload()
+
+    with pytest.raises(ReviewWorkerError):
+        asyncio.run(process_review_pull_request_job(payload, repository, pipeline))
+
+    assert repository.events == [
+        ("running", "run-1", None, None),
+        ("failed", "run-1", "transient_github_error", "GitHub timed out"),
+    ]
+
+
+def _payload() -> ReviewJobPayload:
+    return ReviewJobPayload(
+        delivery_id="delivery-1",
+        review_run_id="run-1",
+        repository_id="repo-1",
+        pull_request_id="pr-1",
+        pull_request_number=7,
+        head_sha="abc123",
+        trigger_event="pull_request.opened",
+    )
