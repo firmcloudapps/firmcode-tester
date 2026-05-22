@@ -22,8 +22,17 @@ Firmcode should use typed configuration validation in every runtime. Missing req
 | `DATABASE_URL` | yes | NeonDB/PostgreSQL connection string using the `postgres://` or `postgresql://` scheme and a database name. |
 | `DATABASE_SSL` | api/worker | Enable SSL for NeonDB. Default to `true` locally and in production. |
 | `REDIS_URL` | yes | Redis connection string for BullMQ. |
+| `REVIEW_QUEUE_NAME` | worker | BullMQ review queue to consume. Defaults to `review-runs`. |
 
 Local development uses NeonDB, not a local PostgreSQL container. NeonDB connection strings should keep the provider's SSL mode and set `DATABASE_SSL=true` in API and worker environments.
+
+Run database migrations from the repository root with:
+
+```bash
+npm run db:migrate
+```
+
+The command builds the API package and applies pending migrations against `DATABASE_URL`.
 
 Inside Docker Compose, API and worker receive the same external NeonDB URL from the host environment:
 
@@ -75,8 +84,16 @@ Clerk owns sign-in, sign-up, sessions, user profile, organizations where enabled
 | `REVIEW_MAX_INLINE_COMMENTS` | no | Default max inline comments per PR. |
 | `REVIEW_MIN_SEVERITY` | no | Minimum severity for inline comments. |
 | `REVIEW_SKIP_DRAFT_PRS` | no | Skip draft PRs by default. |
-| `REVIEW_MAX_FILES` | no | Max files before large-PR mode. |
-| `REVIEW_MAX_DIFF_BYTES` | no | Max diff bytes before large-PR mode. |
+| `REVIEW_LARGE_PR_MAX_CHANGED_FILES` | no | Changed-file count before prioritized large-PR mode. |
+| `REVIEW_LARGE_PR_MAX_DIFF_BYTES` | no | Total diff bytes before prioritized large-PR mode. |
+| `REVIEW_LARGE_PR_MAX_CHANGED_LINES` | no | Total added plus deleted lines before prioritized large-PR mode. |
+| `REVIEW_LARGE_PR_MAX_ESTIMATED_TOKENS` | no | Estimated prompt tokens before prioritized large-PR mode. |
+| `REVIEW_LARGE_PR_MAX_FILTERED_FILES` | no | Max files after generated/vendor filtering before prioritized mode. |
+| `REVIEW_LARGE_PR_MAX_SEMGREP_RUNTIME_MS` | no | Semgrep runtime budget before prioritized mode. |
+| `REVIEW_LARGE_PR_MAX_FULL_CONTEXT_FILES` | no | Max full-context files retained in prioritized mode before summarizing lower-priority files. |
+| `REVIEW_SUMMARY_ONLY_DIFF_BYTES` | no | Diff-byte threshold for summary-only mode. |
+| `REVIEW_SUMMARY_ONLY_CHANGED_LINES` | no | Changed-line threshold for summary-only mode. |
+| `REVIEW_SUMMARY_ONLY_ESTIMATED_TOKENS` | no | Estimated-token threshold for summary-only mode. |
 | `ARTIFACT_RETENTION_DAYS` | no | Default artifact retention. |
 
 ## Semgrep

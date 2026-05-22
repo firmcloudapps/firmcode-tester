@@ -1,23 +1,25 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import importlib.util
 import json
 import os
-import signal
 import socket
 import subprocess
 import sys
-import time
 from dataclasses import dataclass
 from typing import Mapping
 from urllib.parse import urlparse
+
+from firmcode_worker.review_queue import REVIEW_QUEUE_NAME, run_bullmq_review_worker
 
 
 @dataclass(frozen=True)
 class WorkerRuntimeConfig:
     database_url: str
     redis_url: str
+    queue_name: str
     log_level: str
 
 
@@ -40,6 +42,7 @@ def load_worker_config(env: Mapping[str, str] = os.environ) -> WorkerRuntimeConf
     return WorkerRuntimeConfig(
         database_url=database_url,
         redis_url=redis_url,
+        queue_name=env.get("REVIEW_QUEUE_NAME", REVIEW_QUEUE_NAME),
         log_level=env.get("LOG_LEVEL", "info"),
     )
 
@@ -78,23 +81,18 @@ def main(argv: list[str] | None = None) -> int:
     if status != "ok":
         return 1
 
-    _log("worker.queue.connected", status="ok")
-    return _run_forever()
+    _log("worker.queue.connected", status="ok", queue=config.queue_name)
+    return asyncio.run(
+        _run_worker(
+            database_url=config.database_url,
+            redis_url=config.redis_url,
+            queue_name=config.queue_name,
+        )
+    )
 
 
-def _run_forever() -> int:
-    should_stop = False
-
-    def stop(_signum: int, _frame: object) -> None:
-        nonlocal should_stop
-        should_stop = True
-
-    signal.signal(signal.SIGTERM, stop)
-    signal.signal(signal.SIGINT, stop)
-
-    while not should_stop:
-        time.sleep(5)
-
+async def _run_worker(database_url: str, redis_url: str, queue_name: str) -> int:
+    await run_bullmq_review_worker(database_url=database_url, redis_url=redis_url, queue_name=queue_name)
     _log("worker.shutdown", status="ok")
     return 0
 

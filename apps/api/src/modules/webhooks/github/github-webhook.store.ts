@@ -1,6 +1,8 @@
 import { randomUUID } from "crypto";
 import type { ReviewRunStatus } from "@firmcode/shared";
 
+type MaybePromise<T> = T | Promise<T>;
+
 export type GitHubDeliveryStatus = "processing" | "processed" | "ignored" | "failed";
 
 export interface GitHubDeliveryInput {
@@ -89,33 +91,57 @@ export interface ReviewRunRecord extends ReviewRunInput {
   createdAt: Date;
 }
 
-export interface ReviewJobInput {
-  deliveryId: string;
-  reviewRunId: string;
-  repositoryId: string;
+export interface SupersedeReviewRunsInput {
   pullRequestId: string;
-  pullRequestNumber: number;
   headSha: string;
-  triggerEvent: string;
+  supersededByDeliveryId: string;
 }
 
-export interface ReviewJobRecord extends ReviewJobInput {
-  id: string;
-  name: "review.pull_request";
-  createdAt: Date;
+export interface ReviewRunStatusUpdate {
+  reviewRunId: string;
+  status: ReviewRunStatus;
+  errorCode?: string | null;
+  errorMessage?: string | null;
+}
+
+export interface ReviewRunPublishCheckInput {
+  reviewRunId: string;
+  currentHeadSha: string;
+}
+
+export type ReviewRunPublishBlockedReason =
+  | "review_run_not_found"
+  | "review_run_superseded"
+  | "head_sha_changed";
+
+export interface ReviewRunPublishCheck {
+  publishable: boolean;
+  reason: ReviewRunPublishBlockedReason | null;
+  reviewRun: ReviewRunRecord | null;
+  currentHeadSha: string;
 }
 
 export interface GitHubWebhookStore {
-  createDelivery(input: GitHubDeliveryInput): { created: boolean; delivery: GitHubDeliveryRecord };
-  markDeliveryProcessed(deliveryId: string, status: Exclude<GitHubDeliveryStatus, "processing">, error?: string): void;
-  upsertInstallation(input: GitHubInstallationUpsert): GitHubInstallationRecord;
-  upsertRepository(input: RepositoryUpsert): RepositoryRecord;
-  upsertPullRequest(input: PullRequestUpsert): PullRequestRecord;
-  createReviewRun(input: ReviewRunInput): ReviewRunRecord;
-  enqueuePullRequestReview(input: ReviewJobInput): ReviewJobRecord;
+  createDelivery(input: GitHubDeliveryInput): MaybePromise<{ created: boolean; delivery: GitHubDeliveryRecord }>;
+  markDeliveryProcessed(
+    deliveryId: string,
+    status: Exclude<GitHubDeliveryStatus, "processing">,
+    error?: string
+  ): MaybePromise<void>;
+  upsertInstallation(input: GitHubInstallationUpsert): MaybePromise<GitHubInstallationRecord>;
+  upsertRepository(input: RepositoryUpsert): MaybePromise<RepositoryRecord>;
+  upsertPullRequest(input: PullRequestUpsert): MaybePromise<PullRequestRecord>;
+  createReviewRun(input: ReviewRunInput): MaybePromise<ReviewRunRecord>;
+  findReviewRun(reviewRunId: string): MaybePromise<ReviewRunRecord | null>;
+  updateReviewRunStatus(input: ReviewRunStatusUpdate): MaybePromise<ReviewRunRecord | null>;
+  supersedeQueuedOrRunningReviewRuns(input: SupersedeReviewRunsInput): MaybePromise<ReviewRunRecord[]>;
+  verifyReviewRunHeadBeforePublishing(input: ReviewRunPublishCheckInput): MaybePromise<ReviewRunPublishCheck>;
 }
 
 export const GITHUB_WEBHOOK_STORE = Symbol("GITHUB_WEBHOOK_STORE");
+
+const SUPERSEDABLE_REVIEW_RUN_STATUSES = new Set<ReviewRunStatus>(["queued", "running"]);
+const FINISHED_REVIEW_RUN_STATUSES = new Set<ReviewRunStatus>(["succeeded", "failed", "superseded"]);
 
 export class InMemoryGitHubWebhookStore implements GitHubWebhookStore {
   readonly deliveries = new Map<string, GitHubDeliveryRecord>();
@@ -123,7 +149,6 @@ export class InMemoryGitHubWebhookStore implements GitHubWebhookStore {
   readonly repositories = new Map<number, RepositoryRecord>();
   readonly pullRequests = new Map<string, PullRequestRecord>();
   readonly reviewRuns: ReviewRunRecord[] = [];
-  readonly reviewJobs = new Map<string, ReviewJobRecord>();
 
   createDelivery(input: GitHubDeliveryInput): { created: boolean; delivery: GitHubDeliveryRecord } {
     const existing = this.deliveries.get(input.deliveryId);
@@ -219,21 +244,105 @@ export class InMemoryGitHubWebhookStore implements GitHubWebhookStore {
     return reviewRun;
   }
 
-  enqueuePullRequestReview(input: ReviewJobInput): ReviewJobRecord {
-    const existing = this.reviewJobs.get(input.deliveryId);
+  findReviewRun(reviewRunId: string): ReviewRunRecord | null {
+    return this.reviewRuns.find((reviewRun) => reviewRun.id === reviewRunId) ?? null;
+  }
 
-    if (existing !== undefined) {
-      return existing;
+  updateReviewRunStatus(input: ReviewRunStatusUpdate): ReviewRunRecord | null {
+    const existing = this.findReviewRun(input.reviewRunId);
+
+    if (existing === null) {
+      return null;
     }
 
-    const job: ReviewJobRecord = {
-      id: input.deliveryId,
-      name: "review.pull_request",
-      ...input,
-      createdAt: new Date()
-    };
-    this.reviewJobs.set(input.deliveryId, job);
+    return this.replaceReviewRun({
+      ...existing,
+      status: input.status,
+      startedAt: input.status === "running" ? existing.startedAt ?? new Date() : existing.startedAt,
+      finishedAt: FINISHED_REVIEW_RUN_STATUSES.has(input.status) ? existing.finishedAt ?? new Date() : existing.finishedAt,
+      errorCode: input.errorCode === undefined ? existing.errorCode : input.errorCode,
+      errorMessage: input.errorMessage === undefined ? existing.errorMessage : input.errorMessage
+    });
+  }
 
-    return job;
+  supersedeQueuedOrRunningReviewRuns(input: SupersedeReviewRunsInput): ReviewRunRecord[] {
+    const supersededAt = new Date();
+    const supersededRuns: ReviewRunRecord[] = [];
+
+    for (const reviewRun of this.reviewRuns) {
+      if (
+        reviewRun.pullRequestId === input.pullRequestId &&
+        reviewRun.headSha !== input.headSha &&
+        SUPERSEDABLE_REVIEW_RUN_STATUSES.has(reviewRun.status)
+      ) {
+        const supersededRun = this.replaceReviewRun({
+          ...reviewRun,
+          status: "superseded",
+          finishedAt: reviewRun.finishedAt ?? supersededAt,
+          errorCode: "superseded_by_new_head",
+          errorMessage: `Superseded by delivery ${input.supersededByDeliveryId} for head ${input.headSha}`
+        });
+
+        supersededRuns.push(supersededRun);
+      }
+    }
+
+    return supersededRuns;
+  }
+
+  verifyReviewRunHeadBeforePublishing(input: ReviewRunPublishCheckInput): ReviewRunPublishCheck {
+    const reviewRun = this.findReviewRun(input.reviewRunId);
+
+    if (reviewRun === null) {
+      return {
+        publishable: false,
+        reason: "review_run_not_found",
+        reviewRun: null,
+        currentHeadSha: input.currentHeadSha
+      };
+    }
+
+    if (reviewRun.status === "superseded") {
+      return {
+        publishable: false,
+        reason: "review_run_superseded",
+        reviewRun,
+        currentHeadSha: input.currentHeadSha
+      };
+    }
+
+    if (reviewRun.headSha !== input.currentHeadSha) {
+      const supersededRun = this.replaceReviewRun({
+        ...reviewRun,
+        status: "superseded",
+        finishedAt: reviewRun.finishedAt ?? new Date(),
+        errorCode: "current_head_sha_changed",
+        errorMessage: `Skipped publishing because current PR head is ${input.currentHeadSha}`
+      });
+
+      return {
+        publishable: false,
+        reason: "head_sha_changed",
+        reviewRun: supersededRun,
+        currentHeadSha: input.currentHeadSha
+      };
+    }
+
+    return {
+      publishable: true,
+      reason: null,
+      reviewRun,
+      currentHeadSha: input.currentHeadSha
+    };
+  }
+
+  private replaceReviewRun(updatedReviewRun: ReviewRunRecord): ReviewRunRecord {
+    const index = this.reviewRuns.findIndex((reviewRun) => reviewRun.id === updatedReviewRun.id);
+
+    if (index >= 0) {
+      this.reviewRuns[index] = updatedReviewRun;
+    }
+
+    return updatedReviewRun;
   }
 }

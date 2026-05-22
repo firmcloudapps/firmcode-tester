@@ -9,7 +9,6 @@ on:
 concurrency:
   group: deploy-${{ github.ref }}
   cancel-in-progress: true
-  
 
 env:
   COOLIFY_URL: https://coolify.firmoncloud.com

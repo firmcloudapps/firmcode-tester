@@ -3,6 +3,7 @@ export const REVIEW_RUN_STATUSES = [
   "running",
   "succeeded",
   "failed",
+  "cancelled",
   "superseded"
 ] as const;
 

@@ -12,7 +12,7 @@ export class GitHubWebhookController {
     @Headers("x-hub-signature-256") signature: string | string[] | undefined,
     @Headers("x-github-event") eventName: string | string[] | undefined,
     @Headers("x-github-delivery") deliveryId: string | string[] | undefined
-  ): GitHubWebhookReceipt {
+  ): Promise<GitHubWebhookReceipt> {
     return this.webhookService.acceptDelivery({
       rawBody: Buffer.isBuffer(body) ? body : null,
       signature,

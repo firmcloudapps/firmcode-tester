@@ -11,6 +11,7 @@ def test_worker_config_requires_database_and_redis_urls() -> None:
 
     assert config.database_url.startswith("postgresql://")
     assert config.redis_url == "redis://redis:6379"
+    assert config.queue_name == "review-runs"
 
 
 def test_worker_config_rejects_invalid_redis_url() -> None:

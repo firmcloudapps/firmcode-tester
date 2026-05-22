@@ -102,13 +102,20 @@ Local development remains Docker-first for the API and worker using Docker Compo
 
 Every feature that touches API or worker runtime behavior should pass the Docker Compose smoke path before it is considered done. Dashboard changes should pass the local Next.js and Vercel build paths.
 
+Use separate Compose files for local and production:
+
+- `docker-compose.yml`: local backend stack for API, worker, and Redis.
+- `docker-compose.prod.yml`: production/Coolify backend stack for API, worker, and internal Redis.
+
+Neither Compose file runs PostgreSQL or the Next.js dashboard. PostgreSQL is NeonDB, and the dashboard deploys to Vercel.
+
 ## Required URLs
 
 | Name | Example | Used By |
 | --- | --- | --- |
 | Web URL | `https://firmcode.example.com` | Clerk redirects, user dashboard |
-| API URL | `https://api.firmcode.example.com` | Vercel web, GitHub webhooks |
-| GitHub webhook URL | `https://api.firmcode.example.com/webhooks/github` | GitHub App |
+| API URL | `https://firmcodeapi.firmoncloud.com` | Vercel web, GitHub webhooks |
+| GitHub webhook URL | `https://firmcodeapi.firmoncloud.com/webhooks/github` | GitHub App |
 | Clerk callback URLs | Vercel production and preview URLs | Clerk |
 
 ## CORS Policy
@@ -123,11 +130,13 @@ The API must not use wildcard CORS in production.
 
 ## Deployment Artifacts
 
-Implementation should create:
+Deployment artifacts:
 
 - Vercel project config notes for `apps/web`.
 - Coolify service notes for `apps/api`.
 - Coolify service notes for `apps/worker`.
+- Production Compose file `docker-compose.prod.yml`.
+- Production backend Dockerfiles in `infra/docker/*.prod.Dockerfile`.
 - Redis deployment notes.
 - NeonDB connection notes.
 - Migration command notes.
