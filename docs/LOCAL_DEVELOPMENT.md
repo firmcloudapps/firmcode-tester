@@ -38,7 +38,7 @@ docker compose up --build
 Production/Coolify Compose is separate:
 
 ```bash
-docker compose -f docker-compose.prod.yml --env-file .env config
+DOCKERHUB_NAMESPACE=firmcloudapps IMAGE_TAG=latest docker compose -f docker-compose.prod.yml config --quiet
 ```
 
 Task 0.2 smoke workflow:

@@ -4,15 +4,15 @@ Firmcode uses Coolify for long-running Docker services: the NestJS API in `apps/
 
 ## Production Services
 
-| Service | Coolify type | Build context | Dockerfile | Exposed port | Health check |
-| --- | --- | --- | --- | --- | --- |
-| Compose stack | Docker Compose | repository root `.` | `docker-compose.prod.yml` | API `3001` only | service health checks |
-| API | Docker service | repository root `.` | `infra/docker/api.prod.Dockerfile` | `3001` | `GET /health` on port `3001` |
-| Worker | Docker service | repository root `.` | `infra/docker/worker.prod.Dockerfile` | none | `python -m firmcode_worker.runtime --check` |
-| Redis | Compose internal Redis or external managed Redis | provider-managed or Compose | provider-managed or `redis:7-alpine` | internal only | Redis `PING` |
-| NeonDB | external managed PostgreSQL | not built by Coolify | not applicable | provider-managed | connection smoke from API and worker |
+| Service | Coolify type | Image or build source | Exposed port | Health check |
+| --- | --- | --- | --- | --- |
+| Compose stack | Docker Compose | `docker-compose.prod.yml` | API `3001` only | service health checks |
+| API | Compose service | `${DOCKERHUB_NAMESPACE}/firmcode-api:${IMAGE_TAG:-latest}` | `3001` | `GET /health` on port `3001` |
+| Worker | Compose service | `${DOCKERHUB_NAMESPACE}/firmcode-worker:${IMAGE_TAG:-latest}` | none | `python -m firmcode_worker.runtime --check` |
+| Redis | Compose internal Redis or external managed Redis | `redis:7-alpine` or provider-managed | internal only | Redis `PING` |
+| NeonDB | external managed PostgreSQL | provider-managed | provider-managed | connection smoke from API and worker |
 
-Use the repository root as the Docker build context so the API image can copy root workspace metadata and `packages/shared`.
+GitHub Actions builds and pushes the API and worker images to Docker Hub. Coolify should deploy the Compose stack by pulling those images, not by rebuilding the API or worker from source.
 
 Prefer deploying `docker-compose.prod.yml` in Coolify so API, worker, and Redis remain one production backend stack. The production Compose file intentionally excludes PostgreSQL and the Next.js web service.
 
@@ -22,8 +22,7 @@ Coolify settings:
 
 | Setting | Value |
 | --- | --- |
-| Build context | `.` |
-| Dockerfile path | `infra/docker/api.prod.Dockerfile` |
+| Image | `${DOCKERHUB_NAMESPACE}/firmcode-api:${IMAGE_TAG:-latest}` |
 | Container port | `3001` |
 | Public domain | `https://firmcodeapi.firmoncloud.com` |
 | Health check path | `/health` |
@@ -75,8 +74,7 @@ Coolify settings:
 
 | Setting | Value |
 | --- | --- |
-| Build context | `.` |
-| Dockerfile path | `infra/docker/worker.prod.Dockerfile` |
+| Image | `${DOCKERHUB_NAMESPACE}/firmcode-worker:${IMAGE_TAG:-latest}` |
 | Container port | none |
 | Public domain | none |
 | Health check command | `python -m firmcode_worker.runtime --check` |
@@ -144,14 +142,17 @@ The command builds the API package and applies pending migrations against `DATAB
 1. Provision NeonDB and copy the pooled `DATABASE_URL`.
 2. Provision Clerk and configure dashboard callback URLs.
 3. Provision Redis through Coolify or a managed Redis provider.
-4. Create the Coolify Compose application from `docker-compose.prod.yml`.
-5. Configure production environment variables and deploy API, worker, and Redis.
-6. Run the migration command from the API service.
-7. Keep one worker replica until live webhook processing is stable.
-8. Deploy the Vercel dashboard with `NEXT_PUBLIC_API_URL` pointing to the API URL.
-9. Add Vercel production and preview origins to API `CORS_ALLOWED_ORIGINS`.
-10. Configure GitHub App webhook URL: `https://firmcodeapi.firmoncloud.com/webhooks/github`.
-11. Run a synthetic dry-run review before setting `DRY_RUN=false`.
+4. Configure Docker Hub credentials and image-publish secrets in GitHub Actions.
+5. Push to `main` and confirm the deploy workflow pushed `firmcode-api` and `firmcode-worker`.
+6. Create the Coolify Compose application from `docker-compose.prod.yml`.
+7. Configure production environment variables, including `DOCKERHUB_NAMESPACE` and optional `IMAGE_TAG`.
+8. Deploy API, worker, and Redis.
+9. Run the migration command from the API service.
+10. Keep one worker replica until live webhook processing is stable.
+11. Deploy the Vercel dashboard with `NEXT_PUBLIC_API_URL` pointing to the API URL.
+12. Add Vercel production and preview origins to API `CORS_ALLOWED_ORIGINS`.
+13. Configure GitHub App webhook URL: `https://firmcodeapi.firmoncloud.com/webhooks/github`.
+14. Run a synthetic dry-run review before setting `DRY_RUN=false`.
 
 ## Rollback Notes
 
@@ -180,8 +181,8 @@ The local Docker Compose stack mirrors Coolify service boundaries:
 
 | Local Compose | Deployed Target | Notes |
 | --- | --- | --- |
-| `api` | Coolify API service | Same service boundary, local Dockerfile `api.Dockerfile`, production Dockerfile `api.prod.Dockerfile`, container port `3001`, and `/health` check. |
-| `worker` | Coolify worker service | Same service boundary, local Dockerfile `worker.Dockerfile`, production Dockerfile `worker.prod.Dockerfile`, and runtime health command. |
+| `api` | Coolify API service | Same service boundary, local Dockerfile `api.Dockerfile`, production image `firmcode-api`, container port `3001`, and `/health` check. |
+| `worker` | Coolify worker service | Same service boundary, local Dockerfile `worker.Dockerfile`, production image `firmcode-worker`, and runtime health command. |
 | `redis` | Coolify Redis or managed Redis | Local URL is `redis://redis:6379`; deployed URL comes from provider. |
 | Host-provided `DATABASE_URL` | NeonDB | Compose and Coolify both use external NeonDB; neither runs PostgreSQL. |
 | Local web outside Compose | Vercel dashboard | Local web uses `NEXT_PUBLIC_API_URL=http://localhost:3001`; Vercel uses the public Coolify API URL. |

@@ -5,11 +5,11 @@ Firmcode uses Docker-first local development for the NestJS API and Python worke
 ## Files
 
 - `../../docker-compose.yml` defines the local `api`, `worker`, and `redis` stack.
-- `../../docker-compose.prod.yml` defines the production/Coolify `api`, `worker`, and internal `redis` stack.
+- `../../docker-compose.prod.yml` defines the production/Coolify `api`, `worker`, and internal `redis` stack that pulls prebuilt API and worker images from Docker Hub.
 - `api.Dockerfile` builds the local NestJS API image and runs `npm run start --workspace @firmcode/api`.
 - `worker.Dockerfile` builds the local Python worker image with Semgrep CLI and Tree-sitter runtime dependency.
-- `api.prod.Dockerfile` builds the production NestJS API image without copying `apps/web`.
-- `worker.prod.Dockerfile` builds the production Python worker image.
+- `api.prod.Dockerfile` builds the production NestJS API image without copying `apps/web`; GitHub Actions publishes it.
+- `worker.prod.Dockerfile` builds the production Python worker image; GitHub Actions publishes it.
 - `smoke.sh` builds the service images and checks container-network reachability.
 
 ## Smoke Path
@@ -45,8 +45,7 @@ API_PORT=3301 docker compose up --build api
 For a production/Coolify Compose render:
 
 ```bash
-docker compose -f docker-compose.prod.yml --env-file .env config
-docker compose -f docker-compose.prod.yml --env-file .env build api worker
+DOCKERHUB_NAMESPACE=firmcloudapps IMAGE_TAG=latest docker compose -f docker-compose.prod.yml config --quiet
 ```
 
 Production Compose intentionally excludes PostgreSQL and the Next.js web app. NeonDB remains external, and the dashboard deploys separately to Vercel.

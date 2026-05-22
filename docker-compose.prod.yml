@@ -12,9 +12,7 @@ services:
       retries: 10
 
   api:
-    build:
-      context: .
-      dockerfile: infra/docker/api.prod.Dockerfile
+    image: ${DOCKERHUB_NAMESPACE}/firmcode-api:${IMAGE_TAG:-latest}
     restart: unless-stopped
     environment:
       NODE_ENV: production
@@ -63,9 +61,7 @@ services:
       retries: 10
 
   worker:
-    build:
-      context: .
-      dockerfile: infra/docker/worker.prod.Dockerfile
+    image: ${DOCKERHUB_NAMESPACE}/firmcode-worker:${IMAGE_TAG:-latest}
     restart: unless-stopped
     environment:
       NODE_ENV: production
