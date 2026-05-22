@@ -152,6 +152,14 @@ export class GitHubWebhookService {
         };
       }
 
+      if (action === "synchronize") {
+        this.store.supersedeQueuedOrRunningReviewRuns({
+          pullRequestId: pullRequest.id,
+          headSha: pullRequest.headSha,
+          supersededByDeliveryId: deliveryId
+        });
+      }
+
       const triggerEvent = `${eventName}.${action}`;
       const reviewRun = this.store.createReviewRun({
         repositoryId: repository.id,

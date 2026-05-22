@@ -89,6 +89,36 @@ export interface ReviewRunRecord extends ReviewRunInput {
   createdAt: Date;
 }
 
+export interface SupersedeReviewRunsInput {
+  pullRequestId: string;
+  headSha: string;
+  supersededByDeliveryId: string;
+}
+
+export interface ReviewRunStatusUpdate {
+  reviewRunId: string;
+  status: ReviewRunStatus;
+  errorCode?: string | null;
+  errorMessage?: string | null;
+}
+
+export interface ReviewRunPublishCheckInput {
+  reviewRunId: string;
+  currentHeadSha: string;
+}
+
+export type ReviewRunPublishBlockedReason =
+  | "review_run_not_found"
+  | "review_run_superseded"
+  | "head_sha_changed";
+
+export interface ReviewRunPublishCheck {
+  publishable: boolean;
+  reason: ReviewRunPublishBlockedReason | null;
+  reviewRun: ReviewRunRecord | null;
+  currentHeadSha: string;
+}
+
 export interface ReviewJobInput {
   deliveryId: string;
   reviewRunId: string;
@@ -112,10 +142,17 @@ export interface GitHubWebhookStore {
   upsertRepository(input: RepositoryUpsert): RepositoryRecord;
   upsertPullRequest(input: PullRequestUpsert): PullRequestRecord;
   createReviewRun(input: ReviewRunInput): ReviewRunRecord;
+  findReviewRun(reviewRunId: string): ReviewRunRecord | null;
+  updateReviewRunStatus(input: ReviewRunStatusUpdate): ReviewRunRecord | null;
+  supersedeQueuedOrRunningReviewRuns(input: SupersedeReviewRunsInput): ReviewRunRecord[];
+  verifyReviewRunHeadBeforePublishing(input: ReviewRunPublishCheckInput): ReviewRunPublishCheck;
   enqueuePullRequestReview(input: ReviewJobInput): ReviewJobRecord;
 }
 
 export const GITHUB_WEBHOOK_STORE = Symbol("GITHUB_WEBHOOK_STORE");
+
+const SUPERSEDABLE_REVIEW_RUN_STATUSES = new Set<ReviewRunStatus>(["queued", "running"]);
+const FINISHED_REVIEW_RUN_STATUSES = new Set<ReviewRunStatus>(["succeeded", "failed", "superseded"]);
 
 export class InMemoryGitHubWebhookStore implements GitHubWebhookStore {
   readonly deliveries = new Map<string, GitHubDeliveryRecord>();
@@ -219,6 +256,98 @@ export class InMemoryGitHubWebhookStore implements GitHubWebhookStore {
     return reviewRun;
   }
 
+  findReviewRun(reviewRunId: string): ReviewRunRecord | null {
+    return this.reviewRuns.find((reviewRun) => reviewRun.id === reviewRunId) ?? null;
+  }
+
+  updateReviewRunStatus(input: ReviewRunStatusUpdate): ReviewRunRecord | null {
+    const existing = this.findReviewRun(input.reviewRunId);
+
+    if (existing === null) {
+      return null;
+    }
+
+    return this.replaceReviewRun({
+      ...existing,
+      status: input.status,
+      startedAt: input.status === "running" ? existing.startedAt ?? new Date() : existing.startedAt,
+      finishedAt: FINISHED_REVIEW_RUN_STATUSES.has(input.status) ? existing.finishedAt ?? new Date() : existing.finishedAt,
+      errorCode: input.errorCode === undefined ? existing.errorCode : input.errorCode,
+      errorMessage: input.errorMessage === undefined ? existing.errorMessage : input.errorMessage
+    });
+  }
+
+  supersedeQueuedOrRunningReviewRuns(input: SupersedeReviewRunsInput): ReviewRunRecord[] {
+    const supersededAt = new Date();
+    const supersededRuns: ReviewRunRecord[] = [];
+
+    for (const reviewRun of this.reviewRuns) {
+      if (
+        reviewRun.pullRequestId === input.pullRequestId &&
+        reviewRun.headSha !== input.headSha &&
+        SUPERSEDABLE_REVIEW_RUN_STATUSES.has(reviewRun.status)
+      ) {
+        const supersededRun = this.replaceReviewRun({
+          ...reviewRun,
+          status: "superseded",
+          finishedAt: reviewRun.finishedAt ?? supersededAt,
+          errorCode: "superseded_by_new_head",
+          errorMessage: `Superseded by delivery ${input.supersededByDeliveryId} for head ${input.headSha}`
+        });
+
+        supersededRuns.push(supersededRun);
+      }
+    }
+
+    return supersededRuns;
+  }
+
+  verifyReviewRunHeadBeforePublishing(input: ReviewRunPublishCheckInput): ReviewRunPublishCheck {
+    const reviewRun = this.findReviewRun(input.reviewRunId);
+
+    if (reviewRun === null) {
+      return {
+        publishable: false,
+        reason: "review_run_not_found",
+        reviewRun: null,
+        currentHeadSha: input.currentHeadSha
+      };
+    }
+
+    if (reviewRun.status === "superseded") {
+      return {
+        publishable: false,
+        reason: "review_run_superseded",
+        reviewRun,
+        currentHeadSha: input.currentHeadSha
+      };
+    }
+
+    if (reviewRun.headSha !== input.currentHeadSha) {
+      const supersededRun = this.replaceReviewRun({
+        ...reviewRun,
+        status: "superseded",
+        finishedAt: reviewRun.finishedAt ?? new Date(),
+        errorCode: "current_head_sha_changed",
+        errorMessage: `Skipped publishing because current PR head is ${input.currentHeadSha}`
+      });
+
+      return {
+        publishable: false,
+        reason: "head_sha_changed",
+        reviewRun: supersededRun,
+        currentHeadSha: input.currentHeadSha
+      };
+    }
+
+    return {
+      publishable: true,
+      reason: null,
+      reviewRun,
+      currentHeadSha: input.currentHeadSha
+    };
+  }
+
   enqueuePullRequestReview(input: ReviewJobInput): ReviewJobRecord {
     const existing = this.reviewJobs.get(input.deliveryId);
 
@@ -235,5 +364,15 @@ export class InMemoryGitHubWebhookStore implements GitHubWebhookStore {
     this.reviewJobs.set(input.deliveryId, job);
 
     return job;
+  }
+
+  private replaceReviewRun(updatedReviewRun: ReviewRunRecord): ReviewRunRecord {
+    const index = this.reviewRuns.findIndex((reviewRun) => reviewRun.id === updatedReviewRun.id);
+
+    if (index >= 0) {
+      this.reviewRuns[index] = updatedReviewRun;
+    }
+
+    return updatedReviewRun;
   }
 }
