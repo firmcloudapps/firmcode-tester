@@ -11,7 +11,7 @@ from firmcode_worker.semgrep.normalizer import (
     normalize_semgrep_output,
     normalize_semgrep_process_failure,
 )
-from firmcode_worker.semgrep.runner import SemgrepScanConfig, run_semgrep_scan
+from firmcode_worker.semgrep.runner import SemgrepScanConfig, _build_command, run_semgrep_scan
 
 
 FIXTURE_DIR = Path(__file__).resolve().parent / "fixtures" / "semgrep"
@@ -117,15 +117,26 @@ def test_semgrep_normalization_records_non_finding_process_failures() -> None:
 def test_semgrep_scan_config_reads_env_overrides() -> None:
     config = SemgrepScanConfig.from_env(
         {
-            "SEMGREP_CONFIGS": "auto,infra/semgrep",
+            "SEMGREP_CONFIGS": "auto,infra/semgrep/config.yml",
             "SEMGREP_TIMEOUT_MS": "12345",
             "SEMGREP_EXECUTABLE": "/usr/local/bin/semgrep",
         }
     )
 
-    assert config.configs == ("auto", "infra/semgrep")
+    assert config.configs == ("auto", "infra/semgrep/config.yml")
     assert config.timeout_ms == 12345
     assert config.executable == "/usr/local/bin/semgrep"
+
+
+def test_semgrep_default_config_includes_local_infra_rules() -> None:
+    command = _build_command(
+        scan_config=SemgrepScanConfig(timeout_ms=15_000),
+        targets=["src/app.py"],
+    )
+
+    assert "--config" in command
+    assert "auto" in command
+    assert any(config.endswith("infra/semgrep/config.yml") for config in command)
 
 
 @pytest.mark.skipif(shutil.which("semgrep") is None, reason="Semgrep CLI is not installed")

@@ -16,7 +16,9 @@ from firmcode_worker.semgrep.normalizer import (
 
 
 DEFAULT_SEMGREP_TIMEOUT_MS = 30_000
-DEFAULT_SEMGREP_CONFIGS = ("auto",)
+FIRMCODE_REPO_ROOT = Path(__file__).resolve().parents[4]
+LOCAL_INFRA_SEMGREP_CONFIG = "infra/semgrep/config.yml"
+DEFAULT_SEMGREP_CONFIGS = ("auto", LOCAL_INFRA_SEMGREP_CONFIG)
 SEMGREP_RAW_ARTIFACT_SCHEMA_VERSION = "semgrep-raw-output/v1"
 
 
@@ -91,9 +93,21 @@ def _build_command(*, scan_config: SemgrepScanConfig, targets: Sequence[str | Pa
 
     command = [scan_config.executable, "scan", "--json", "--metrics=off"]
     for config in scan_config.configs:
-        command.extend(["--config", config])
+        command.extend(["--config", _resolve_config_reference(config)])
     command.extend(str(target) for target in targets)
     return tuple(command)
+
+
+def _resolve_config_reference(config: str) -> str:
+    config_path = Path(config)
+    if config_path.is_absolute():
+        return config
+
+    repo_config_path = FIRMCODE_REPO_ROOT / config_path
+    if repo_config_path.exists():
+        return str(repo_config_path)
+
+    return config
 
 
 def _run_command(*, command: tuple[str, ...], timeout_ms: int, cwd: str | Path | None) -> RawSemgrepOutput:

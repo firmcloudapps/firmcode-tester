@@ -1,0 +1,17 @@
+name: CI
+
+on:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      # ruleid: firmcode.infra.github-actions.unpinned-action
+      - uses: actions/checkout@v4
+      - name: Pinned checkout
+        # ok: firmcode.infra.github-actions.unpinned-action
+        uses: actions/checkout@0b7f75aa2ea1e729bfc45db72f7ddfb4d44fbf42
+      - name: Local action
+        # ok: firmcode.infra.github-actions.unpinned-action
+        uses: ./github/actions/build

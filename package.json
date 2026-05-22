@@ -15,6 +15,7 @@
     "docker:smoke": "bash infra/docker/smoke.sh",
     "dev": "npm run dev --workspaces --if-present",
     "lint": "npm run build --workspace @firmcode/shared && npm run build --workspace @firmcode/prompts && npm run lint --workspaces --if-present",
+    "semgrep:infra:test": "bash infra/semgrep/run-rule-tests.sh",
     "test": "npm run build --workspace @firmcode/shared && npm run build --workspace @firmcode/prompts && npm run test --workspaces --if-present && python3 -m pytest apps/worker/tests"
   },
   "engines": {

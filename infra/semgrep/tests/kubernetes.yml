@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: unsafe-api
+spec:
+  selector:
+    matchLabels:
+      app: unsafe-api
+  template:
+    metadata:
+      labels:
+        app: unsafe-api
+    spec:
+      containers:
+        - name: api
+          image: example/api:1.0.0
+          # ruleid: firmcode.infra.kubernetes.privileged-container
+          securityContext:
+            privileged: true
+        # ruleid: firmcode.infra.kubernetes.missing-resource-limits
+        - name: worker
+          image: example/worker:1.0.0
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: safe-api
+spec:
+  selector:
+    matchLabels:
+      app: safe-api
+  template:
+    metadata:
+      labels:
+        app: safe-api
+    spec:
+      containers:
+        - name: api
+          image: example/api:1.0.1
+          # ok: firmcode.infra.kubernetes.privileged-container
+          securityContext:
+            privileged: false
+          resources:
+            limits:
+              cpu: 500m
+              memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
