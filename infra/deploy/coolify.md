@@ -118,10 +118,10 @@ Use a production NeonDB branch for production and a separate branch or project f
 Run migrations from the API service after the API image deploys and before scaling workers:
 
 ```bash
-npm run migrate --workspace @firmcode/api
+npm run db:migrate --workspace @firmcode/api
 ```
 
-Task 3.1 adds the actual database migration implementation. Until then, record migrations as not applicable for pre-database scaffold deployments; before production, this command must exist and succeed against NeonDB.
+The command builds the API package and applies pending migrations against `DATABASE_URL`.
 
 ## Deployment Order
 
