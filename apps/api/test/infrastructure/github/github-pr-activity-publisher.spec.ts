@@ -41,7 +41,7 @@ describe("GitHubAppPullRequestActivityPublisher", () => {
   });
 
   it("rejects failed GitHub activity publishing requests with a normalized error", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("nope", { status: 403 })));
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({ message: "Resource not accessible by integration" }, 403)));
 
     await expect(
       new GitHubAppPullRequestActivityPublisher(testGitHubConfig()).publishScanningActivity({
@@ -54,7 +54,9 @@ describe("GitHubAppPullRequestActivityPublisher", () => {
       })
     ).rejects.toMatchObject({
       name: "GitHubActivityPublishError",
-      status: 403
+      status: 403,
+      githubMessage: "Resource not accessible by integration",
+      message: expect.stringContaining("Resource not accessible by integration")
     });
   });
 
@@ -65,9 +67,9 @@ describe("GitHubAppPullRequestActivityPublisher", () => {
   });
 });
 
-function jsonResponse(value: unknown): Response {
+function jsonResponse(value: unknown, status = 200): Response {
   return new Response(JSON.stringify(value), {
-    status: 200,
+    status,
     headers: { "content-type": "application/json" }
   });
 }

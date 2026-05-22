@@ -293,7 +293,9 @@ export class GitHubWebhookService {
           repositoryFullName: input.repositoryFullName,
           pullRequestNumber: input.pullRequestNumber,
           reviewRunId: input.reviewRunId,
-          error: error instanceof Error ? error.name : "UnknownError"
+          error: error instanceof Error ? error.name : "UnknownError",
+          status: typeof (error as { status?: unknown }).status === "number" ? (error as { status: number }).status : null,
+          message: error instanceof Error ? error.message : "Unknown publishing error"
         })
       );
     }

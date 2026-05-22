@@ -213,6 +213,7 @@ describe("GitHubWebhookService", () => {
       status: "processed"
     });
     expect(warn).toHaveBeenCalledWith(expect.stringContaining("github.activity.publish_failed"));
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("GitHub unavailable"));
     warn.mockRestore();
   });
 

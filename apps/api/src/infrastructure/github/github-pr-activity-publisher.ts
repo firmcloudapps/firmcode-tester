@@ -26,7 +26,8 @@ export class NoopGitHubPullRequestActivityPublisher implements GitHubPullRequest
 export class GitHubActivityPublishError extends Error {
   constructor(
     message: string,
-    readonly status: number | null = null
+    readonly status: number | null = null,
+    readonly githubMessage: string | null = null
   ) {
     super(message);
     this.name = "GitHubActivityPublishError";
@@ -117,7 +118,13 @@ export class GitHubAppPullRequestActivityPublisher implements GitHubPullRequestA
     });
 
     if (!response.ok) {
-      throw new GitHubActivityPublishError(`GitHub activity publish request failed with status ${response.status}.`, response.status);
+      const githubMessage = await readGitHubErrorMessage(response);
+      const detail = githubMessage === null ? "" : ` GitHub message: ${githubMessage}`;
+      throw new GitHubActivityPublishError(
+        `GitHub activity publish request failed with status ${response.status}.${detail}`,
+        response.status,
+        githubMessage
+      );
     }
 
     if (response.status === 204) {
@@ -152,4 +159,31 @@ function splitRepositoryFullName(value: string): [string, string] {
 
 function base64UrlJson(value: Record<string, unknown>): string {
   return Buffer.from(JSON.stringify(value)).toString("base64url");
+}
+
+async function readGitHubErrorMessage(response: Response): Promise<string | null> {
+  const text = await response.text();
+
+  if (!text.trim()) {
+    return null;
+  }
+
+  try {
+    const parsed: unknown = JSON.parse(text);
+
+    if (parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)) {
+      const message = (parsed as { message?: unknown }).message;
+      if (typeof message === "string" && message.trim()) {
+        return boundedGitHubMessage(message);
+      }
+    }
+  } catch {
+    // Fall back to bounded raw text below.
+  }
+
+  return boundedGitHubMessage(text);
+}
+
+function boundedGitHubMessage(value: string): string {
+  return value.trim().slice(0, 500);
 }
