@@ -1,19 +1,12 @@
 import { type OnModuleDestroy } from "@nestjs/common";
 import { Queue, type JobsOptions } from "bullmq";
+import type { WorkerReviewJobInput } from "@firmcode/shared";
 
 export const REVIEW_QUEUE = Symbol("REVIEW_QUEUE");
 export const REVIEW_QUEUE_NAME = "review-runs";
 export const REVIEW_PULL_REQUEST_JOB_NAME = "review.pull_request";
 
-export interface ReviewJobInput {
-  deliveryId: string;
-  reviewRunId: string;
-  repositoryId: string;
-  pullRequestId: string;
-  pullRequestNumber: number;
-  headSha: string;
-  triggerEvent: string;
-}
+export type ReviewJobInput = WorkerReviewJobInput;
 
 export interface ReviewJobRecord extends ReviewJobInput {
   id: string;

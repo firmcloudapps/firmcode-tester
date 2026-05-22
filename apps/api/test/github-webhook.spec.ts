@@ -155,6 +155,7 @@ describe("GitHubWebhookService", () => {
       status: "queued"
     });
     expect(queue.jobs.get(`delivery-${action}`)).toMatchObject({
+      schemaVersion: "review-job-input/v1",
       deliveryId: `delivery-${action}`,
       reviewRunId: receipt.reviewRunId,
       pullRequestNumber: 7,

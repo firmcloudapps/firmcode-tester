@@ -41,6 +41,7 @@ class StubReviewPipeline:
 def test_review_job_payload_from_mapping_validates_required_fields() -> None:
     payload = review_job_payload_from_mapping(
         {
+            "schemaVersion": "review-job-input/v1",
             "deliveryId": "delivery-1",
             "reviewRunId": "run-1",
             "repositoryId": "repo-1",
@@ -93,6 +94,7 @@ def test_review_worker_lifecycle_marks_run_failed_and_reraises() -> None:
 
 def _payload() -> ReviewJobPayload:
     return ReviewJobPayload(
+        schema_version="review-job-input/v1",
         delivery_id="delivery-1",
         review_run_id="run-1",
         repository_id="repo-1",
