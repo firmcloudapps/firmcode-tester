@@ -1,0 +1,8 @@
+name: firmcode
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: test
+        run: npm test

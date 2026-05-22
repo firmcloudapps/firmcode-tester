@@ -22,7 +22,8 @@
           "byteRange": {
             "startByte": 0,
             "endByte": 95
-          }
+          },
+          "changed": true
         }
       ],
       "imports": [],

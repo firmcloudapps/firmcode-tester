@@ -1,0 +1,14 @@
+{
+  "symbols": [
+    {"name": "normalize", "kind": "function", "range": {"startLine": 5, "endLine": 6}, "changed": false},
+    {"name": "Runner", "kind": "class", "range": {"startLine": 9, "endLine": 11}, "changed": true},
+    {"name": "run", "kind": "method", "range": {"startLine": 10, "endLine": 11}, "changed": true}
+  ],
+  "imports": [
+    {"source": "os", "symbols": ["os"], "line": 1},
+    {"source": "pathlib", "symbols": ["Path"], "line": 2}
+  ],
+  "hunkScopes": [
+    {"path": "src/runner.py", "hunkNewStart": 10, "hunkNewEnd": 11, "enclosingSymbol": "run"}
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "symbols": [
+    {"name": "formatName", "kind": "function", "range": {"startLine": 4, "endLine": 6}, "changed": false},
+    {"name": "ReviewController", "kind": "class", "range": {"startLine": 8, "endLine": 12}, "changed": true},
+    {"name": "handle", "kind": "method", "range": {"startLine": 9, "endLine": 11}, "changed": true},
+    {"name": "buildMessage", "kind": "function", "range": {"startLine": 14, "endLine": 16}, "changed": true}
+  ],
+  "imports": [
+    {"source": "@nestjs/common", "symbols": ["Controller"], "line": 1},
+    {"source": "./helper", "symbols": ["helper"], "line": 2}
+  ],
+  "hunkScopes": [
+    {"path": "src/review.ts", "hunkNewStart": 9, "hunkNewEnd": 10, "enclosingSymbol": "handle"},
+    {"path": "src/review.ts", "hunkNewStart": 14, "hunkNewEnd": 15, "enclosingSymbol": "buildMessage"}
+  ]
+}

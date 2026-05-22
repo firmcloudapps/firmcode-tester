@@ -1,0 +1,16 @@
+{
+  "symbols": [
+    {"name": "name", "kind": "mapping", "range": {"startLine": 1, "endLine": 1}, "changed": false},
+    {"name": "jobs", "kind": "mapping", "range": {"startLine": 2, "endLine": 8}, "changed": true},
+    {"name": "review", "kind": "mapping", "range": {"startLine": 3, "endLine": 8}, "changed": true},
+    {"name": "runs-on", "kind": "mapping", "range": {"startLine": 4, "endLine": 4}, "changed": false},
+    {"name": "steps", "kind": "mapping", "range": {"startLine": 5, "endLine": 8}, "changed": true},
+    {"name": "uses", "kind": "mapping", "range": {"startLine": 6, "endLine": 6}, "changed": false},
+    {"name": "name", "kind": "mapping", "range": {"startLine": 7, "endLine": 7}, "changed": false},
+    {"name": "run", "kind": "mapping", "range": {"startLine": 8, "endLine": 8}, "changed": true}
+  ],
+  "imports": [],
+  "hunkScopes": [
+    {"path": ".github/workflows/review.yml", "hunkNewStart": 7, "hunkNewEnd": 8, "enclosingSymbol": "steps"}
+  ]
+}

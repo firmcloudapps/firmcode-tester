@@ -1,0 +1,14 @@
+{
+  "symbols": [
+    {"name": "Runner", "kind": "class", "range": {"startLine": 8, "endLine": 10}, "changed": false},
+    {"name": "Normalize", "kind": "function", "range": {"startLine": 12, "endLine": 14}, "changed": false},
+    {"name": "Run", "kind": "method", "range": {"startLine": 16, "endLine": 18}, "changed": true}
+  ],
+  "imports": [
+    {"source": "fmt", "symbols": [], "line": 4},
+    {"source": "strings", "symbols": ["alias"], "line": 5}
+  ],
+  "hunkScopes": [
+    {"path": "src/review.go", "hunkNewStart": 16, "hunkNewEnd": 17, "enclosingSymbol": "Run"}
+  ]
+}
