@@ -1,3 +1,5 @@
+import { classifyChangedFileRisk, type ChangedFileRiskClassification } from "@firmcode/shared";
+
 export interface GitHubRestRequest {
   readonly method?: "GET";
   readonly path: string;
@@ -32,6 +34,7 @@ export interface GitHubFetchedPullRequestFile {
   readonly headSha: string;
   readonly content: string;
   readonly sizeBytes: number;
+  readonly risk: ChangedFileRiskClassification;
 }
 
 export interface GitHubSkippedPullRequestFile {
@@ -46,6 +49,7 @@ export interface GitHubSkippedPullRequestFile {
   readonly excludedFromSemgrep: boolean;
   readonly excludedFromTreeSitter: boolean;
   readonly excludedFromLlmContext: boolean;
+  readonly risk: ChangedFileRiskClassification;
 }
 
 export type GitHubSkippedPullRequestFileReason =
@@ -207,7 +211,13 @@ export class GitHubPullRequestFileFetcher {
         language,
         headSha: input.headSha,
         content: content.text,
-        sizeBytes: content.sizeBytes ?? Buffer.byteLength(content.text, "utf8")
+        sizeBytes: content.sizeBytes ?? Buffer.byteLength(content.text, "utf8"),
+        risk: classifyChangedFileRisk({
+          path: normalized.path,
+          previousPath: normalized.previousPath,
+          patch: normalized.patch,
+          content: content.text
+        })
       });
     }
 
@@ -374,7 +384,12 @@ function toSkippedPullRequestFile(
     sizeBytes,
     excludedFromSemgrep: true,
     excludedFromTreeSitter: true,
-    excludedFromLlmContext: true
+    excludedFromLlmContext: true,
+    risk: classifyChangedFileRisk({
+      path: file.path,
+      previousPath: file.previousPath,
+      patch: file.patch
+    })
   };
 }
 
