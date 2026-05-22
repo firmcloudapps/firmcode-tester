@@ -58,12 +58,12 @@ CORS_ALLOWED_ORIGINS=https://firmcode.example.com,https://firmcode-git-main-owne
 
 Coolify Compose compatibility note: `docker-compose.prod.yml` intentionally uses plain `${VARIABLE}` interpolation instead of `${VARIABLE:?message}`. Firmcode validates missing or malformed values at process startup, while plain interpolation avoids Coolify passing literal shell-expression strings into the container.
 
-Coolify writes runtime-enabled environment variables to a `.env` file for Docker Compose deployments. `docker-compose.prod.yml` uses `env_file: .env` for API and worker so Coolify-managed values reach the containers. The Compose `environment` block only overrides service-local values such as `NODE_ENV`, `PORT`, internal `REDIS_URL`, and queue name.
+`docker-compose.prod.yml` explicitly passes required runtime variables through each service `environment` block. Do not commit `.env`; keep secrets in Coolify environment variables and let Compose interpolate them at deploy time. If Coolify does not provide a variable, the API's safe runtime diagnostics will report the unresolved or missing shape without printing secret values.
 
 If the API exits with `ConfigValidationError` for missing `DATABASE_URL`, `GITHUB_APP_ID`, or `GITHUB_APP_PRIVATE_KEY`, check these Coolify settings before changing application code:
 
 - Deploy from `docker-compose.prod.yml`, not the standalone local compose file.
-- If using a standalone Dockerfile resource instead of the Compose stack, attach the variables to that exact API resource; Compose `env_file` settings will not apply.
+- If using a standalone Dockerfile resource instead of the Compose stack, attach the variables to that exact API resource; Compose service-level variables will not apply.
 - Confirm each variable is enabled for runtime, not build-only.
 - Redeploy or recreate the containers after editing variables; already-running containers will not pick up changed values.
 - Keep `GITHUB_APP_PRIVATE_KEY` as a single-line escaped-newline PEM or base64-encoded PEM in Coolify.
