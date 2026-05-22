@@ -1,0 +1,9 @@
+diff --git a/src/value.ts b/src/value.ts
+index 0f12db0..d44e31f 100644
+--- a/src/value.ts
++++ b/src/value.ts
+@@ -1 +1 @@
+-export const value = "old";
+\ No newline at end of file
++export const value = "new";
+\ No newline at end of file
