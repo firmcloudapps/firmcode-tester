@@ -63,6 +63,7 @@ Coolify writes runtime-enabled environment variables to a `.env` file for Docker
 If the API exits with `ConfigValidationError` for missing `DATABASE_URL`, `GITHUB_APP_ID`, or `GITHUB_APP_PRIVATE_KEY`, check these Coolify settings before changing application code:
 
 - Deploy from `docker-compose.prod.yml`, not the standalone local compose file.
+- If using a standalone Dockerfile resource instead of the Compose stack, attach the variables to that exact API resource; Compose `env_file` settings will not apply.
 - Confirm each variable is enabled for runtime, not build-only.
 - Redeploy or recreate the containers after editing variables; already-running containers will not pick up changed values.
 - Keep `GITHUB_APP_PRIVATE_KEY` as a single-line escaped-newline PEM or base64-encoded PEM in Coolify.
