@@ -25,7 +25,7 @@ Coolify settings:
 | Build context | `.` |
 | Dockerfile path | `infra/docker/api.prod.Dockerfile` |
 | Container port | `3001` |
-| Public domain | `https://api.firmcode.example.com` |
+| Public domain | `https://firmcodeapi.firmoncloud.com` |
 | Health check path | `/health` |
 | Readiness check | `/health/ready` when enabled |
 | Start command | Dockerfile default: `npm run start --workspace @firmcode/api` |
@@ -37,7 +37,7 @@ Required API environment variables:
 | `NODE_ENV=production` | Set explicitly for deployed API. |
 | `PORT=3001` | Must match the exposed container port. |
 | `APP_URL` | Vercel dashboard URL. |
-| `API_URL` | Public Coolify API URL. |
+| `API_URL` | Public Coolify API URL: `https://firmcodeapi.firmoncloud.com`. |
 | `CORS_ALLOWED_ORIGINS` | Comma-separated Vercel production, preview, and local dev origins. |
 | `DATABASE_URL` | NeonDB PostgreSQL URL with database name and SSL mode. |
 | `DATABASE_SSL=true` | Required for NeonDB. |
@@ -137,7 +137,7 @@ The command builds the API package and applies pending migrations against `DATAB
 7. Keep one worker replica until live webhook processing is stable.
 9. Deploy the Vercel dashboard with `NEXT_PUBLIC_API_URL` pointing to the API URL.
 10. Add Vercel production and preview origins to API `CORS_ALLOWED_ORIGINS`.
-11. Configure GitHub App webhook URL: `https://api.firmcode.example.com/webhooks/github`.
+11. Configure GitHub App webhook URL: `https://firmcodeapi.firmoncloud.com/webhooks/github`.
 12. Run a synthetic dry-run review before setting `DRY_RUN=false`.
 
 ## Rollback Notes

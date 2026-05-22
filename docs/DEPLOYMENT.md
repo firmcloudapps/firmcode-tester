@@ -114,8 +114,8 @@ Neither Compose file runs PostgreSQL or the Next.js dashboard. PostgreSQL is Neo
 | Name | Example | Used By |
 | --- | --- | --- |
 | Web URL | `https://firmcode.example.com` | Clerk redirects, user dashboard |
-| API URL | `https://api.firmcode.example.com` | Vercel web, GitHub webhooks |
-| GitHub webhook URL | `https://api.firmcode.example.com/webhooks/github` | GitHub App |
+| API URL | `https://firmcodeapi.firmoncloud.com` | Vercel web, GitHub webhooks |
+| GitHub webhook URL | `https://firmcodeapi.firmoncloud.com/webhooks/github` | GitHub App |
 | Clerk callback URLs | Vercel production and preview URLs | Clerk |
 
 ## CORS Policy

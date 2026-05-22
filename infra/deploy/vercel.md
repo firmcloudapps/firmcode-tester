@@ -37,7 +37,7 @@ Set these variables in Vercel for Production, Preview, and Development as approp
 | --- | --- | --- |
 | `NODE_ENV` | Vercel | Usually managed by Vercel. |
 | `APP_URL` | web | Production dashboard URL. Preview deployments can use `https://${VERCEL_URL}` where supported. |
-| `NEXT_PUBLIC_API_URL` | web | Public Coolify API URL, for example `https://api.firmcode.example.com`. |
+| `NEXT_PUBLIC_API_URL` | web | Public Coolify API URL, `https://firmcodeapi.firmoncloud.com`. |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | web | Clerk publishable key for the matching Clerk environment. |
 | `CLERK_SECRET_KEY` | web server | Required only for server-side Clerk calls in the dashboard. Keep it secret. |
 | `CLERK_BILLING_PORTAL_URL` | web | Clerk-managed billing portal or account billing URL. |
@@ -105,7 +105,7 @@ Local development maps to Vercel like this:
 | Local | Vercel |
 | --- | --- |
 | `npm run dev --workspace @firmcode/web` | Vercel Next.js runtime |
-| `NEXT_PUBLIC_API_URL=http://localhost:3001` | `NEXT_PUBLIC_API_URL=https://api.firmcode.example.com` |
+| `NEXT_PUBLIC_API_URL=http://localhost:3001` | `NEXT_PUBLIC_API_URL=https://firmcodeapi.firmoncloud.com` |
 | `APP_URL=http://localhost:3000` | `APP_URL=https://firmcode.example.com` |
 | Local Clerk development keys | Clerk production or preview keys |
 
