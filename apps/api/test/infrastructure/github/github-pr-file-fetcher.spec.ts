@@ -330,4 +330,125 @@ describe("GitHubPullRequestFileFetcher", () => {
       })
     ]);
   });
+
+  it("skips low-value generated files before content fetch while preserving Semgrep eligibility", async () => {
+    const client = new MockGitHubRestClient();
+    const pageOnePath = "/repos/acme/widgets/pulls/21/files?per_page=2&page=1";
+    const pageTwoPath = "/repos/acme/widgets/pulls/21/files?per_page=2&page=2";
+
+    client.enqueue(pageOnePath, [
+      {
+        filename: "apps/web/__generated__/client.generated.ts",
+        status: "modified",
+        additions: 100,
+        deletions: 20,
+        patch: "@@ -1 +1 @@\n-export type Old = {}\n+export type New = {}\n"
+      },
+      {
+        filename: "apps/web/public/app.min.js",
+        status: "modified",
+        additions: 1,
+        deletions: 1,
+        patch: "@@ -1 +1 @@\n-old\n+new\n"
+      }
+    ]);
+    client.enqueue(pageTwoPath, []);
+
+    const result = await createFetcher(client).fetchPullRequestFiles({
+      owner: "acme",
+      repo: "widgets",
+      pullNumber: 21,
+      headSha: "head-generated"
+    });
+
+    expect(result.files).toEqual([]);
+    expect(result.skippedFiles).toEqual([
+      expect.objectContaining({
+        path: "apps/web/__generated__/client.generated.ts",
+        reason: "generated",
+        handling: "summarized",
+        excludedFromSemgrep: false,
+        excludedFromTreeSitter: true,
+        excludedFromLlmContext: true
+      }),
+      expect.objectContaining({
+        path: "apps/web/public/app.min.js",
+        reason: "minified",
+        handling: "summarized",
+        excludedFromSemgrep: false
+      })
+    ]);
+    expect(result.largePullRequest.skippedFiles.map((file) => file.reason)).toEqual(["generated", "minified"]);
+    expect(client.requests.map((request) => request.path)).toEqual([pageOnePath, pageTwoPath]);
+  });
+
+  it("returns a large-PR artifact from configurable thresholds", async () => {
+    const client = new MockGitHubRestClient();
+    const pageOnePath = "/repos/acme/widgets/pulls/22/files?per_page=2&page=1";
+    const pageTwoPath = "/repos/acme/widgets/pulls/22/files?per_page=2&page=2";
+    const firstContentPath = "/repos/acme/widgets/contents/apps/api/src/auth/session.ts?ref=head-large";
+    const secondContentPath = "/repos/acme/widgets/contents/apps/api/src/util/math.ts?ref=head-large";
+
+    client.enqueue(pageOnePath, [
+      {
+        filename: "apps/api/src/auth/session.ts",
+        status: "modified",
+        additions: 1,
+        deletions: 0,
+        patch: "@@ -1 +1,2 @@\n export function validate() {}\n+const ok = jwt.verify(token, key);\n"
+      },
+      {
+        filename: "apps/api/src/util/math.ts",
+        status: "modified",
+        additions: 1,
+        deletions: 0,
+        patch: "@@ -1 +1,2 @@\n export const value = 1;\n+export const next = 2;\n"
+      }
+    ]);
+    client.enqueue(pageTwoPath, []);
+    client.enqueue(firstContentPath, {
+      type: "file",
+      encoding: "base64",
+      size: 62,
+      content: base64("export function validate() {}\nconst ok = jwt.verify(token, key);\n")
+    });
+    client.enqueue(secondContentPath, {
+      type: "file",
+      encoding: "base64",
+      size: 44,
+      content: base64("export const value = 1;\nexport const next = 2;\n")
+    });
+
+    const result = await new GitHubPullRequestFileFetcher(client, {
+      perPage: 2,
+      maxRetries: 0,
+      largePullRequestThresholds: {
+        maxChangedFiles: 1,
+        maxFullContextFiles: 1
+      }
+    }).fetchPullRequestFiles({
+      owner: "acme",
+      repo: "widgets",
+      pullNumber: 22,
+      headSha: "head-large"
+    });
+
+    expect(result.files).toHaveLength(2);
+    expect(result.largePullRequest).toMatchObject({
+      mode: "prioritized",
+      isLargePullRequest: true,
+      prioritizedFiles: [
+        expect.objectContaining({
+          path: "apps/api/src/auth/session.ts",
+          priorityReasons: expect.arrayContaining(["risk:auth"])
+        })
+      ],
+      skippedFiles: [
+        expect.objectContaining({
+          path: "apps/api/src/util/math.ts",
+          reason: "budget_exhausted"
+        })
+      ]
+    });
+  });
 });

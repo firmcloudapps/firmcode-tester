@@ -356,9 +356,11 @@ describe("GitHubWebhookService", () => {
   it("creates a review run for draft pull requests when configured", async () => {
     const rawBody = await readFixture("pull_request.opened.draft.json");
     const draftStore = new InMemoryGitHubWebhookStore();
+    const config = createApiRuntimeConfig(API_ENV);
     const draftService = new GitHubWebhookService(WEBHOOK_SECRET, draftStore, {
-      ...createApiRuntimeConfig(API_ENV),
+      ...config,
       review: {
+        ...config.review,
         skipDraftPullRequests: false
       }
     });

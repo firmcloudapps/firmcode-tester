@@ -75,8 +75,16 @@ Clerk owns sign-in, sign-up, sessions, user profile, organizations where enabled
 | `REVIEW_MAX_INLINE_COMMENTS` | no | Default max inline comments per PR. |
 | `REVIEW_MIN_SEVERITY` | no | Minimum severity for inline comments. |
 | `REVIEW_SKIP_DRAFT_PRS` | no | Skip draft PRs by default. |
-| `REVIEW_MAX_FILES` | no | Max files before large-PR mode. |
-| `REVIEW_MAX_DIFF_BYTES` | no | Max diff bytes before large-PR mode. |
+| `REVIEW_LARGE_PR_MAX_CHANGED_FILES` | no | Changed-file count before prioritized large-PR mode. |
+| `REVIEW_LARGE_PR_MAX_DIFF_BYTES` | no | Total diff bytes before prioritized large-PR mode. |
+| `REVIEW_LARGE_PR_MAX_CHANGED_LINES` | no | Total added plus deleted lines before prioritized large-PR mode. |
+| `REVIEW_LARGE_PR_MAX_ESTIMATED_TOKENS` | no | Estimated prompt tokens before prioritized large-PR mode. |
+| `REVIEW_LARGE_PR_MAX_FILTERED_FILES` | no | Max files after generated/vendor filtering before prioritized mode. |
+| `REVIEW_LARGE_PR_MAX_SEMGREP_RUNTIME_MS` | no | Semgrep runtime budget before prioritized mode. |
+| `REVIEW_LARGE_PR_MAX_FULL_CONTEXT_FILES` | no | Max full-context files retained in prioritized mode before summarizing lower-priority files. |
+| `REVIEW_SUMMARY_ONLY_DIFF_BYTES` | no | Diff-byte threshold for summary-only mode. |
+| `REVIEW_SUMMARY_ONLY_CHANGED_LINES` | no | Changed-line threshold for summary-only mode. |
+| `REVIEW_SUMMARY_ONLY_ESTIMATED_TOKENS` | no | Estimated-token threshold for summary-only mode. |
 | `ARTIFACT_RETENTION_DAYS` | no | Default artifact retention. |
 
 ## Semgrep

@@ -31,6 +31,7 @@ describe("API runtime config", () => {
     expect(config.github?.appId).toBe(12345);
     expect(config.github?.privateKey).toBe(RAW_PRIVATE_KEY);
     expect(config.port).toBe(3001);
+    expect(config.review.largePullRequest.maxChangedFiles).toBe(100);
   });
 
   it("fails fast when Clerk, database, or GitHub variables are missing", () => {
@@ -83,6 +84,44 @@ describe("API runtime config", () => {
         PORT: "99999"
       })
     ).toThrow(/PORT must be an integer/);
+  });
+
+  it("loads configurable large-PR thresholds", () => {
+    const config = createApiRuntimeConfig({
+      ...VALID_ENV,
+      REVIEW_LARGE_PR_MAX_CHANGED_FILES: "25",
+      REVIEW_LARGE_PR_MAX_DIFF_BYTES: "90000",
+      REVIEW_LARGE_PR_MAX_CHANGED_LINES: "1200",
+      REVIEW_LARGE_PR_MAX_ESTIMATED_TOKENS: "8000",
+      REVIEW_LARGE_PR_MAX_FILTERED_FILES: "20",
+      REVIEW_LARGE_PR_MAX_SEMGREP_RUNTIME_MS: "15000",
+      REVIEW_SUMMARY_ONLY_DIFF_BYTES: "200000",
+      REVIEW_SUMMARY_ONLY_CHANGED_LINES: "4000",
+      REVIEW_SUMMARY_ONLY_ESTIMATED_TOKENS: "25000",
+      REVIEW_LARGE_PR_MAX_FULL_CONTEXT_FILES: "12"
+    });
+
+    expect(config.review.largePullRequest).toEqual({
+      maxChangedFiles: 25,
+      maxDiffBytes: 90000,
+      maxChangedLines: 1200,
+      maxEstimatedTokens: 8000,
+      maxFilesAfterFiltering: 20,
+      maxSemgrepRuntimeMs: 15000,
+      summaryOnlyDiffBytes: 200000,
+      summaryOnlyChangedLines: 4000,
+      summaryOnlyEstimatedTokens: 25000,
+      maxFullContextFiles: 12
+    });
+  });
+
+  it("rejects invalid large-PR threshold values", () => {
+    expect(() =>
+      createApiRuntimeConfig({
+        ...VALID_ENV,
+        REVIEW_LARGE_PR_MAX_CHANGED_FILES: "0"
+      })
+    ).toThrow(/REVIEW_LARGE_PR_MAX_CHANGED_FILES must be a positive integer/);
   });
 });
 

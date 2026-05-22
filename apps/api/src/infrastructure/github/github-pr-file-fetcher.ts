@@ -1,4 +1,12 @@
-import { classifyChangedFileRisk, type ChangedFileRiskClassification } from "@firmcode/shared";
+import {
+  classifyChangedFileRisk,
+  classifyLowValueFile,
+  createLargePullRequestReviewArtifact,
+  type ChangedFileRiskClassification,
+  type LargePullRequestReviewArtifact,
+  type LargePullRequestThresholds,
+  type ReviewFileHandling
+} from "@firmcode/shared";
 
 export interface GitHubRestRequest {
   readonly method?: "GET";
@@ -19,6 +27,7 @@ export interface GitHubPullRequestFilesInput {
 export interface GitHubPullRequestFilesResult {
   readonly files: GitHubFetchedPullRequestFile[];
   readonly skippedFiles: GitHubSkippedPullRequestFile[];
+  readonly largePullRequest: LargePullRequestReviewArtifact;
   readonly pageCount: number;
   readonly totalFiles: number;
 }
@@ -45,6 +54,8 @@ export interface GitHubSkippedPullRequestFile {
   readonly deletions: number;
   readonly patch: string | null;
   readonly reason: GitHubSkippedPullRequestFileReason;
+  readonly handling: Extract<ReviewFileHandling, "summarized" | "skipped">;
+  readonly detail: string;
   readonly sizeBytes: number | null;
   readonly excludedFromSemgrep: boolean;
   readonly excludedFromTreeSitter: boolean;
@@ -55,9 +66,14 @@ export interface GitHubSkippedPullRequestFile {
 export type GitHubSkippedPullRequestFileReason =
   | "deleted"
   | "binary"
+  | "dependency_lockfile"
+  | "generated"
+  | "large_snapshot"
+  | "minified"
   | "unsupported"
   | "oversized"
-  | "content_unavailable";
+  | "content_unavailable"
+  | "vendor";
 
 export type SupportedGitHubFileLanguage =
   | "dockerfile"
@@ -76,6 +92,7 @@ export interface GitHubPullRequestFileFetcherOptions {
   readonly maxContentBytes?: number;
   readonly maxRetries?: number;
   readonly retryDelayMs?: number;
+  readonly largePullRequestThresholds?: Partial<LargePullRequestThresholds>;
 }
 
 export class GitHubApiError extends Error {
@@ -161,6 +178,7 @@ export class GitHubPullRequestFileFetcher {
   private readonly maxContentBytes: number;
   private readonly maxRetries: number;
   private readonly retryDelayMs: number;
+  private readonly largePullRequestThresholds: Partial<LargePullRequestThresholds>;
 
   constructor(
     private readonly client: GitHubRestClient,
@@ -170,19 +188,22 @@ export class GitHubPullRequestFileFetcher {
     this.maxContentBytes = options.maxContentBytes ?? DEFAULT_MAX_CONTENT_BYTES;
     this.maxRetries = options.maxRetries ?? DEFAULT_MAX_RETRIES;
     this.retryDelayMs = options.retryDelayMs ?? DEFAULT_RETRY_DELAY_MS;
+    this.largePullRequestThresholds = options.largePullRequestThresholds ?? {};
   }
 
   async fetchPullRequestFiles(input: GitHubPullRequestFilesInput): Promise<GitHubPullRequestFilesResult> {
     const files = await this.fetchPaginatedFiles(input);
     const fetchedFiles: GitHubFetchedPullRequestFile[] = [];
     const skippedFiles: GitHubSkippedPullRequestFile[] = [];
+    const changedFilesForArtifact: NormalizedGitHubPullRequestFile[] = [];
 
     for (const file of files.items) {
       const normalized = normalizePullRequestFile(file);
+      changedFilesForArtifact.push(normalized);
       const preContentSkip = this.classifyPreContentSkip(normalized);
 
       if (preContentSkip !== null) {
-        skippedFiles.push(toSkippedPullRequestFile(normalized, preContentSkip, normalized.sizeBytes));
+        skippedFiles.push(toSkippedPullRequestFile(normalized, preContentSkip.reason, normalized.sizeBytes, preContentSkip));
         continue;
       }
 
@@ -224,6 +245,10 @@ export class GitHubPullRequestFileFetcher {
     return {
       files: fetchedFiles,
       skippedFiles,
+      largePullRequest: createLargePullRequestReviewArtifact({
+        files: changedFilesForArtifact.map(toReviewPlanChangedFile),
+        thresholds: this.largePullRequestThresholds
+      }),
       pageCount: files.pageCount,
       totalFiles: files.items.length
     };
@@ -255,21 +280,47 @@ export class GitHubPullRequestFileFetcher {
     return { items, pageCount };
   }
 
-  private classifyPreContentSkip(file: NormalizedGitHubPullRequestFile): GitHubSkippedPullRequestFileReason | null {
+  private classifyPreContentSkip(file: NormalizedGitHubPullRequestFile): GitHubPreContentSkip | null {
     if (DELETED_FILE_STATUSES.has(file.status)) {
-      return "deleted";
+      return {
+        reason: "deleted",
+        handling: "skipped",
+        detail: "deleted files are not available on the pull request head",
+        excludedFromSemgrep: true
+      };
     }
 
     if (isBinaryPath(file.path)) {
-      return "binary";
+      return {
+        reason: "binary",
+        handling: "skipped",
+        detail: "binary files are excluded from static analysis and LLM context",
+        excludedFromSemgrep: true
+      };
+    }
+
+    const lowValueSkip = classifyLowValueFile(toReviewPlanChangedFile(file));
+
+    if (lowValueSkip !== null) {
+      return lowValueSkip;
     }
 
     if (file.sizeBytes !== null && file.sizeBytes > this.maxContentBytes) {
-      return "oversized";
+      return {
+        reason: "oversized",
+        handling: "skipped",
+        detail: "file exceeds the configured content fetch size limit",
+        excludedFromSemgrep: true
+      };
     }
 
     if (resolveSupportedLanguage(file.path) === null) {
-      return "unsupported";
+      return {
+        reason: "unsupported",
+        handling: "skipped",
+        detail: "file language is not supported by the MVP analysis pipeline",
+        excludedFromSemgrep: true
+      };
     }
 
     return null;
@@ -347,6 +398,13 @@ interface NormalizedGitHubPullRequestFile {
   readonly sizeBytes: number | null;
 }
 
+interface GitHubPreContentSkip {
+  readonly reason: GitHubSkippedPullRequestFileReason;
+  readonly handling: Extract<ReviewFileHandling, "summarized" | "skipped">;
+  readonly detail: string;
+  readonly excludedFromSemgrep: boolean;
+}
+
 interface DecodedGitHubFileContent {
   readonly available: boolean;
   readonly text: string;
@@ -371,7 +429,8 @@ function normalizePullRequestFile(file: GitHubPullRequestFileResponse): Normaliz
 function toSkippedPullRequestFile(
   file: NormalizedGitHubPullRequestFile,
   reason: GitHubSkippedPullRequestFileReason,
-  sizeBytes: number | null
+  sizeBytes: number | null,
+  skip: GitHubPreContentSkip = defaultPreContentSkip(reason)
 ): GitHubSkippedPullRequestFile {
   return {
     path: file.path,
@@ -381,8 +440,10 @@ function toSkippedPullRequestFile(
     deletions: file.deletions,
     patch: file.patch,
     reason,
+    handling: skip.handling,
+    detail: skip.detail,
     sizeBytes,
-    excludedFromSemgrep: true,
+    excludedFromSemgrep: skip.excludedFromSemgrep,
     excludedFromTreeSitter: true,
     excludedFromLlmContext: true,
     risk: classifyChangedFileRisk({
@@ -390,6 +451,58 @@ function toSkippedPullRequestFile(
       previousPath: file.previousPath,
       patch: file.patch
     })
+  };
+}
+
+function defaultPreContentSkip(reason: GitHubSkippedPullRequestFileReason): GitHubPreContentSkip {
+  return {
+    reason,
+    handling: "skipped",
+    detail: defaultSkipDetail(reason),
+    excludedFromSemgrep: true
+  };
+}
+
+function defaultSkipDetail(reason: GitHubSkippedPullRequestFileReason): string {
+  switch (reason) {
+    case "binary":
+      return "binary files are excluded from static analysis and LLM context";
+    case "content_unavailable":
+      return "GitHub did not return a readable file blob";
+    case "deleted":
+      return "deleted files are not available on the pull request head";
+    case "oversized":
+      return "file exceeds the configured content fetch size limit";
+    case "unsupported":
+      return "file language is not supported by the MVP analysis pipeline";
+    case "dependency_lockfile":
+      return "dependency lockfiles are summarized and risk-flagged instead of fully packed";
+    case "generated":
+      return "generated files are summarized and kept eligible for deterministic secret scanning";
+    case "large_snapshot":
+      return "snapshot or golden files are summarized because review value is low";
+    case "minified":
+      return "minified assets are summarized because line-level review signal is low";
+    case "vendor":
+      return "vendor or build-output paths are summarized instead of sent as review context";
+  }
+}
+
+function toReviewPlanChangedFile(file: NormalizedGitHubPullRequestFile) {
+  return {
+    path: file.path,
+    previousPath: file.previousPath,
+    status: file.status,
+    additions: file.additions,
+    deletions: file.deletions,
+    patch: file.patch,
+    sizeBytes: file.sizeBytes,
+    risk: classifyChangedFileRisk({
+      path: file.path,
+      previousPath: file.previousPath,
+      patch: file.patch
+    }),
+    binary: isBinaryPath(file.path)
   };
 }
 
