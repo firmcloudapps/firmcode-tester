@@ -48,6 +48,7 @@ Use this checklist before deploying or enabling real GitHub publishing.
 - Webhook delivery succeeds.
 - Signature verification passes.
 - Installation allowlist is configured for personal MVP if needed.
+- FirmcodeAI scanning activity comment is created or updated on pull request events.
 
 ## Auth And Billing
 

@@ -4,5 +4,6 @@ export * from "./contracts/worker";
 export * from "./config/runtime";
 export * from "./diff/unified-diff";
 export * from "./enums/review-run-status";
+export * from "./github/firmcodeai-activity";
 export * from "./risk/changed-file-risk";
 export * from "./review/large-pr-handling";

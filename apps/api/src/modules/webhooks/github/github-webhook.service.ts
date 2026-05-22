@@ -1,7 +1,12 @@
-import { BadRequestException, Inject, Injectable, UnauthorizedException } from "@nestjs/common";
+import { BadRequestException, Inject, Injectable, Optional, UnauthorizedException } from "@nestjs/common";
 import { createHmac, timingSafeEqual } from "crypto";
 import { WORKER_REVIEW_JOB_INPUT_SCHEMA_VERSION, type ApiRuntimeConfig } from "@firmcode/shared";
 import { API_RUNTIME_CONFIG } from "../../../config/api-config.provider";
+import {
+  GITHUB_PR_ACTIVITY_PUBLISHER,
+  NoopGitHubPullRequestActivityPublisher,
+  type GitHubPullRequestActivityPublisher
+} from "../../../infrastructure/github/github-pr-activity-publisher";
 import { REVIEW_QUEUE, type ReviewQueueProducer } from "../../queues/review-queue";
 import { isSupportedGitHubWebhookEvent } from "./github-webhook.events";
 import { GITHUB_WEBHOOK_STORE, type GitHubWebhookStore } from "./github-webhook.store";
@@ -43,7 +48,10 @@ export class GitHubWebhookService {
     @Inject(GITHUB_WEBHOOK_SECRET) private readonly webhookSecret: string,
     @Inject(GITHUB_WEBHOOK_STORE) private readonly store: GitHubWebhookStore,
     @Inject(REVIEW_QUEUE) private readonly reviewQueue: ReviewQueueProducer,
-    @Inject(API_RUNTIME_CONFIG) private readonly config: ApiRuntimeConfig
+    @Inject(API_RUNTIME_CONFIG) private readonly config: ApiRuntimeConfig,
+    @Optional()
+    @Inject(GITHUB_PR_ACTIVITY_PUBLISHER)
+    private readonly activityPublisher: GitHubPullRequestActivityPublisher = new NoopGitHubPullRequestActivityPublisher()
   ) {}
 
   async acceptDelivery(input: GitHubWebhookDeliveryInput): Promise<GitHubWebhookReceipt> {
@@ -181,6 +189,15 @@ export class GitHubWebhookService {
         triggerEvent
       });
 
+      await this.publishScanningActivity({
+        installationId: installation.installationId,
+        repositoryFullName: repository.fullName,
+        pullRequestNumber: pullRequest.number,
+        reviewRunId: reviewRun.id,
+        headSha: pullRequest.headSha,
+        triggerEvent
+      });
+
       await this.store.markDeliveryProcessed(deliveryId, "processed");
 
       return {
@@ -253,5 +270,32 @@ export class GitHubWebhookService {
     }
 
     return deliveryId;
+  }
+
+  private async publishScanningActivity(input: {
+    readonly installationId: number;
+    readonly repositoryFullName: string;
+    readonly pullRequestNumber: number;
+    readonly reviewRunId: string;
+    readonly headSha: string;
+    readonly triggerEvent: string;
+  }): Promise<void> {
+    try {
+      await this.activityPublisher.publishScanningActivity({
+        ...input,
+        status: "queued"
+      });
+    } catch (error) {
+      console.warn(
+        JSON.stringify({
+          event: "github.activity.publish_failed",
+          activity: "scanning",
+          repositoryFullName: input.repositoryFullName,
+          pullRequestNumber: input.pullRequestNumber,
+          reviewRunId: input.reviewRunId,
+          error: error instanceof Error ? error.name : "UnknownError"
+        })
+      );
+    }
   }
 }
