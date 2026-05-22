@@ -1,0 +1,104 @@
+name: Deploy to Coolify
+
+on:
+  push:
+    branches:
+      - main
+      - codex/add-bullmq-review-queue
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  COOLIFY_URL: https://coolify.firmoncloud.com
+  DOCKERHUB_NAMESPACE: ${{ vars.DOCKERHUB_NAMESPACE || secrets.DOCKERHUB_USERNAME }}
+  API_IMAGE_NAME: firmcode-api
+  WORKER_IMAGE_NAME: firmcode-worker
+
+jobs:
+  build-and-push:
+    name: Build and push Docker images
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate required configuration
+        run: |
+          test -n "${{ secrets.DOCKERHUB_USERNAME }}" || (echo "DOCKERHUB_USERNAME secret is required" && exit 1)
+          test -n "${{ secrets.DOCKERHUB_TOKEN }}" || (echo "DOCKERHUB_TOKEN secret is required" && exit 1)
+          test -n "${{ env.DOCKERHUB_NAMESPACE }}" || (echo "DOCKERHUB_NAMESPACE variable or DOCKERHUB_USERNAME secret is required" && exit 1)
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Extract Docker metadata for API
+        id: api-meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.DOCKERHUB_NAMESPACE }}/${{ env.API_IMAGE_NAME }}
+          tags: |
+            type=sha,prefix=
+            type=ref,event=branch
+            type=raw,value=latest
+
+      - name: Extract Docker metadata for worker
+        id: worker-meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.DOCKERHUB_NAMESPACE }}/${{ env.WORKER_IMAGE_NAME }}
+          tags: |
+            type=sha,prefix=
+            type=ref,event=branch
+            type=raw,value=latest
+
+      - name: Build and push API image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infra/docker/api.prod.Dockerfile
+          push: true
+          tags: ${{ steps.api-meta.outputs.tags }}
+          labels: ${{ steps.api-meta.outputs.labels }}
+          cache-from: type=gha,scope=firmcode-api
+          cache-to: type=gha,mode=max,scope=firmcode-api
+
+      - name: Build and push worker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infra/docker/worker.prod.Dockerfile
+          push: true
+          tags: ${{ steps.worker-meta.outputs.tags }}
+          labels: ${{ steps.worker-meta.outputs.labels }}
+          cache-from: type=gha,scope=firmcode-worker
+          cache-to: type=gha,mode=max,scope=firmcode-worker
+
+  deploy:
+    name: Trigger Coolify deployment
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate Coolify configuration
+        run: |
+          test -n "${{ secrets.COOLIFY_API_TOKEN }}" || (echo "COOLIFY_API_TOKEN secret is required" && exit 1)
+          test -n "${{ secrets.COOLIFY_APP_UUID }}" || (echo "COOLIFY_APP_UUID secret is required" && exit 1)
+
+      - name: Trigger Coolify deploy
+        env:
+          COOLIFY_API_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
+          COOLIFY_APP_UUID: ${{ secrets.COOLIFY_APP_UUID }}
+        run: |
+          curl --fail-with-body --show-error --silent --request GET \
+            --header "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
+            "${COOLIFY_URL%/}/api/v1/deploy?uuid=${COOLIFY_APP_UUID}&force=true"
