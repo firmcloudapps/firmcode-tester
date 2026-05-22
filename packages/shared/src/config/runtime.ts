@@ -436,7 +436,7 @@ function readOptionalPositiveInteger(
   fallback: number,
   issues: ConfigValidationIssue[]
 ): number {
-  const rawValue = env[variable]?.trim();
+  const rawValue = normalizeEnvironmentValue(env[variable]);
 
   if (!rawValue) {
     return fallback;
@@ -461,7 +461,7 @@ function readOptionalBoolean(
   fallback: boolean,
   issues: ConfigValidationIssue[]
 ): boolean {
-  const rawValue = env[variable]?.trim().toLowerCase();
+  const rawValue = normalizeEnvironmentValue(env[variable])?.toLowerCase();
 
   if (!rawValue) {
     return fallback;
@@ -481,7 +481,7 @@ function readOptionalBoolean(
 }
 
 function readRequired(env: EnvironmentVariables, variable: string, issues: ConfigValidationIssue[]): string | null {
-  const value = env[variable]?.trim();
+  const value = normalizeEnvironmentValue(env[variable]);
 
   if (!value) {
     issues.push({
@@ -495,8 +495,25 @@ function readRequired(env: EnvironmentVariables, variable: string, issues: Confi
 }
 
 function readOptional(env: EnvironmentVariables, variable: string): string | null {
-  const value = env[variable]?.trim();
+  const value = normalizeEnvironmentValue(env[variable]);
   return value ? value : null;
+}
+
+function normalizeEnvironmentValue(value: string | undefined): string | null {
+  const trimmed = value?.trim();
+
+  if (!trimmed) {
+    return null;
+  }
+
+  if (
+    (trimmed.startsWith("\"") && trimmed.endsWith("\"")) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+  ) {
+    return trimmed.slice(1, -1).trim();
+  }
+
+  return trimmed;
 }
 
 function readOptionalHttpUrl(
@@ -569,7 +586,7 @@ function readDatabaseSsl(
   nodeEnv: RuntimeEnvironment,
   issues: ConfigValidationIssue[]
 ): boolean | null {
-  const rawValue = env.DATABASE_SSL?.trim().toLowerCase();
+  const rawValue = normalizeEnvironmentValue(env.DATABASE_SSL)?.toLowerCase();
 
   if (!rawValue) {
     if (nodeEnv === "production") {
@@ -605,11 +622,13 @@ function readDatabaseSsl(
 }
 
 function readPort(value: string | undefined, fallback: number, issues: ConfigValidationIssue[]): number {
-  if (!value) {
+  const normalized = normalizeEnvironmentValue(value);
+
+  if (!normalized) {
     return fallback;
   }
 
-  const port = Number(value);
+  const port = Number(normalized);
 
   if (Number.isInteger(port) && port > 0 && port <= 65535) {
     return port;
@@ -624,7 +643,7 @@ function readPort(value: string | undefined, fallback: number, issues: ConfigVal
 
 function readList(value: string | undefined): string[] {
   return (
-    value
+    normalizeEnvironmentValue(value)
       ?.split(",")
       .map((item) => item.trim())
       .filter(Boolean) ?? []

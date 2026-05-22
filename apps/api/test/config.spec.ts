@@ -34,6 +34,24 @@ describe("API runtime config", () => {
     expect(config.review.largePullRequest.maxChangedFiles).toBe(100);
   });
 
+  it("accepts values copied with surrounding quotes from deployment UIs", () => {
+    const config = createApiRuntimeConfig({
+      ...VALID_ENV,
+      DATABASE_URL: `"${VALID_ENV.DATABASE_URL}"`,
+      REDIS_URL: `"${VALID_ENV.REDIS_URL}"`,
+      CLERK_SECRET_KEY: `"${VALID_ENV.CLERK_SECRET_KEY}"`,
+      GITHUB_APP_ID: `"${VALID_ENV.GITHUB_APP_ID}"`,
+      GITHUB_APP_PRIVATE_KEY: `"${RAW_PRIVATE_KEY.replace(/\n/g, "\\n")}"`,
+      GITHUB_WEBHOOK_SECRET: `"${VALID_ENV.GITHUB_WEBHOOK_SECRET}"`,
+      GITHUB_CLIENT_ID: `"${VALID_ENV.GITHUB_CLIENT_ID}"`,
+      GITHUB_CLIENT_SECRET: `"${VALID_ENV.GITHUB_CLIENT_SECRET}"`
+    });
+
+    expect(config.database.url).toBe(VALID_ENV.DATABASE_URL);
+    expect(config.github?.appId).toBe(12345);
+    expect(config.github?.privateKey).toBe(RAW_PRIVATE_KEY);
+  });
+
   it("fails fast when Clerk, database, or GitHub variables are missing", () => {
     expect(() => createApiRuntimeConfig({ NODE_ENV: "development" })).toThrow(ConfigValidationError);
   });
