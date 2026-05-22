@@ -1,6 +1,6 @@
 import { BadRequestException, Inject, Injectable, UnauthorizedException } from "@nestjs/common";
 import { createHmac, timingSafeEqual } from "crypto";
-import { type ApiRuntimeConfig } from "@firmcode/shared";
+import { WORKER_REVIEW_JOB_INPUT_SCHEMA_VERSION, type ApiRuntimeConfig } from "@firmcode/shared";
 import { API_RUNTIME_CONFIG } from "../../../config/api-config.provider";
 import { REVIEW_QUEUE, type ReviewQueueProducer } from "../../queues/review-queue";
 import { isSupportedGitHubWebhookEvent } from "./github-webhook.events";
@@ -171,6 +171,7 @@ export class GitHubWebhookService {
         headSha: pullRequest.headSha
       });
       const job = await this.reviewQueue.enqueuePullRequestReview({
+        schemaVersion: WORKER_REVIEW_JOB_INPUT_SCHEMA_VERSION,
         deliveryId,
         reviewRunId: reviewRun.id,
         repositoryId: repository.id,

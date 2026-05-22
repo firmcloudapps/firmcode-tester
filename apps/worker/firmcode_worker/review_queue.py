@@ -2,23 +2,16 @@ from __future__ import annotations
 
 import asyncio
 import signal
-from dataclasses import dataclass
 from typing import Any, Mapping, Protocol
+
+from firmcode_worker.schemas.contracts import ContractValidationError, ReviewJobInput
 
 
 REVIEW_QUEUE_NAME = "review-runs"
 REVIEW_PULL_REQUEST_JOB_NAME = "review.pull_request"
 
 
-@dataclass(frozen=True)
-class ReviewJobPayload:
-    delivery_id: str
-    review_run_id: str
-    repository_id: str
-    pull_request_id: str
-    pull_request_number: int
-    head_sha: str
-    trigger_event: str
+ReviewJobPayload = ReviewJobInput
 
 
 class ReviewRunRepository(Protocol):
@@ -157,29 +150,10 @@ async def run_bullmq_review_worker(
 
 
 def review_job_payload_from_mapping(value: Mapping[str, Any]) -> ReviewJobPayload:
-    return ReviewJobPayload(
-        delivery_id=_read_str(value, "deliveryId"),
-        review_run_id=_read_str(value, "reviewRunId"),
-        repository_id=_read_str(value, "repositoryId"),
-        pull_request_id=_read_str(value, "pullRequestId"),
-        pull_request_number=_read_int(value, "pullRequestNumber"),
-        head_sha=_read_str(value, "headSha"),
-        trigger_event=_read_str(value, "triggerEvent"),
-    )
-
-
-def _read_str(value: Mapping[str, Any], key: str) -> str:
-    field = value.get(key)
-    if isinstance(field, str) and field.strip():
-        return field
-    raise ReviewWorkerError("invalid_job_payload", f"Job payload field {key} must be a non-empty string")
-
-
-def _read_int(value: Mapping[str, Any], key: str) -> int:
-    field = value.get(key)
-    if isinstance(field, int) and field > 0:
-        return field
-    raise ReviewWorkerError("invalid_job_payload", f"Job payload field {key} must be a positive integer")
+    try:
+        return ReviewJobInput.from_mapping(value)
+    except ContractValidationError as error:
+        raise ReviewWorkerError("invalid_job_payload", str(error)) from error
 
 
 def _error_message(error: Exception) -> str:
