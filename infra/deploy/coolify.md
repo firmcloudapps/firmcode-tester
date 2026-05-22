@@ -6,12 +6,15 @@ Firmcode uses Coolify for long-running Docker services: the NestJS API in `apps/
 
 | Service | Coolify type | Build context | Dockerfile | Exposed port | Health check |
 | --- | --- | --- | --- | --- | --- |
-| API | Docker service | repository root `.` | `infra/docker/api.Dockerfile` | `3001` | `GET /health` on port `3001` |
-| Worker | Docker service | repository root `.` | `infra/docker/worker.Dockerfile` | none | `python -m firmcode_worker.runtime --check` |
-| Redis | Coolify Redis or external managed Redis | provider-managed | provider-managed | `6379` if Coolify Redis | Redis `PING` |
+| Compose stack | Docker Compose | repository root `.` | `docker-compose.prod.yml` | API `3001` only | service health checks |
+| API | Docker service | repository root `.` | `infra/docker/api.prod.Dockerfile` | `3001` | `GET /health` on port `3001` |
+| Worker | Docker service | repository root `.` | `infra/docker/worker.prod.Dockerfile` | none | `python -m firmcode_worker.runtime --check` |
+| Redis | Compose internal Redis or external managed Redis | provider-managed or Compose | provider-managed or `redis:7-alpine` | internal only | Redis `PING` |
 | NeonDB | external managed PostgreSQL | not built by Coolify | not applicable | provider-managed | connection smoke from API and worker |
 
 Use the repository root as the Docker build context so the API image can copy root workspace metadata and `packages/shared`.
+
+Prefer deploying `docker-compose.prod.yml` in Coolify so API, worker, and Redis remain one production backend stack. The production Compose file intentionally excludes PostgreSQL and the Next.js web service.
 
 ## API Service
 
@@ -20,7 +23,7 @@ Coolify settings:
 | Setting | Value |
 | --- | --- |
 | Build context | `.` |
-| Dockerfile path | `infra/docker/api.Dockerfile` |
+| Dockerfile path | `infra/docker/api.prod.Dockerfile` |
 | Container port | `3001` |
 | Public domain | `https://api.firmcode.example.com` |
 | Health check path | `/health` |
@@ -60,7 +63,7 @@ Coolify settings:
 | Setting | Value |
 | --- | --- |
 | Build context | `.` |
-| Dockerfile path | `infra/docker/worker.Dockerfile` |
+| Dockerfile path | `infra/docker/worker.prod.Dockerfile` |
 | Container port | none |
 | Public domain | none |
 | Health check command | `python -m firmcode_worker.runtime --check` |
@@ -128,11 +131,10 @@ The command builds the API package and applies pending migrations against `DATAB
 1. Provision NeonDB and copy the pooled `DATABASE_URL`.
 2. Provision Clerk and configure dashboard callback URLs.
 3. Provision Redis through Coolify or a managed Redis provider.
-4. Create the Coolify API service with build context `.` and Dockerfile `infra/docker/api.Dockerfile`.
-5. Configure API environment variables and deploy the API.
+4. Create the Coolify Compose application from `docker-compose.prod.yml`.
+5. Configure production environment variables and deploy API, worker, and Redis.
 6. Run the migration command from the API service.
-7. Create the Coolify worker service with build context `.` and Dockerfile `infra/docker/worker.Dockerfile`.
-8. Configure worker environment variables and deploy one worker replica.
+7. Keep one worker replica until live webhook processing is stable.
 9. Deploy the Vercel dashboard with `NEXT_PUBLIC_API_URL` pointing to the API URL.
 10. Add Vercel production and preview origins to API `CORS_ALLOWED_ORIGINS`.
 11. Configure GitHub App webhook URL: `https://api.firmcode.example.com/webhooks/github`.
@@ -165,8 +167,8 @@ The local Docker Compose stack mirrors Coolify service boundaries:
 
 | Local Compose | Deployed Target | Notes |
 | --- | --- | --- |
-| `api` | Coolify API service | Same Dockerfile path, container port `3001`, and `/health` check. |
-| `worker` | Coolify worker service | Same Dockerfile path and runtime health command. |
+| `api` | Coolify API service | Same service boundary, local Dockerfile `api.Dockerfile`, production Dockerfile `api.prod.Dockerfile`, container port `3001`, and `/health` check. |
+| `worker` | Coolify worker service | Same service boundary, local Dockerfile `worker.Dockerfile`, production Dockerfile `worker.prod.Dockerfile`, and runtime health command. |
 | `redis` | Coolify Redis or managed Redis | Local URL is `redis://redis:6379`; deployed URL comes from provider. |
 | Host-provided `DATABASE_URL` | NeonDB | Compose and Coolify both use external NeonDB; neither runs PostgreSQL. |
 | Local web outside Compose | Vercel dashboard | Local web uses `NEXT_PUBLIC_API_URL=http://localhost:3001`; Vercel uses the public Coolify API URL. |

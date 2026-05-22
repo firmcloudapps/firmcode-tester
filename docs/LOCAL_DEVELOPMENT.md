@@ -22,11 +22,10 @@ Firmcode should be developed Docker-first for API and worker runtime behavior. D
 4. Create GitHub App with required permissions and webhook secret.
 5. Set `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, and `GITHUB_WEBHOOK_SECRET`.
 6. Set LLM provider/model variables.
-7. Start services with Docker Compose.
+7. Start API, worker, and Redis with local Docker Compose.
 8. Run migrations.
-9. Start API and worker with Docker Compose.
-10. Start the web dashboard independently with Next.js dev.
-11. Use webhook tunnel for GitHub App webhook URL.
+9. Start the web dashboard independently with Next.js dev.
+10. Use webhook tunnel for GitHub App webhook URL.
 
 ## Docker-First Workflow
 
@@ -34,6 +33,12 @@ Default local workflow:
 
 ```bash
 docker compose up --build
+```
+
+Production/Coolify Compose is separate:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env config
 ```
 
 Task 0.2 smoke workflow:
@@ -49,6 +54,8 @@ The Compose stack should include:
 - `redis`
 
 The API and worker containers should use the same production entrypoints planned for Coolify wherever practical. The web dashboard runs independently with `npm run dev --workspace @firmcode/web` for local development and deploys to Vercel in production.
+
+Do not add PostgreSQL or the Next.js web app to either backend Compose stack. NeonDB and Vercel own those roles.
 
 Before merging implementation work, verify:
 

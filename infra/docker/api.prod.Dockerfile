@@ -32,6 +32,7 @@ COPY package.json package-lock.json ./
 COPY apps/api/package.json apps/api/package.json
 COPY packages/shared/package.json packages/shared/package.json
 COPY packages/prompts/package.json packages/prompts/package.json
+
 RUN npm ci --omit=dev \
   --workspace @firmcode/api \
   --workspace @firmcode/shared \
