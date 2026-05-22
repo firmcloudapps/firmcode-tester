@@ -25,6 +25,14 @@ Firmcode should use typed configuration validation in every runtime. Missing req
 
 Local development uses NeonDB, not a local PostgreSQL container. NeonDB connection strings should keep the provider's SSL mode and set `DATABASE_SSL=true` in API and worker environments.
 
+Run database migrations from the repository root with:
+
+```bash
+npm run db:migrate
+```
+
+The command builds the API package and applies pending migrations against `DATABASE_URL`.
+
 Inside Docker Compose, API and worker receive the same external NeonDB URL from the host environment:
 
 ```text
