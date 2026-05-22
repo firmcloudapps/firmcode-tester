@@ -39,13 +39,13 @@ Required API environment variables:
 | `APP_URL` | Vercel dashboard URL. |
 | `API_URL` | Public Coolify API URL: `https://firmcodeapi.firmoncloud.com`. |
 | `CORS_ALLOWED_ORIGINS` | Comma-separated Vercel production, preview, and local dev origins. |
-| `DATABASE_URL` | NeonDB PostgreSQL URL with database name and SSL mode. |
+| `DATABASE_URL` | NeonDB PostgreSQL URL with database name and SSL mode. Example: `postgresql://user:password@host/dbname?sslmode=require`. |
 | `DATABASE_SSL=true` | Required for NeonDB. |
 | `REDIS_URL` | Coolify Redis internal URL or managed Redis URL. |
 | `CLERK_SECRET_KEY` | Used to validate dashboard API requests. |
 | `CLERK_WEBHOOK_SECRET` | Required if Clerk webhooks are enabled. |
 | `GITHUB_APP_ID` | GitHub App ID. |
-| `GITHUB_APP_PRIVATE_KEY` | PEM, escaped-newline, or base64 private key. Do not log it. |
+| `GITHUB_APP_PRIVATE_KEY` | PEM, escaped-newline, or base64 private key. In Coolify, prefer a single-line escaped-newline value such as `-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----` or a base64-encoded PEM. Do not log it. |
 | `GITHUB_WEBHOOK_SECRET` | Used to verify GitHub webhook signatures. |
 | `LOG_LEVEL` | Default `info`. |
 | `DRY_RUN` | Start with `true` until smoke checks pass. |
@@ -55,6 +55,8 @@ API CORS must use explicit origins:
 ```text
 CORS_ALLOWED_ORIGINS=https://firmcode.example.com,https://firmcode-git-main-owner.vercel.app,http://localhost:3000
 ```
+
+Coolify Compose compatibility note: `docker-compose.prod.yml` intentionally uses plain `${VARIABLE}` interpolation instead of `${VARIABLE:?message}`. Firmcode validates missing or malformed values at process startup, while plain interpolation avoids Coolify passing literal shell-expression strings into the container.
 
 ## Worker Service
 
