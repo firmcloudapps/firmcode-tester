@@ -1,18 +1,18 @@
 services:
   redis:
     image: redis:7-alpine
-    command: ["redis-server", "--appendonly", "yes"]
+    command: [ "redis-server", "--appendonly", "yes" ]
     restart: unless-stopped
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 10s
       timeout: 5s
       retries: 10
 
   api:
-    image: ${DOCKERHUB_NAMESPACE}/firmcode-api:${IMAGE_TAG:-latest}
+    image: obehiaye/firmcode-api:latest
     restart: unless-stopped
     environment:
       NODE_ENV: production
@@ -49,19 +49,13 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test:
-        [
-          "CMD",
-          "node",
-          "-e",
-          "fetch('http://localhost:3001/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
-        ]
+      test: [ "CMD", "node", "-e", "fetch('http://localhost:3001/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" ]
       interval: 30s
       timeout: 5s
       retries: 10
 
   worker:
-    image: ${DOCKERHUB_NAMESPACE}/firmcode-worker:${IMAGE_TAG:-latest}
+    image: obehiaye/firmcode-worker:latest
     restart: unless-stopped
     environment:
       NODE_ENV: production
@@ -90,7 +84,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-m", "firmcode_worker.runtime", "--check"]
+      test: [ "CMD", "python", "-m", "firmcode_worker.runtime", "--check" ]
       interval: 30s
       timeout: 15s
       retries: 5
