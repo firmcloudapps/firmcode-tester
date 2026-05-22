@@ -1,5 +1,6 @@
 import type { ReviewRunStatus } from "../enums/review-run-status";
 import type { ChangedFileRiskClassification } from "../risk/changed-file-risk";
+import type { LargePullRequestReviewArtifact, ReviewSkippedFileReport } from "../review/large-pr-handling";
 
 export interface ReviewRunSummary {
   id: string;
@@ -23,6 +24,8 @@ export interface ReviewContextPack {
   pullRequestNumber: number;
   headSha: string;
   files: ReviewContextFile[];
+  largePullRequest?: LargePullRequestReviewArtifact;
+  skippedFiles?: ReviewSkippedFileReport[];
 }
 
 export interface ReviewContextFile {

@@ -1,3 +1,8 @@
+import {
+  DEFAULT_LARGE_PULL_REQUEST_THRESHOLDS,
+  type LargePullRequestThresholds
+} from "../review/large-pr-handling";
+
 export type RuntimeEnvironment = "development" | "test" | "production";
 
 export type EnvironmentVariables = Record<string, string | undefined>;
@@ -77,6 +82,7 @@ export interface ApiRuntimeConfig {
 
 export interface ReviewConfig {
   skipDraftPullRequests: boolean;
+  largePullRequest: LargePullRequestThresholds;
 }
 
 const BOOLEAN_VALUES = new Map<string, boolean>([
@@ -358,8 +364,95 @@ function readQueueConfig(env: EnvironmentVariables, issues: ConfigValidationIssu
 
 function readReviewConfig(env: EnvironmentVariables, issues: ConfigValidationIssue[]): ReviewConfig {
   return {
-    skipDraftPullRequests: readOptionalBoolean(env, "REVIEW_SKIP_DRAFT_PRS", true, issues)
+    skipDraftPullRequests: readOptionalBoolean(env, "REVIEW_SKIP_DRAFT_PRS", true, issues),
+    largePullRequest: {
+      maxChangedFiles: readOptionalPositiveInteger(
+        env,
+        "REVIEW_LARGE_PR_MAX_CHANGED_FILES",
+        DEFAULT_LARGE_PULL_REQUEST_THRESHOLDS.maxChangedFiles,
+        issues
+      ),
+      maxDiffBytes: readOptionalPositiveInteger(
+        env,
+        "REVIEW_LARGE_PR_MAX_DIFF_BYTES",
+        DEFAULT_LARGE_PULL_REQUEST_THRESHOLDS.maxDiffBytes,
+        issues
+      ),
+      maxChangedLines: readOptionalPositiveInteger(
+        env,
+        "REVIEW_LARGE_PR_MAX_CHANGED_LINES",
+        DEFAULT_LARGE_PULL_REQUEST_THRESHOLDS.maxChangedLines,
+        issues
+      ),
+      maxEstimatedTokens: readOptionalPositiveInteger(
+        env,
+        "REVIEW_LARGE_PR_MAX_ESTIMATED_TOKENS",
+        DEFAULT_LARGE_PULL_REQUEST_THRESHOLDS.maxEstimatedTokens,
+        issues
+      ),
+      maxFilesAfterFiltering: readOptionalPositiveInteger(
+        env,
+        "REVIEW_LARGE_PR_MAX_FILTERED_FILES",
+        DEFAULT_LARGE_PULL_REQUEST_THRESHOLDS.maxFilesAfterFiltering,
+        issues
+      ),
+      maxSemgrepRuntimeMs: readOptionalPositiveInteger(
+        env,
+        "REVIEW_LARGE_PR_MAX_SEMGREP_RUNTIME_MS",
+        DEFAULT_LARGE_PULL_REQUEST_THRESHOLDS.maxSemgrepRuntimeMs,
+        issues
+      ),
+      summaryOnlyDiffBytes: readOptionalPositiveInteger(
+        env,
+        "REVIEW_SUMMARY_ONLY_DIFF_BYTES",
+        DEFAULT_LARGE_PULL_REQUEST_THRESHOLDS.summaryOnlyDiffBytes,
+        issues
+      ),
+      summaryOnlyChangedLines: readOptionalPositiveInteger(
+        env,
+        "REVIEW_SUMMARY_ONLY_CHANGED_LINES",
+        DEFAULT_LARGE_PULL_REQUEST_THRESHOLDS.summaryOnlyChangedLines,
+        issues
+      ),
+      summaryOnlyEstimatedTokens: readOptionalPositiveInteger(
+        env,
+        "REVIEW_SUMMARY_ONLY_ESTIMATED_TOKENS",
+        DEFAULT_LARGE_PULL_REQUEST_THRESHOLDS.summaryOnlyEstimatedTokens,
+        issues
+      ),
+      maxFullContextFiles: readOptionalPositiveInteger(
+        env,
+        "REVIEW_LARGE_PR_MAX_FULL_CONTEXT_FILES",
+        DEFAULT_LARGE_PULL_REQUEST_THRESHOLDS.maxFullContextFiles,
+        issues
+      )
+    }
   };
+}
+
+function readOptionalPositiveInteger(
+  env: EnvironmentVariables,
+  variable: string,
+  fallback: number,
+  issues: ConfigValidationIssue[]
+): number {
+  const rawValue = env[variable]?.trim();
+
+  if (!rawValue) {
+    return fallback;
+  }
+
+  const parsed = Number(rawValue);
+
+  if (Number.isInteger(parsed) && parsed > 0) {
+    return parsed;
+  }
+
+  issues.push({
+    variable,
+    message: "must be a positive integer"
+  });
+  return fallback;
 }
 
 function readOptionalBoolean(
