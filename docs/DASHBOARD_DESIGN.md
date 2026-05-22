@@ -1,0 +1,502 @@
+# Dashboard Design
+
+Firmcode's dashboard should feel like a clean, modern, light-mode code review SaaS product: calm, precise, fast to scan, and built for repeated engineering workflows. It should feel closer to a polished developer operations console than a marketing site.
+
+Copy-ready prompts for implementing and QAing the dashboard live in `docs/DASHBOARD_PROMPTS.md`.
+
+## Technology Direction
+
+- Framework: Next.js with TypeScript.
+- Styling: Tailwind CSS.
+- Authentication: Clerk.
+- Billing: Clerk Billing.
+- Database: NeonDB PostgreSQL.
+- UI posture: light mode first, responsive, dense but breathable.
+
+## Visual Direction
+
+### Product Feel
+
+- Quiet, professional, and modern.
+- Dense enough for engineering users.
+- Clear hierarchy without decorative noise.
+- Tables, tabs, drawers, status pills, compact cards, code snippets, and pipeline views.
+- No landing-page hero treatment inside the app.
+- No oversized decorative cards or one-note color themes.
+
+### Palette
+
+Use a neutral light shell with restrained accent color.
+
+- App background: `#F8FAFC`
+- Surface: `#FFFFFF`
+- Subtle surface: `#F1F5F9`
+- Border: `#E2E8F0`
+- Text primary: `#0F172A`
+- Text secondary: `#64748B`
+- Accent: `#2563EB` or `#4F46E5`
+- Success: `#16A34A`
+- Warning: `#D97706`
+- Critical: `#DC2626`
+- Info: `#0284C7`
+
+### Typography
+
+- Use a clean sans-serif for UI text.
+- Use a monospace font for code snippets, commit SHAs, file paths, logs, rule IDs, and environment values.
+- Keep headings compact inside dashboards. Avoid hero-scale typography in operational views.
+
+### Component Style
+
+- 6-8px border radius for cards, tables, controls, and drawers.
+- Subtle borders over heavy shadows.
+- Status pills should use pale backgrounds and strong text colors.
+- Tables should have sticky headers where useful.
+- Code and logs should appear in bordered monospace panels.
+- Diff snippets should highlight added, removed, and context lines with restrained colors.
+- Use icons in navigation and action buttons where they improve recognition.
+
+## Global App Shell
+
+```text
+Top Bar
+├── Workspace switcher
+├── Global search
+├── GitHub install/connect action
+├── Notifications
+└── Clerk user menu
+
+Left Sidebar
+├── Overview
+├── Repositories
+├── Pull Requests
+├── Review Runs
+├── Findings
+├── CI Failures
+├── Rules / Policies
+├── Settings
+└── Billing
+```
+
+### Top Bar
+
+- Shows current workspace or organization.
+- Provides global search across repositories, PRs, findings, and review runs.
+- Includes GitHub App install/connect CTA when no installation exists.
+- Uses Clerk user menu for identity and account controls.
+- Keeps height compact, around 56-64px.
+
+### Sidebar
+
+- Icon plus label navigation.
+- Active item has soft accent background and left accent indicator.
+- Collapse behavior can be deferred for MVP, but mobile should use a drawer.
+
+## Clerk Responsibilities
+
+Clerk should own:
+
+- Sign in and sign up.
+- Session management.
+- User profile menu.
+- Organization/workspace switcher if Clerk Organizations are enabled.
+- Member management if using Clerk Organizations.
+- Billing checkout, subscription management, and customer portal via Clerk Billing.
+
+The Next.js app should wrap the dashboard in a Clerk provider boundary. Until `@clerk/nextjs` is installed, the boundary remains a no-op scaffold so the rest of the dashboard can compile while the environment and route contracts are tested.
+
+Firmcode should store Clerk-linked metadata:
+
+- `clerk_user_id`
+- `clerk_org_id`
+- Internal workspace ID.
+- GitHub installation mapping.
+- Repository review configuration.
+- Usage counters or cached billing-related usage metrics where needed.
+
+## NeonDB Responsibilities
+
+NeonDB stores application state:
+
+- GitHub installations.
+- Repositories.
+- Pull requests.
+- Review runs.
+- Changed files.
+- Analysis artifacts.
+- Findings.
+- Published comments.
+- User/workspace settings.
+- Repository configuration.
+- Usage events and review metrics.
+
+Use NeonDB as the PostgreSQL database behind the schema in `docs/PRD.md`.
+
+## Pages
+
+## 1. Overview
+
+Purpose: show the current health and activity of automated reviews.
+
+### Layout
+
+```text
+Metric Row
+├── Review Activity
+├── Security Findings
+├── CI Failures Explained
+└── Repositories Monitored
+
+Main Grid
+├── Recent Review Runs table
+└── Needs Attention panel
+
+Lower Section
+└── Review Quality metrics
+```
+
+### Metric Cards
+
+Each card includes:
+
+- Current value.
+- 7-day change.
+- Small trend indicator or sparkline.
+- Status color only when meaningful.
+
+### Recent Review Runs Table
+
+Columns:
+
+- Repository.
+- PR.
+- Status.
+- Risk.
+- Findings.
+- Duration.
+- Trigger.
+- Last updated.
+
+### Needs Attention Panel
+
+Items:
+
+- Failed review jobs.
+- High severity findings.
+- PRs with CI failures.
+- Repositories not fully configured.
+
+## 2. Repositories
+
+Purpose: connect, inspect, and configure GitHub repositories.
+
+### Layout
+
+```text
+Header
+├── Title: Repositories
+├── Sync GitHub
+└── Connect GitHub App
+
+Filters
+├── Enabled
+├── Disabled
+├── Private
+├── Public
+└── Language
+
+Repository Table
+```
+
+### Table Columns
+
+- Repository name.
+- Default branch.
+- Visibility.
+- Review automation status.
+- Last PR reviewed.
+- Last run status.
+- Open findings.
+- Actions.
+
+### Row Actions
+
+- Enable or disable reviews.
+- Configure.
+- View runs.
+- Sync.
+
+### Repository Detail Tabs
+
+```text
+Overview | Pull Requests | Findings | Configuration | Activity
+```
+
+Configuration controls:
+
+- Auto-review enabled.
+- Draft PR behavior.
+- Max inline comments.
+- Review severity threshold.
+- Semgrep enabled.
+- Tree-sitter parsing enabled.
+- CI failure explanation enabled.
+- Infrastructure review enabled.
+- Dry-run mode.
+
+## 3. Pull Requests
+
+Purpose: act as an engineering queue for PR review activity.
+
+### Filters
+
+- Repository.
+- Status.
+- Risk level.
+- Review status.
+- Author.
+- Date range.
+
+### Table Columns
+
+- PR title.
+- Repository.
+- Author.
+- Risk.
+- Review status.
+- Findings.
+- CI status.
+- Updated.
+
+### PR Detail Layout
+
+```text
+Main
+├── PR summary
+├── Changed components
+├── Risk analysis
+├── Review timeline
+└── Findings list
+
+Right Panel
+├── Metadata
+├── Branches
+├── Commit SHA
+├── Files changed
+├── Review duration
+└── GitHub link
+```
+
+Tabs:
+
+```text
+Summary | Findings | Files | CI Analysis | Artifacts
+```
+
+## 4. Review Runs
+
+Purpose: debug and inspect each pipeline execution.
+
+### Review Run List
+
+Filters:
+
+- Repository.
+- Status.
+- Trigger.
+- Date range.
+- Risk.
+
+Columns:
+
+- Run ID.
+- Repository.
+- PR.
+- Status.
+- Pipeline stage.
+- Duration.
+- Findings.
+- Comments posted.
+- Started.
+
+### Review Run Detail
+
+Header:
+
+```text
+Review Run #123
+Status
+Repository / PR / Commit SHA
+```
+
+Summary cards:
+
+- Duration.
+- Files analyzed.
+- Semgrep findings.
+- AI findings.
+- Inline comments posted.
+- Token usage or estimated cost.
+
+Pipeline visualization:
+
+```text
+Webhook Received -> Diff Fetched -> Tree-sitter Parsed -> Semgrep Scanned -> LLM Reviewed -> Comments Published
+```
+
+Each stage shows:
+
+- Status.
+- Duration.
+- Error message if failed.
+- Artifact link.
+
+Findings section:
+
+- Severity.
+- Source: Semgrep, AI, CI, or policy.
+- Category.
+- File.
+- Line.
+- Confidence.
+- Posted or not posted.
+- Reason if not posted.
+
+## 5. Findings
+
+Purpose: provide a code quality and security inbox.
+
+### Filters
+
+- Severity.
+- Source.
+- Category.
+- Repository.
+- Status.
+- Posted inline.
+- Date.
+
+### Finding Detail Drawer
+
+- Title.
+- Explanation.
+- Evidence.
+- File path and line.
+- Semgrep rule ID if available.
+- Suggested fix.
+- Review run link.
+- GitHub comment link.
+
+### Finding Statuses
+
+- Open.
+- Posted.
+- Suppressed.
+- Resolved.
+- False positive.
+
+## 6. CI Failures
+
+Purpose: explain broken checks and workflow failures.
+
+### List Columns
+
+- Repository.
+- PR.
+- Failed workflow/job.
+- Root cause summary.
+- Flaky suspected.
+- Suggested fix.
+- Created at.
+
+### Detail View
+
+- Failure summary.
+- Likely root cause.
+- Suggested fixes.
+- Failed jobs.
+- Relevant log excerpts.
+
+Raw logs should be collapsed by default and redacted before display.
+
+## 7. Rules / Policies
+
+Purpose: control review behavior.
+
+Sections:
+
+- Review preferences.
+- Security rules.
+- Infrastructure rules.
+- Comment policy.
+- Prompt instructions.
+- Ignored paths.
+
+Controls:
+
+- Severity threshold.
+- Max comments per PR.
+- Enable/disable categories.
+- Custom review instructions.
+- Paths to ignore.
+- Generated file ignore patterns.
+- Semgrep rule config.
+
+## 8. Settings
+
+Purpose: workspace and integration settings.
+
+Tabs:
+
+```text
+General | GitHub App | Members | API Keys | Data Retention | Notifications
+```
+
+Clerk owns identity and membership UI where possible. Firmcode owns GitHub installation mapping, retention policy, notifications, and review configuration.
+
+## 9. Billing
+
+Purpose: lightweight billing and usage view backed by Clerk Billing.
+
+Content:
+
+- Current plan.
+- Usage this month.
+- Review runs.
+- AI tokens.
+- Repositories monitored.
+- Seats.
+- Manage subscription button through Clerk.
+
+The manage subscription action should link to `CLERK_BILLING_PORTAL_URL`, which is expected to be a Clerk-managed billing portal or account billing entry point. Firmcode should not implement custom checkout or subscription mutation screens for the MVP.
+
+## MVP Page Priority
+
+Build in this order:
+
+1. Overview.
+2. Repositories.
+3. Review Runs.
+4. Review Run Detail.
+5. Findings.
+6. Settings.
+
+Pull Requests, CI Failures, Rules / Policies, and Billing can follow once the core review loop is visible.
+
+## Tailwind Implementation Notes
+
+- Define semantic color tokens in `tailwind.config.ts`.
+- Keep shared UI primitives in `apps/web/components/ui`.
+- Keep dashboard-specific components in `apps/web/components/dashboard`.
+- Use typed component props and shared API DTOs from `packages/shared`.
+- Prefer server components for data-heavy pages and client components for filters, drawers, menus, and interactive controls.
+- Use accessible table, tabs, dialog/drawer, menu, tooltip, select, checkbox, switch, and segmented control primitives.
+- Ensure empty, loading, error, and permission-denied states for every page.
+
+## Frontend Quality Bar
+
+- Text must not overflow buttons, badges, table cells, cards, or drawers.
+- Tables should remain usable on laptop widths.
+- Mobile can prioritize navigation, summary cards, and detail drawers; dense tables may become stacked lists.
+- Every status should be understandable by text, not color alone.
+- Run visual checks on the dashboard after significant frontend changes.

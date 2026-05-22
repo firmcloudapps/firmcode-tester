@@ -1,0 +1,22 @@
+{
+  "name": "firmcode",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Firmcode monorepo for AI-powered pull request review and testing.",
+  "workspaces": [
+    "packages/shared",
+    "packages/prompts",
+    "apps/api",
+    "apps/web"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "dev": "npm run dev --workspaces --if-present",
+    "lint": "npm run build --workspace @firmcode/shared && npm run build --workspace @firmcode/prompts && npm run lint --workspaces --if-present",
+    "test": "npm run build --workspace @firmcode/shared && npm run build --workspace @firmcode/prompts && npm run test --workspaces --if-present && python3 -m pytest apps/worker/tests"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  }
+}
