@@ -271,4 +271,63 @@ describe("GitHubPullRequestFileFetcher", () => {
     ]);
     expect(client.requests.map((request) => request.path)).toEqual([pageOnePath, pageOnePath, contentPath, contentPath]);
   });
+
+  it("attaches persisted risk metadata to fetched and skipped changed files", async () => {
+    const client = new MockGitHubRestClient();
+    const pageOnePath = "/repos/acme/widgets/pulls/20/files?per_page=2&page=1";
+    const pageTwoPath = "/repos/acme/widgets/pulls/20/files?per_page=2&page=2";
+    const contentPath = "/repos/acme/widgets/contents/src/auth/session.ts?ref=head999";
+
+    client.enqueue(pageOnePath, [
+      {
+        filename: "src/auth/session.ts",
+        status: "modified",
+        additions: 1,
+        deletions: 0,
+        patch: "@@ -1 +1,2 @@\n export function validate() {}\n+const ok = jwt.verify(token, key);\n"
+      },
+      {
+        filename: ".env.production",
+        status: "modified",
+        additions: 1,
+        deletions: 1,
+        patch: "@@ -1 +1 @@\n-API_KEY=old\n+API_KEY=sk_live_example\n"
+      }
+    ]);
+    client.enqueue(pageTwoPath, []);
+    client.enqueue(contentPath, {
+      type: "file",
+      encoding: "base64",
+      size: 55,
+      content: base64("export function validate() {}\nconst ok = jwt.verify(token, key);\n")
+    });
+
+    const result = await createFetcher(client).fetchPullRequestFiles({
+      owner: "acme",
+      repo: "widgets",
+      pullNumber: 20,
+      headSha: "head999"
+    });
+
+    expect(result.files).toEqual([
+      expect.objectContaining({
+        path: "src/auth/session.ts",
+        risk: expect.objectContaining({
+          flags: ["auth"],
+          level: "high",
+          isInfrastructure: false
+        })
+      })
+    ]);
+    expect(result.skippedFiles).toEqual([
+      expect.objectContaining({
+        path: ".env.production",
+        reason: "unsupported",
+        risk: expect.objectContaining({
+          flags: ["secrets"],
+          level: "high"
+        })
+      })
+    ]);
+  });
 });
