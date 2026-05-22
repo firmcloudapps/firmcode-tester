@@ -83,21 +83,21 @@ jobs:
           cache-from: type=gha,scope=firmcode-worker
           cache-to: type=gha,mode=max,scope=firmcode-worker
 
-  deploy:
-    name: Trigger Coolify deployment
-    needs: build-and-push
-    runs-on: ubuntu-latest
-    steps:
-      - name: Validate Coolify configuration
-        run: |
-          test -n "${{ secrets.COOLIFY_API_TOKEN }}" || (echo "COOLIFY_API_TOKEN secret is required" && exit 1)
-          test -n "${{ secrets.COOLIFY_APP_UUID }}" || (echo "COOLIFY_APP_UUID secret is required" && exit 1)
+  # deploy:
+  #   name: Trigger Coolify deployment
+  #   needs: build-and-push
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Validate Coolify configuration
+  #       run: |
+  #         test -n "${{ secrets.COOLIFY_API_TOKEN }}" || (echo "COOLIFY_API_TOKEN secret is required" && exit 1)
+  #         test -n "${{ secrets.COOLIFY_APP_UUID }}" || (echo "COOLIFY_APP_UUID secret is required" && exit 1)
 
-      - name: Trigger Coolify deploy
-        env:
-          COOLIFY_API_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
-          COOLIFY_APP_UUID: ${{ secrets.COOLIFY_APP_UUID }}
-        run: |
-          curl --fail-with-body --show-error --silent --request GET \
-            --header "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
-            "${COOLIFY_URL%/}/api/v1/deploy?uuid=${COOLIFY_APP_UUID}&force=true"
+  #     - name: Trigger Coolify deploy
+  #       env:
+  #         COOLIFY_API_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
+  #         COOLIFY_APP_UUID: ${{ secrets.COOLIFY_APP_UUID }}
+  #       run: |
+  #         curl --fail-with-body --show-error --silent --request GET \
+  #           --header "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
+  #           "${COOLIFY_URL%/}/api/v1/deploy?uuid=${COOLIFY_APP_UUID}&force=true"
