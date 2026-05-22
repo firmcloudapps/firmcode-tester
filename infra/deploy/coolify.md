@@ -58,6 +58,16 @@ CORS_ALLOWED_ORIGINS=https://firmcode.example.com,https://firmcode-git-main-owne
 
 Coolify Compose compatibility note: `docker-compose.prod.yml` intentionally uses plain `${VARIABLE}` interpolation instead of `${VARIABLE:?message}`. Firmcode validates missing or malformed values at process startup, while plain interpolation avoids Coolify passing literal shell-expression strings into the container.
 
+Coolify writes runtime-enabled environment variables to a `.env` file for Docker Compose deployments. `docker-compose.prod.yml` uses `env_file: .env` for API and worker so Coolify-managed values reach the containers. The Compose `environment` block only overrides service-local values such as `NODE_ENV`, `PORT`, internal `REDIS_URL`, and queue name.
+
+If the API exits with `ConfigValidationError` for missing `DATABASE_URL`, `GITHUB_APP_ID`, or `GITHUB_APP_PRIVATE_KEY`, check these Coolify settings before changing application code:
+
+- Deploy from `docker-compose.prod.yml`, not the standalone local compose file.
+- Confirm each variable is enabled for runtime, not build-only.
+- Redeploy or recreate the containers after editing variables; already-running containers will not pick up changed values.
+- Keep `GITHUB_APP_PRIVATE_KEY` as a single-line escaped-newline PEM or base64-encoded PEM in Coolify.
+- Use the Coolify terminal to check presence without printing secrets: `node -e 'for (const k of ["DATABASE_URL","GITHUB_APP_ID","GITHUB_APP_PRIVATE_KEY"]) console.log(k, process.env[k] ? "set" : "missing")'`.
+
 ## Worker Service
 
 Coolify settings:
@@ -137,10 +147,10 @@ The command builds the API package and applies pending migrations against `DATAB
 5. Configure production environment variables and deploy API, worker, and Redis.
 6. Run the migration command from the API service.
 7. Keep one worker replica until live webhook processing is stable.
-9. Deploy the Vercel dashboard with `NEXT_PUBLIC_API_URL` pointing to the API URL.
-10. Add Vercel production and preview origins to API `CORS_ALLOWED_ORIGINS`.
-11. Configure GitHub App webhook URL: `https://firmcodeapi.firmoncloud.com/webhooks/github`.
-12. Run a synthetic dry-run review before setting `DRY_RUN=false`.
+8. Deploy the Vercel dashboard with `NEXT_PUBLIC_API_URL` pointing to the API URL.
+9. Add Vercel production and preview origins to API `CORS_ALLOWED_ORIGINS`.
+10. Configure GitHub App webhook URL: `https://firmcodeapi.firmoncloud.com/webhooks/github`.
+11. Run a synthetic dry-run review before setting `DRY_RUN=false`.
 
 ## Rollback Notes
 
