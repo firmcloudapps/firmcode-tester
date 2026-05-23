@@ -8,6 +8,7 @@ export interface DashboardApiProxyInput {
 
 const WORKSPACE_HEADER = "x-firmcode-workspace-id";
 const USER_HEADER = "x-firmcode-user-id";
+const CLERK_BILLING_ROLE_HEADER = "x-firmcode-clerk-billing-role";
 
 type DashboardProxyEnvironment = Record<string, string | undefined>;
 
@@ -43,6 +44,7 @@ export function createDashboardApiHeaders(env: DashboardProxyEnvironment, hasBod
   });
   const workspaceId = env.FIRMCODE_DASHBOARD_WORKSPACE_ID;
   const clerkUserId = env.FIRMCODE_DASHBOARD_CLERK_USER_ID;
+  const clerkBillingRole = env.FIRMCODE_DASHBOARD_CLERK_BILLING_ROLE;
 
   if (hasBody) {
     headers.set("content-type", "application/json");
@@ -54,6 +56,10 @@ export function createDashboardApiHeaders(env: DashboardProxyEnvironment, hasBod
 
   if (clerkUserId !== undefined && clerkUserId !== "") {
     headers.set(USER_HEADER, clerkUserId);
+  }
+
+  if (clerkBillingRole !== undefined && clerkBillingRole !== "") {
+    headers.set(CLERK_BILLING_ROLE_HEADER, clerkBillingRole);
   }
 
   return headers;

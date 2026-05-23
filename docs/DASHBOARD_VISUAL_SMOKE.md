@@ -35,3 +35,21 @@ npm run dev --workspace @firmcode/web
 - Empty GitHub installation state and populated installation cards do not overflow.
 
 The automated component tests cover tab active state, loading, empty, error, populated, Clerk-gated shell, and role-based disabled states. The manual responsive smoke remains a visual layout check because the MVP test stack does not include Playwright screenshots yet.
+
+## Billing Shell
+
+1. Start the web app if it is not already running:
+
+```bash
+npm run dev --workspace @firmcode/web
+```
+
+2. Open `/billing`, then verify at desktop width and a narrow mobile width:
+
+- The Billing sidebar item is active inside the dashboard shell.
+- Current plan, monthly review runs, AI tokens, repositories, seats, billing status, and usage period remain readable without overlap.
+- The Manage subscription action links to the configured Clerk Billing portal URL when `CLERK_BILLING_PORTAL_URL` is set.
+- When `CLERK_BILLING_PORTAL_URL` is missing, the action is disabled and the warning explains that Clerk Billing is not configured.
+- Lower-role or unauthenticated responses show the Billing access denied state instead of exposing payment controls.
+
+The automated component and API tests cover populated, missing portal URL, loading/error states, Clerk-gated access, and elevated role checks. This manual smoke is for responsive layout and visual polish.

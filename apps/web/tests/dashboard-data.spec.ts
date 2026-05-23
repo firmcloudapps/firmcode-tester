@@ -1,15 +1,17 @@
-import type { FindingsListResponse } from "@firmcode/shared";
-import { loadFindingsState, loadSettingsState } from "../lib/dashboard-data";
+import type { FindingsListResponse, WorkspaceBillingResponse } from "@firmcode/shared";
+import { loadBillingState, loadFindingsState, loadSettingsState } from "../lib/dashboard-data";
 
 describe("dashboard findings data loader", () => {
   const originalApiUrl = process.env.NEXT_PUBLIC_API_URL;
   const originalWorkspaceId = process.env.FIRMCODE_DASHBOARD_WORKSPACE_ID;
   const originalClerkUserId = process.env.FIRMCODE_DASHBOARD_CLERK_USER_ID;
+  const originalClerkBillingRole = process.env.FIRMCODE_DASHBOARD_CLERK_BILLING_ROLE;
 
   afterEach(() => {
     process.env.NEXT_PUBLIC_API_URL = originalApiUrl;
     process.env.FIRMCODE_DASHBOARD_WORKSPACE_ID = originalWorkspaceId;
     process.env.FIRMCODE_DASHBOARD_CLERK_USER_ID = originalClerkUserId;
+    process.env.FIRMCODE_DASHBOARD_CLERK_BILLING_ROLE = originalClerkBillingRole;
     vi.unstubAllGlobals();
   });
 
@@ -64,6 +66,41 @@ describe("dashboard findings data loader", () => {
     expect(url.pathname).toBe("/api/settings");
     expect(headers.get("x-firmcode-workspace-id")).toBe("workspace-1");
     expect(headers.get("x-firmcode-user-id")).toBe("user-1");
+  });
+
+  it("fetches billing data with Clerk-gated workspace and billing role headers", async () => {
+    process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
+    process.env.FIRMCODE_DASHBOARD_WORKSPACE_ID = "workspace-1";
+    process.env.FIRMCODE_DASHBOARD_CLERK_USER_ID = "user-1";
+    process.env.FIRMCODE_DASHBOARD_CLERK_BILLING_ROLE = "billing";
+    const fetcher = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => jsonResponse(billingResponse));
+
+    vi.stubGlobal("fetch", fetcher);
+
+    await expect(loadBillingState()).resolves.toMatchObject({ status: "populated" });
+
+    const url = new URL(String(fetcher.mock.calls[0]?.[0]));
+    const init = fetcher.mock.calls[0]?.[1] as RequestInit;
+    const headers = new Headers(init.headers);
+
+    expect(url.pathname).toBe("/api/billing");
+    expect(headers.get("x-firmcode-workspace-id")).toBe("workspace-1");
+    expect(headers.get("x-firmcode-user-id")).toBe("user-1");
+    expect(headers.get("x-firmcode-clerk-billing-role")).toBe("billing");
+  });
+
+  it("maps billing authorization failures to a clear denied state message", async () => {
+    process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
+    const fetcher = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      jsonResponse({ message: "Forbidden" }, 403)
+    );
+
+    vi.stubGlobal("fetch", fetcher);
+
+    await expect(loadBillingState()).resolves.toEqual({
+      status: "error",
+      message: "Billing access requires workspace Owner/Admin or Clerk billing role."
+    });
   });
 
   it("treats settings with no GitHub installation as empty", async () => {
@@ -165,6 +202,33 @@ const settingsResponse = {
   notifications: {
     enabled: false,
     message: "Email and Slack notification routing is planned after review delivery stabilizes."
+  }
+};
+
+const billingResponse: WorkspaceBillingResponse = {
+  workspace: {
+    id: "workspace-1",
+    name: "Firmcode",
+    role: "owner",
+    canManageBilling: true,
+    billingAccessSource: "workspace_role"
+  },
+  plan: {
+    name: "Clerk managed",
+    source: "clerk",
+    description: "Plan, checkout, seats, invoices, and subscription mutations stay in Clerk Billing."
+  },
+  billingStatus: {
+    label: "Managed in Clerk",
+    source: "clerk"
+  },
+  usage: {
+    monthlyReviewRuns: 3,
+    aiTokens: 1200,
+    repositories: 2,
+    seats: 4,
+    periodStart: "2026-05-01T00:00:00.000Z",
+    periodEnd: "2026-06-01T00:00:00.000Z"
   }
 };
 
