@@ -632,6 +632,9 @@ class DeterministicReviewPipeline:
                 selected_file_count=len(changed_files),
                 skipped_file_count=len(skipped_files),
                 semgrep_finding_count=len(_read_list(semgrep_artifact.get("findings"))),
+                semgrep_scanned_count=len(_semgrep_scanned_paths(semgrep_artifact)),
+                semgrep_error_count=len(_read_list(semgrep_artifact.get("errors"))),
+                tree_sitter_parsed_count=_tree_sitter_parsed_count(tree_sitter_artifact),
             )
 
             _log(
@@ -775,6 +778,9 @@ class DeterministicReviewPipeline:
         selected_file_count: int | None = None,
         skipped_file_count: int | None = None,
         semgrep_finding_count: int | None = None,
+        semgrep_scanned_count: int | None = None,
+        semgrep_error_count: int | None = None,
+        tree_sitter_parsed_count: int | None = None,
         error_message: str | None = None,
     ) -> None:
         body = render_scanning_progress_comment(
@@ -785,6 +791,9 @@ class DeterministicReviewPipeline:
             selected_file_count=selected_file_count,
             skipped_file_count=skipped_file_count,
             semgrep_finding_count=semgrep_finding_count,
+            semgrep_scanned_count=semgrep_scanned_count,
+            semgrep_error_count=semgrep_error_count,
+            tree_sitter_parsed_count=tree_sitter_parsed_count,
             error_message=error_message,
         )
         try:
@@ -872,8 +881,10 @@ def render_summary_comment(
 ) -> str:
     semgrep_findings = _read_list(semgrep_artifact.get("findings"))
     semgrep_errors = _read_list(semgrep_artifact.get("errors"))
+    semgrep_scanned_paths = _semgrep_scanned_paths(semgrep_artifact)
+    semgrep_skipped_paths = _semgrep_skipped_paths(semgrep_artifact)
     tree_files = _read_list(tree_sitter_artifact.get("files"))
-    parsed_count = sum(1 for file in tree_files if _read_str(_read_object(file).get("parseStatus"), "") == "parsed")
+    parsed_count = _tree_sitter_parsed_count(tree_sitter_artifact)
     partial_count = sum(1 for file in tree_files if _read_str(_read_object(file).get("parseStatus"), "") == "partial")
     risk_level = _risk_level(semgrep_findings, semgrep_errors)
     components = _changed_components(changed_files)
@@ -902,6 +913,16 @@ def render_summary_comment(
             "### Changed components",
             "",
             *[f"- {component}" for component in (components or ["No supported changed files were selected."])],
+            "",
+            "### Code scan",
+            "",
+            f"- Semgrep scanned files: {len(semgrep_scanned_paths)}",
+            f"- Semgrep skipped files: {len(semgrep_skipped_paths)}",
+            f"- Semgrep errors: {len(semgrep_errors)}",
+            f"- Tree-sitter parsed files: {parsed_count}",
+            *(_render_scan_path_block("Semgrep scanned paths", semgrep_scanned_paths) if semgrep_scanned_paths else []),
+            *(_render_scan_path_block("Semgrep skipped paths", _format_semgrep_skipped_paths(semgrep_skipped_paths)) if semgrep_skipped_paths else []),
+            *(_render_semgrep_error_block(semgrep_errors) if semgrep_errors else []),
             "",
             "### Key findings",
             "",
@@ -936,6 +957,9 @@ def render_scanning_progress_comment(
     selected_file_count: int | None = None,
     skipped_file_count: int | None = None,
     semgrep_finding_count: int | None = None,
+    semgrep_scanned_count: int | None = None,
+    semgrep_error_count: int | None = None,
+    tree_sitter_parsed_count: int | None = None,
     error_message: str | None = None,
 ) -> str:
     status_message = {
@@ -959,6 +983,12 @@ def render_scanning_progress_comment(
         activity_lines.append("- Skipped files: pending")
     if semgrep_finding_count is not None:
         activity_lines.append(f"- Semgrep findings so far: {semgrep_finding_count}")
+    if semgrep_scanned_count is not None:
+        activity_lines.append(f"- Semgrep scanned files: {semgrep_scanned_count}")
+    if semgrep_error_count is not None:
+        activity_lines.append(f"- Semgrep errors: {semgrep_error_count}")
+    if tree_sitter_parsed_count is not None:
+        activity_lines.append(f"- Tree-sitter parsed files: {tree_sitter_parsed_count}")
     if error_message:
         activity_lines.append(f"- Failure: {_single_line(error_message)[:300]}")
 
@@ -1231,6 +1261,58 @@ def _render_semgrep_finding(value: Any) -> str:
     message = _read_str(finding.get("message"), "Semgrep finding")
     rule_id = _read_str(finding.get("ruleId"), "unknown")
     return f"{severity}: {message} (`{path}:{line}`, `{rule_id}`)"
+
+
+def _semgrep_scanned_paths(semgrep_artifact: Mapping[str, Any]) -> list[str]:
+    paths = _read_object(semgrep_artifact.get("paths"))
+    return [_read_str(path, "") for path in _read_list(paths.get("scanned")) if _read_str(path, "")]
+
+
+def _semgrep_skipped_paths(semgrep_artifact: Mapping[str, Any]) -> list[Any]:
+    paths = _read_object(semgrep_artifact.get("paths"))
+    return _read_list(paths.get("skipped"))
+
+
+def _tree_sitter_parsed_count(tree_sitter_artifact: Mapping[str, Any]) -> int:
+    tree_files = _read_list(tree_sitter_artifact.get("files"))
+    return sum(1 for file in tree_files if _read_str(_read_object(file).get("parseStatus"), "") == "parsed")
+
+
+def _render_scan_path_block(title: str, values: Sequence[str]) -> list[str]:
+    visible_values = [value for value in values if value][:12]
+    hidden_count = max(0, len(values) - len(visible_values))
+    lines = ["", f"<details>", f"<summary>{title}</summary>", ""]
+    lines.extend(f"- `{value}`" for value in visible_values)
+    if hidden_count:
+        lines.append(f"- ...and {hidden_count} more")
+    lines.extend(["", "</details>"])
+    return lines
+
+
+def _format_semgrep_skipped_paths(values: Sequence[Any]) -> list[str]:
+    formatted: list[str] = []
+    for value in values:
+        item = _read_object(value)
+        path = _read_str(item.get("path"), "")
+        if not path:
+            continue
+        reason = _read_str(item.get("reason"), "skipped")
+        formatted.append(f"{path} - {reason}")
+    return formatted
+
+
+def _render_semgrep_error_block(errors: Sequence[Any]) -> list[str]:
+    lines = ["", "<details open>", "<summary>Semgrep scan errors</summary>", ""]
+    for error in errors[:5]:
+        item = _read_object(error)
+        message = _single_line(_read_str(item.get("message"), "Semgrep scan failed"))[:500]
+        code = _read_str(item.get("code"), "error")
+        lines.append(f"- `{code}`: {message}")
+    hidden_count = max(0, len(errors) - 5)
+    if hidden_count:
+        lines.append(f"- ...and {hidden_count} more")
+    lines.extend(["", "</details>"])
+    return lines
 
 
 def _risk_level(findings: Sequence[Any], errors: Sequence[Any]) -> str:

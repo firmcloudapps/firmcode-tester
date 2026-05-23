@@ -15,6 +15,7 @@ RUN pip install --no-cache-dir semgrep tree-sitter
 
 COPY apps/worker/pyproject.toml apps/worker/pyproject.toml
 COPY apps/worker/firmcode_worker apps/worker/firmcode_worker
+COPY infra/semgrep infra/semgrep
 
 RUN pip install --no-cache-dir ./apps/worker
 

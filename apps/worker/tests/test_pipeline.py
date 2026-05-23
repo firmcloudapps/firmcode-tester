@@ -168,6 +168,9 @@ def test_deterministic_pipeline_publishes_actual_analysis_summary() -> None:
     assert store.summary_body is not None
     assert "FirmcodeAI analyzed 1 changed file(s)" in store.summary_body
     assert "Semgrep reported 1 finding(s)" in store.summary_body
+    assert "### Code scan" in store.summary_body
+    assert "Semgrep scanned files: 1" in store.summary_body
+    assert "Tree-sitter parsed files: 1" in store.summary_body
     assert "Avoid eval on untrusted input" in store.summary_body
     assert "`src/widget.ts:2`" in store.summary_body
     assert store.dry_run is True
@@ -177,6 +180,8 @@ def test_deterministic_pipeline_publishes_actual_analysis_summary() -> None:
     assert "scan new changes" not in "\n".join(github.scanning_bodies)
     assert "Files selected for processing: 1" in "\n".join(github.scanning_bodies)
     assert "Semgrep findings so far: 1" in "\n".join(github.scanning_bodies)
+    assert "Semgrep scanned files: 1" in github.scanning_bodies[-1]
+    assert "Tree-sitter parsed files: 1" in github.scanning_bodies[-1]
     assert "Status: `completed`" in github.scanning_bodies[-1]
 
 
