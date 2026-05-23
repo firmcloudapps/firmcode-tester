@@ -4,12 +4,80 @@ import type { LargePullRequestReviewArtifact, ReviewSkippedFileReport } from "..
 
 export interface ReviewRunSummary {
   id: string;
+  repositoryId: string;
+  pullRequestId: string;
   repositoryFullName: string;
   pullRequestNumber: number;
+  pullRequestTitle: string;
   headSha: string;
   status: ReviewRunStatus;
   findingsCount: number;
+  startedAt: string | null;
+  finishedAt: string | null;
   createdAt: string;
+  updatedAt: string;
+}
+
+export interface DashboardRepositoryListFilters {
+  enabled?: boolean;
+  private?: boolean;
+  language?: string;
+}
+
+export interface RepositoryLastReview {
+  reviewRunId: string;
+  pullRequestNumber: number;
+  pullRequestTitle: string;
+  status: ReviewRunStatus;
+  headSha: string;
+  createdAt: string;
+  finishedAt: string | null;
+}
+
+export interface RepositoryListItem {
+  id: string;
+  owner: string;
+  name: string;
+  fullName: string;
+  private: boolean;
+  defaultBranch: string;
+  enabled: boolean;
+  primaryLanguage: string | null;
+  openFindingsCount: number;
+  lastReview: RepositoryLastReview | null;
+  updatedAt: string;
+}
+
+export interface RepositoryListResponse {
+  repositories: RepositoryListItem[];
+  filters: DashboardRepositoryListFilters;
+}
+
+export type ReviewRunRiskLevel = "low" | "medium" | "high" | "unknown";
+
+export interface ReviewRunListFilters {
+  status?: ReviewRunStatus;
+  repositoryId?: string;
+  repository?: string;
+  triggerEvent?: string;
+  risk?: Exclude<ReviewRunRiskLevel, "unknown">;
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+export interface ReviewRunListItem extends ReviewRunSummary {
+  triggerEvent: string;
+  currentStage: string;
+  durationMs: number | null;
+  commentsPostedCount: number;
+  filesAnalyzedCount: number;
+  riskLevel: ReviewRunRiskLevel;
+  pullRequestAuthor: string;
+}
+
+export interface ReviewRunListResponse {
+  reviewRuns: ReviewRunListItem[];
+  filters: ReviewRunListFilters;
 }
 
 export interface ReviewRunPublishedComment {
@@ -26,15 +94,94 @@ export interface ReviewRunPublishedComment {
   createdAt: string;
 }
 
+export interface ReviewRunChangedFile {
+  id: string;
+  path: string;
+  status: string;
+  additions: number;
+  deletions: number;
+  language: string | null;
+  isInfrastructure: boolean;
+  isSupported: boolean;
+  riskFlags: string[];
+  createdAt: string;
+}
+
+export type ReviewFindingSource = "semgrep" | "llm" | "ci" | "policy";
+export type ReviewFindingCategory = "bug" | "security" | "performance" | "maintainability" | "test" | "infra" | "ci";
+export type ReviewFindingSeverity = "info" | "low" | "medium" | "high" | "critical";
+export type ReviewFindingConfidence = "low" | "medium" | "high";
+
+export interface ReviewRunFinding {
+  id: string;
+  source: ReviewFindingSource;
+  category: ReviewFindingCategory;
+  severity: ReviewFindingSeverity;
+  confidence: ReviewFindingConfidence;
+  filePath: string | null;
+  startLine: number | null;
+  endLine: number | null;
+  title: string;
+  body: string;
+  evidence: unknown[];
+  suggestion: string | null;
+  dedupeKey: string;
+  postAsInline: boolean;
+  postedInline: boolean;
+  createdAt: string;
+}
+
+export type ReviewRunArtifactType = "diff" | "treesitter" | "semgrep" | "context_pack" | "llm_raw" | "ci_log";
+
+export interface ReviewRunArtifact {
+  id: string;
+  artifactType: ReviewRunArtifactType;
+  storageKey: string;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface ReviewRunLogExcerpt {
+  id: string;
+  source: "ci_log" | "worker" | "system";
+  title: string;
+  excerpt: string;
+  artifactId: string | null;
+  storageKey: string | null;
+  redacted: boolean;
+  truncated: boolean;
+  createdAt: string;
+}
+
+export type ReviewPipelineStageStatus = "pending" | "running" | "succeeded" | "failed" | "skipped";
+
+export interface ReviewPipelineStage {
+  key: string;
+  label: string;
+  status: ReviewPipelineStageStatus;
+  durationMs: number | null;
+  errorMessage: string | null;
+  artifactId: string | null;
+}
+
 export interface ReviewRunDetail extends ReviewRunSummary {
-  repositoryId: string;
-  pullRequestId: string;
   triggerEvent: string;
-  startedAt: string | null;
-  finishedAt: string | null;
   errorCode: string | null;
   errorMessage: string | null;
   metrics: Record<string, unknown>;
+  durationMs: number | null;
+  filesAnalyzedCount: number;
+  semgrepFindingsCount: number;
+  aiFindingsCount: number;
+  inlineCommentsPostedCount: number;
+  tokenUsage: number | null;
+  estimatedCostUsd: number | null;
+  riskLevel: ReviewRunRiskLevel;
+  pipelineStages: ReviewPipelineStage[];
+  changedFiles: ReviewRunChangedFile[];
+  findings: ReviewRunFinding[];
+  artifacts: ReviewRunArtifact[];
+  logExcerpts: ReviewRunLogExcerpt[];
   publishedComments: ReviewRunPublishedComment[];
 }
 
