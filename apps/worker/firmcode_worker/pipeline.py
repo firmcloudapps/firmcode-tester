@@ -666,6 +666,46 @@ SET github_comment_id = EXCLUDED.github_comment_id,
         async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
             async with connection.cursor() as cursor:
                 for comment in comments:
+                    body_hash = _body_hash(review_run_id, f"{comment.finding_id}\0{comment.file_path}\0{comment.line}\0{comment.body}")
+                    if comment.github_comment_id is not None:
+                        await cursor.execute(
+                            """
+INSERT INTO published_comments (
+  id,
+  review_run_id,
+  github_review_id,
+  github_comment_id,
+  comment_type,
+  file_path,
+  line,
+  body,
+  body_hash,
+  dry_run
+) VALUES (%s, %s, %s, %s, 'inline', %s, %s, %s, %s, %s)
+ON CONFLICT (github_comment_id) WHERE github_comment_id IS NOT NULL DO UPDATE
+SET review_run_id = EXCLUDED.review_run_id,
+    github_review_id = EXCLUDED.github_review_id,
+    comment_type = EXCLUDED.comment_type,
+    file_path = EXCLUDED.file_path,
+    line = EXCLUDED.line,
+    body = EXCLUDED.body,
+    body_hash = EXCLUDED.body_hash,
+    dry_run = EXCLUDED.dry_run
+""",
+                            (
+                                str(uuid4()),
+                                review_run_id,
+                                comment.github_review_id,
+                                comment.github_comment_id,
+                                comment.file_path,
+                                comment.line,
+                                comment.body,
+                                body_hash,
+                                comment.dry_run,
+                            ),
+                        )
+                        continue
+
                     await cursor.execute(
                         """
 INSERT INTO published_comments (
@@ -696,7 +736,7 @@ SET github_review_id = EXCLUDED.github_review_id,
                             comment.file_path,
                             comment.line,
                             comment.body,
-                            _body_hash(review_run_id, f"{comment.finding_id}\0{comment.file_path}\0{comment.line}\0{comment.body}"),
+                            body_hash,
                             comment.dry_run,
                         ),
                     )
