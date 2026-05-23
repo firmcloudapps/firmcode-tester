@@ -105,7 +105,7 @@ async def process_review_pull_request_job(
     try:
         await pipeline.run(payload)
     except Exception as error:
-        error_code = error.error_code if isinstance(error, ReviewWorkerError) else "review_worker_error"
+        error_code = _error_code(error)
         await repository.mark_failed(payload.review_run_id, error_code, _error_message(error))
         raise
 
@@ -122,7 +122,7 @@ async def run_bullmq_review_worker(
     from bullmq import Worker
 
     repository = PostgresReviewRunRepository(database_url)
-    review_pipeline = pipeline or NoopReviewPipeline()
+    review_pipeline = pipeline or _default_review_pipeline(database_url)
     shutdown_event = asyncio.Event()
 
     def request_shutdown(_signum: int, _frame: object) -> None:
@@ -161,3 +161,17 @@ def _error_message(error: Exception) -> str:
     if message:
         return message[:1000]
     return error.__class__.__name__
+
+
+def _error_code(error: Exception) -> str:
+    value = getattr(error, "error_code", None)
+    return value if isinstance(value, str) and value else "review_worker_error"
+
+
+def _default_review_pipeline(database_url: str) -> ReviewPipeline:
+    try:
+        from firmcode_worker.pipeline import DeterministicReviewPipeline
+
+        return DeterministicReviewPipeline.from_env(database_url=database_url)
+    except Exception as error:
+        raise ReviewWorkerError(_error_code(error), _error_message(error)) from error
