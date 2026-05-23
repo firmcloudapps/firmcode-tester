@@ -10,6 +10,7 @@ from firmcode_worker.pipeline import (
     DeterministicReviewPipeline,
     GitHubFile,
     ReviewContext,
+    _partition_existing_inline_comments,
     normalize_private_key,
     parse_patch_hunks,
 )
@@ -172,6 +173,42 @@ def test_normalize_private_key_accepts_quoted_escaped_and_base64_pem() -> None:
     assert normalize_private_key(f'"{encoded}"') == pem
     assert normalize_private_key(unpadded) == pem
     assert normalize_private_key(spaced) == pem
+
+
+def test_partition_existing_inline_comments_prevents_duplicate_review_posts() -> None:
+    selected = [
+        {
+            "findingId": "finding-1",
+            "path": "src/widget.ts",
+            "line": 2,
+            "body": "⚠️ Potential issue",
+        },
+        {
+            "findingId": "finding-2",
+            "path": "src/other.ts",
+            "line": 7,
+            "body": "new issue",
+        },
+    ]
+
+    published, missing = _partition_existing_inline_comments(
+        selected,
+        [
+            {
+                "id": 123,
+                "pull_request_review_id": 456,
+                "path": "src/widget.ts",
+                "line": 2,
+                "body": "⚠️ Potential issue",
+            }
+        ],
+    )
+
+    assert len(published) == 1
+    assert published[0].github_comment_id == 123
+    assert published[0].github_review_id == 456
+    assert published[0].finding_id == "finding-1"
+    assert missing == [selected[1]]
 
 
 def test_deterministic_pipeline_publishes_actual_analysis_summary() -> None:

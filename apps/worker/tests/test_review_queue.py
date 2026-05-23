@@ -7,6 +7,9 @@ import pytest
 
 from firmcode_worker.review_queue import (
     ReviewJobPayload,
+    REVIEW_WORKER_LOCK_DURATION_MS,
+    REVIEW_WORKER_LOCK_RENEW_TIME_MS,
+    REVIEW_WORKER_STALLED_INTERVAL_MS,
     ReviewWorkerError,
     process_review_pull_request_job,
     review_job_payload_from_mapping,
@@ -90,6 +93,12 @@ def test_review_worker_lifecycle_marks_run_failed_and_reraises() -> None:
         ("running", "run-1", None, None),
         ("failed", "run-1", "transient_github_error", "GitHub timed out"),
     ]
+
+
+def test_review_worker_lock_window_covers_long_publish_steps() -> None:
+    assert REVIEW_WORKER_LOCK_DURATION_MS == 600_000
+    assert REVIEW_WORKER_LOCK_RENEW_TIME_MS == 300_000
+    assert REVIEW_WORKER_STALLED_INTERVAL_MS == 60_000
 
 
 def _payload() -> ReviewJobPayload:

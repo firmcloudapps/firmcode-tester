@@ -9,6 +9,9 @@ from firmcode_worker.schemas.contracts import ContractValidationError, ReviewJob
 
 REVIEW_QUEUE_NAME = "review-runs"
 REVIEW_PULL_REQUEST_JOB_NAME = "review.pull_request"
+REVIEW_WORKER_LOCK_DURATION_MS = 10 * 60 * 1000
+REVIEW_WORKER_LOCK_RENEW_TIME_MS = REVIEW_WORKER_LOCK_DURATION_MS // 2
+REVIEW_WORKER_STALLED_INTERVAL_MS = 60 * 1000
 
 
 ReviewJobPayload = ReviewJobInput
@@ -141,7 +144,16 @@ async def run_bullmq_review_worker(
             pipeline=review_pipeline,
         )
 
-    worker = Worker(queue_name, process, {"connection": redis_url})
+    worker = Worker(
+        queue_name,
+        process,
+        {
+            "connection": redis_url,
+            "lockDuration": REVIEW_WORKER_LOCK_DURATION_MS,
+            "lockRenewTime": REVIEW_WORKER_LOCK_RENEW_TIME_MS,
+            "stalledInterval": REVIEW_WORKER_STALLED_INTERVAL_MS,
+        },
+    )
 
     try:
         await shutdown_event.wait()
