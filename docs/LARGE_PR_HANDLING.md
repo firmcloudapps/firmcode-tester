@@ -93,6 +93,8 @@ Context packing priority:
 5. File list and skipped reasons.
 6. Lower-risk changed hunks.
 
+Syntax-aware context packing emits deterministic `context-chunks/v1` artifacts in the worker. Each chunk is built around one changed hunk, always keeps changed lines, adds the smallest enclosing Tree-sitter symbol plus imports when the configured character/token budget allows, and marks the chunk as truncated when full hunk or symbol scope had to be pruned.
+
 ## Tests
 
 Fixtures should cover:
@@ -103,4 +105,3 @@ Fixtures should cover:
 - generated file PR
 - infrastructure-heavy PR
 - large PR with one high-severity Semgrep finding
-
