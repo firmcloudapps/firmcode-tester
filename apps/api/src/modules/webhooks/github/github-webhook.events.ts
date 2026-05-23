@@ -4,6 +4,7 @@ export interface GitHubWebhookEventIdentity {
 }
 
 const SUPPORTED_EVENTS = new Set([
+  "push",
   "pull_request.opened",
   "pull_request.synchronize",
   "pull_request.reopened",
@@ -18,5 +19,9 @@ const SUPPORTED_EVENTS = new Set([
 ]);
 
 export function isSupportedGitHubWebhookEvent({ eventName, action }: GitHubWebhookEventIdentity): boolean {
+  if (eventName === "push" && action === null) {
+    return SUPPORTED_EVENTS.has("push");
+  }
+
   return action !== null && SUPPORTED_EVENTS.has(`${eventName}.${action}`);
 }

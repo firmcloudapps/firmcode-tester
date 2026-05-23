@@ -3,6 +3,11 @@ import { Pool } from "pg";
 import { type ApiRuntimeConfig } from "@firmcode/shared";
 import { API_RUNTIME_CONFIG, apiRuntimeConfigProvider } from "../../../config/api-config.provider";
 import {
+  GITHUB_PUSH_PR_RESOLVER,
+  GitHubAppPushPullRequestResolver,
+  NoopGitHubPushPullRequestResolver
+} from "../../../infrastructure/github/github-push-pr-resolver";
+import {
   GITHUB_PR_ACTIVITY_PUBLISHER,
   GitHubAppPullRequestActivityPublisher,
   NoopGitHubPullRequestActivityPublisher
@@ -63,6 +68,17 @@ import { PostgresGitHubWebhookStore } from "./postgres-github-webhook.store";
         }
 
         return GitHubAppPullRequestActivityPublisher.fromConfig(config);
+      },
+      inject: [API_RUNTIME_CONFIG]
+    },
+    {
+      provide: GITHUB_PUSH_PR_RESOLVER,
+      useFactory: (config: ApiRuntimeConfig) => {
+        if (config.nodeEnv === "test") {
+          return new NoopGitHubPushPullRequestResolver();
+        }
+
+        return GitHubAppPushPullRequestResolver.fromConfig(config);
       },
       inject: [API_RUNTIME_CONFIG]
     },

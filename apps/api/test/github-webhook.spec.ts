@@ -11,6 +11,11 @@ import type {
   GitHubPullRequestActivityPublisher,
   PublishPullRequestScanningActivityInput
 } from "../src/infrastructure/github/github-pr-activity-publisher";
+import type {
+  GitHubAssociatedPullRequest,
+  GitHubPushPullRequestResolver,
+  ResolvePushPullRequestsInput
+} from "../src/infrastructure/github/github-push-pr-resolver";
 import {
   InMemoryReviewQueueProducer,
   REVIEW_QUEUE
@@ -53,13 +58,22 @@ describe("GitHubWebhookService", () => {
   let store: InMemoryGitHubWebhookStore;
   let queue: InMemoryReviewQueueProducer;
   let activityPublisher: RecordingPullRequestActivityPublisher;
+  let pushPullRequestResolver: RecordingPushPullRequestResolver;
   let service: GitHubWebhookService;
 
   beforeEach(() => {
     store = new InMemoryGitHubWebhookStore();
     queue = new InMemoryReviewQueueProducer();
     activityPublisher = new RecordingPullRequestActivityPublisher();
-    service = new GitHubWebhookService(WEBHOOK_SECRET, store, queue, createApiRuntimeConfig(API_ENV), activityPublisher);
+    pushPullRequestResolver = new RecordingPushPullRequestResolver();
+    service = new GitHubWebhookService(
+      WEBHOOK_SECRET,
+      store,
+      queue,
+      createApiRuntimeConfig(API_ENV),
+      activityPublisher,
+      pushPullRequestResolver
+    );
   });
 
   it("accepts fixture payloads with valid signatures", async () => {
@@ -299,6 +313,98 @@ describe("GitHubWebhookService", () => {
     expect(queue.jobs.size).toBe(2);
   });
 
+  it("resolves push events into associated open pull request review runs and activity updates", async () => {
+    const openedRawBody = await readFixture("pull_request.opened.json");
+    const pushRawBody = await readFixture("push.branch.json");
+    const openedReceipt = await service.acceptDelivery({
+      rawBody: openedRawBody,
+      signature: signPayload(openedRawBody),
+      eventName: "pull_request",
+      deliveryId: "delivery-push-old-head"
+    });
+    pushPullRequestResolver.pullRequests = [
+      {
+        githubPullRequestId: 303,
+        number: 7,
+        title: "Add webhook normalization",
+        authorLogin: "octocat",
+        baseRef: "main",
+        headRef: "feature/webhooks",
+        baseSha: "base123",
+        headSha: "fed456cba123",
+        state: "open",
+        draft: false
+      }
+    ];
+
+    const pushReceipt = await service.acceptDelivery({
+      rawBody: pushRawBody,
+      signature: signPayload(pushRawBody),
+      eventName: "push",
+      deliveryId: "delivery-push-new-head"
+    });
+
+    expect(pushReceipt).toMatchObject({
+      status: "accepted",
+      eventName: "push",
+      action: null,
+      supported: true,
+      duplicate: false,
+      ignored: false,
+      reason: null,
+      jobId: "delivery-push-new-head"
+    });
+    expect(pushPullRequestResolver.calls[0]).toEqual({
+      installationId: 101,
+      repositoryFullName: "openclaw/firmcode-fixture",
+      commitSha: "fed456cba123"
+    });
+    expect(store.reviewRuns).toHaveLength(2);
+    expect(store.findReviewRun(openedReceipt.reviewRunId ?? "")).toMatchObject({
+      status: "superseded",
+      errorCode: "superseded_by_new_head"
+    });
+    expect(store.findReviewRun(pushReceipt.reviewRunId ?? "")).toMatchObject({
+      headSha: "fed456cba123",
+      triggerEvent: "push",
+      status: "queued"
+    });
+    expect(queue.jobs.get("delivery-push-new-head")).toMatchObject({
+      pullRequestNumber: 7,
+      headSha: "fed456cba123",
+      triggerEvent: "push"
+    });
+    expect(activityPublisher.scanningActivities[activityPublisher.scanningActivities.length - 1]).toMatchObject({
+      repositoryFullName: "openclaw/firmcode-fixture",
+      pullRequestNumber: 7,
+      headSha: "fed456cba123",
+      triggerEvent: "push"
+    });
+  });
+
+  it("ignores push events when no associated open pull request is found", async () => {
+    const rawBody = await readFixture("push.branch.json");
+
+    const receipt = await service.acceptDelivery({
+      rawBody,
+      signature: signPayload(rawBody),
+      eventName: "push",
+      deliveryId: "delivery-push-no-pr"
+    });
+
+    expect(receipt).toMatchObject({
+      eventName: "push",
+      supported: true,
+      ignored: true,
+      reason: "no_associated_pull_request",
+      reviewRunId: null,
+      jobId: null
+    });
+    expect(pushPullRequestResolver.calls).toHaveLength(1);
+    expect(store.reviewRuns).toHaveLength(0);
+    expect(queue.jobs.size).toBe(0);
+  });
+
   it("prevents publishing from an old run when the current PR head SHA changed", async () => {
     const openedRawBody = await readFixture("pull_request.opened.json");
     const synchronizeRawBody = await readFixture("pull_request.synchronize.json");
@@ -443,6 +549,16 @@ class RecordingPullRequestActivityPublisher implements GitHubPullRequestActivity
     if (this.failWith !== null) {
       throw this.failWith;
     }
+  }
+}
+
+class RecordingPushPullRequestResolver implements GitHubPushPullRequestResolver {
+  readonly calls: ResolvePushPullRequestsInput[] = [];
+  pullRequests: GitHubAssociatedPullRequest[] = [];
+
+  async resolveAssociatedPullRequests(input: ResolvePushPullRequestsInput): Promise<GitHubAssociatedPullRequest[]> {
+    this.calls.push(input);
+    return this.pullRequests;
   }
 }
 

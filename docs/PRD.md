@@ -515,6 +515,7 @@ Required permissions:
 
 Webhook events:
 
+- Push.
 - Pull request.
 - Pull request review comment.
 - Check suite.

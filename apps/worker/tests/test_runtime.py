@@ -12,6 +12,8 @@ def test_worker_config_requires_database_and_redis_urls() -> None:
     assert config.database_url.startswith("postgresql://")
     assert config.redis_url == "redis://redis:6379"
     assert config.queue_name == "review-runs"
+    assert config.semgrep_executable == "semgrep"
+    assert config.semgrep_startup_timeout_seconds == 20.0
 
 
 def test_worker_config_rejects_invalid_redis_url() -> None:
@@ -26,6 +28,35 @@ def test_worker_config_rejects_invalid_redis_url() -> None:
         assert "REDIS_URL" in str(error)
     else:
         raise AssertionError("Expected invalid Redis URL to fail")
+
+
+def test_worker_config_reads_semgrep_startup_overrides() -> None:
+    config = load_worker_config(
+        {
+            "DATABASE_URL": "postgresql://firmcode:firmcode@ep-example.us-east-2.aws.neon.tech:5432/firmcode",
+            "REDIS_URL": "redis://redis:6379",
+            "SEMGREP_EXECUTABLE": "/usr/local/bin/semgrep",
+            "SEMGREP_STARTUP_TIMEOUT_SECONDS": "45",
+        }
+    )
+
+    assert config.semgrep_executable == "/usr/local/bin/semgrep"
+    assert config.semgrep_startup_timeout_seconds == 45.0
+
+
+def test_worker_config_rejects_invalid_semgrep_startup_timeout() -> None:
+    try:
+        load_worker_config(
+            {
+                "DATABASE_URL": "postgresql://firmcode:firmcode@ep-example.us-east-2.aws.neon.tech:5432/firmcode",
+                "REDIS_URL": "redis://redis:6379",
+                "SEMGREP_STARTUP_TIMEOUT_SECONDS": "0",
+            }
+        )
+    except ValueError as error:
+        assert "SEMGREP_STARTUP_TIMEOUT_SECONDS" in str(error)
+    else:
+        raise AssertionError("Expected invalid Semgrep startup timeout to fail")
 
 
 def test_worker_startup_checks_report_unavailable_dependencies() -> None:
