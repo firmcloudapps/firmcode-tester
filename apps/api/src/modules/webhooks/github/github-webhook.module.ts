@@ -73,7 +73,12 @@ import { PostgresGitHubWebhookStore } from "./postgres-github-webhook.store";
           return new NoopGitHubPullRequestActivityPublisher();
         }
 
-        return GitHubAppPullRequestActivityPublisher.fromConfig(config);
+        const pool = new Pool({
+          connectionString: config.database.url,
+          ssl: config.database.ssl ? { rejectUnauthorized: false } : false
+        });
+
+        return GitHubAppPullRequestActivityPublisher.fromConfig(config, new PostgresPublishedCommentStore(pool));
       },
       inject: [API_RUNTIME_CONFIG]
     },

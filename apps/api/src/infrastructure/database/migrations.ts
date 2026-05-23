@@ -1,4 +1,5 @@
 import { initialReviewSchemaMigration } from "./migrations/001_initial_review_schema";
+import { dryRunPublishedCommentsMigration } from "./migrations/002_dry_run_published_comments";
 
 export interface DatabaseQueryResult<Row = unknown> {
   readonly rows: Row[];
@@ -14,7 +15,10 @@ export interface DatabaseMigration {
   readonly sql: string;
 }
 
-export const DATABASE_MIGRATIONS: readonly DatabaseMigration[] = [initialReviewSchemaMigration];
+export const DATABASE_MIGRATIONS: readonly DatabaseMigration[] = [
+  initialReviewSchemaMigration,
+  dryRunPublishedCommentsMigration
+];
 
 interface AppliedMigrationRow {
   readonly id: string;

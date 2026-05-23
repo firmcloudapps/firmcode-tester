@@ -8,6 +8,11 @@ import {
   type FirmcodeAiSummaryActivityInput,
   type GitHubAppConfig
 } from "@firmcode/shared";
+import {
+  hashPublishedCommentBody,
+  NoopPublishedCommentStore,
+  type PublishedCommentStore
+} from "./published-comment-store";
 
 export const GITHUB_PR_ACTIVITY_PUBLISHER = Symbol("GITHUB_PR_ACTIVITY_PUBLISHER");
 
@@ -20,8 +25,8 @@ export interface PublishPullRequestSummaryActivityInput extends FirmcodeAiSummar
 }
 
 export interface PublishPullRequestActivityResult {
-  readonly action: "created" | "updated";
-  readonly githubCommentId: number;
+  readonly action: "created" | "updated" | "dry_run";
+  readonly githubCommentId: number | null;
   readonly body: string;
 }
 
@@ -40,6 +45,52 @@ export class NoopGitHubPullRequestActivityPublisher implements GitHubPullRequest
       action: "created",
       githubCommentId: 0,
       body: renderFirmcodeAiSummaryActivity(input)
+    };
+  }
+}
+
+export class DryRunGitHubPullRequestActivityPublisher implements GitHubPullRequestActivityPublisher {
+  constructor(private readonly publishedCommentStore: PublishedCommentStore = new NoopPublishedCommentStore()) {}
+
+  async publishScanningActivity(input: PublishPullRequestScanningActivityInput): Promise<void> {
+    console.info(
+      JSON.stringify({
+        event: "github.activity.dry_run",
+        activity: "scanning",
+        repositoryFullName: input.repositoryFullName,
+        pullRequestNumber: input.pullRequestNumber,
+        reviewRunId: input.reviewRunId,
+        githubWriteCallsSkipped: true
+      })
+    );
+  }
+
+  async publishSummaryActivity(input: PublishPullRequestSummaryActivityInput): Promise<PublishPullRequestActivityResult> {
+    const body = renderFirmcodeAiSummaryActivity(input);
+
+    await this.publishedCommentStore.recordPublishedSummaryComment({
+      reviewRunId: input.reviewRunId,
+      githubCommentId: null,
+      body,
+      bodyHash: hashPublishedCommentBody({ reviewRunId: input.reviewRunId, body }),
+      dryRun: true
+    });
+
+    console.info(
+      JSON.stringify({
+        event: "github.activity.dry_run",
+        activity: "summary",
+        repositoryFullName: input.repositoryFullName,
+        pullRequestNumber: input.pullRequestNumber,
+        reviewRunId: input.reviewRunId,
+        githubWriteCallsSkipped: true
+      })
+    );
+
+    return {
+      action: "dry_run",
+      githubCommentId: null,
+      body
     };
   }
 }
@@ -67,7 +118,14 @@ interface GitHubInstallationTokenResponse {
 export class GitHubAppPullRequestActivityPublisher implements GitHubPullRequestActivityPublisher {
   constructor(private readonly github: GitHubAppConfig) {}
 
-  static fromConfig(config: ApiRuntimeConfig): GitHubPullRequestActivityPublisher {
+  static fromConfig(
+    config: ApiRuntimeConfig,
+    publishedCommentStore: PublishedCommentStore = new NoopPublishedCommentStore()
+  ): GitHubPullRequestActivityPublisher {
+    if (config.review.dryRun) {
+      return new DryRunGitHubPullRequestActivityPublisher(publishedCommentStore);
+    }
+
     if (config.github === null) {
       return new NoopGitHubPullRequestActivityPublisher();
     }
