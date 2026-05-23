@@ -56,6 +56,30 @@ export class PostgresPublishedCommentStore implements PublishedCommentStore {
   ) {}
 
   async recordPublishedSummaryComment(record: PublishedSummaryCommentRecord): Promise<void> {
+    if (record.githubCommentId !== null) {
+      await this.database.query(
+        `
+INSERT INTO published_comments (
+  id,
+  review_run_id,
+  github_comment_id,
+  comment_type,
+  body,
+  body_hash,
+  dry_run
+) VALUES ($1, $2, $3, 'summary', $4, $5, $6)
+ON CONFLICT (github_comment_id) WHERE github_comment_id IS NOT NULL DO UPDATE
+SET review_run_id = EXCLUDED.review_run_id,
+    comment_type = EXCLUDED.comment_type,
+    body = EXCLUDED.body,
+    body_hash = EXCLUDED.body_hash,
+    dry_run = EXCLUDED.dry_run
+`,
+        [this.createId(), record.reviewRunId, record.githubCommentId, record.body, record.bodyHash, record.dryRun]
+      );
+      return;
+    }
+
     await this.database.query(
       `
 INSERT INTO published_comments (
