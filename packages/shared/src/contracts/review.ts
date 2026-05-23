@@ -53,6 +53,14 @@ export interface RepositoryListResponse {
   filters: DashboardRepositoryListFilters;
 }
 
+export const DASHBOARD_WORKSPACE_ROLES = ["owner", "admin", "developer", "viewer"] as const;
+
+export type DashboardWorkspaceRole = (typeof DASHBOARD_WORKSPACE_ROLES)[number];
+
+export function canManageSensitiveWorkspaceSettings(role: DashboardWorkspaceRole): boolean {
+  return role === "owner" || role === "admin";
+}
+
 export const REPOSITORY_REVIEW_SEVERITY_THRESHOLDS = ["info", "low", "medium", "high", "critical"] as const;
 
 export type RepositoryReviewSeverityThreshold = (typeof REPOSITORY_REVIEW_SEVERITY_THRESHOLDS)[number];
@@ -230,6 +238,57 @@ export interface FindingInboxItem extends ReviewRunFinding {
 export interface FindingsListResponse {
   findings: FindingInboxItem[];
   filters: FindingsListFilters;
+}
+
+export interface WorkspaceSettingsInstallation {
+  id: string;
+  installationId: number;
+  accountLogin: string | null;
+  accountType: string | null;
+  repositoryCount: number;
+  enabledRepositoryCount: number;
+  updatedAt: string;
+}
+
+export interface WorkspaceRetentionPolicy {
+  artifactRetentionDays: number;
+  changedFilePatchDays: number;
+  fullSnapshotDays: number;
+  ciLogDays: number;
+  llmArtifactDays: number;
+  semgrepArtifactDays: number;
+  treeSitterArtifactDays: number;
+  findingMetadataDays: number;
+  aggregatedMetricDays: number;
+}
+
+export interface WorkspaceSettingsResponse {
+  workspace: {
+    id: string;
+    name: string;
+    clerkOrgId: string | null;
+    role: DashboardWorkspaceRole;
+    canManageSensitiveSettings: boolean;
+  };
+  clerk: {
+    userProfileUrl: string;
+    organizationProfileUrl: string;
+    memberManagementUrl: string;
+  };
+  githubApp: {
+    installUrl: string;
+    installations: WorkspaceSettingsInstallation[];
+    repositoryConfigurationUrl: string;
+  };
+  retention: WorkspaceRetentionPolicy;
+  apiKeys: {
+    enabled: boolean;
+    message: string;
+  };
+  notifications: {
+    enabled: boolean;
+    message: string;
+  };
 }
 
 export type ReviewRunArtifactType = "diff" | "treesitter" | "semgrep" | "context_pack" | "llm_raw" | "ci_log";

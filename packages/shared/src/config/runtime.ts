@@ -84,6 +84,7 @@ export interface ReviewConfig {
   dryRun: boolean;
   skipDraftPullRequests: boolean;
   ciLogMaxBytes: number;
+  artifactRetentionDays: number;
   largePullRequest: LargePullRequestThresholds;
 }
 
@@ -371,6 +372,7 @@ function readReviewConfig(env: EnvironmentVariables, issues: ConfigValidationIss
     dryRun: readOptionalBoolean(env, "DRY_RUN", true, issues),
     skipDraftPullRequests: readOptionalBoolean(env, "REVIEW_SKIP_DRAFT_PRS", true, issues),
     ciLogMaxBytes: readOptionalPositiveInteger(env, "REVIEW_CI_LOG_MAX_BYTES", DEFAULT_CI_LOG_MAX_BYTES, issues),
+    artifactRetentionDays: readOptionalPositiveInteger(env, "ARTIFACT_RETENTION_DAYS", 30, issues),
     largePullRequest: {
       maxChangedFiles: readOptionalPositiveInteger(
         env,
