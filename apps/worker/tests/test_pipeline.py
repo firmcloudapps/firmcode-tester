@@ -109,7 +109,9 @@ class FakeGitHub:
         pull_number: int,
         body: str,
     ) -> tuple[int | None, bool]:
-        assert "Semgrep reported 1 finding(s)" in body
+        assert "Automated checks reported 1 actionable finding(s)" in body
+        assert "Semgrep" not in body
+        assert "Tree-sitter" not in body
         return None, True
 
     def publish_scanning_comment(
@@ -231,30 +233,45 @@ def test_deterministic_pipeline_publishes_actual_analysis_summary() -> None:
     assert github.inline_review_comments[0]["line"] == 2
     inline_body = str(github.inline_review_comments[0]["body"])
     assert "⚠️ Potential issue | 🟠 Major | ⚡ Quick win" in inline_body
-    assert "<summary>🧩 Analysis chain</summary>" in inline_body
+    assert "<summary>Review rationale</summary>" in inline_body
     assert "```typescript" in inline_body
     assert "<summary>🛠 Suggested resolution</summary>" in inline_body
     assert "Validate and parse trusted input instead of evaluating it." in inline_body
+    assert "<details open>" not in inline_body
+    assert "Semgrep" not in inline_body
+    assert "Tree-sitter" not in inline_body
     assert store.summary_body is not None
-    assert "FirmcodeAI analyzed 1 changed file(s)" in store.summary_body
-    assert "Semgrep reported 1 finding(s)" in store.summary_body
-    assert "### Code scan" in store.summary_body
-    assert "Semgrep scanned files: 1" in store.summary_body
+    assert "FirmcodeAI reviewed 1 changed file(s)" in store.summary_body
+    assert "Automated checks reported 1 actionable finding(s)" in store.summary_body
+    assert "### Code Review" in store.summary_body
+    assert "<summary>Risk</summary>" in store.summary_body
+    assert "<summary>Changed Components</summary>" in store.summary_body
+    assert "<summary>Analysis Coverage</summary>" in store.summary_body
+    assert "<summary>Suggested Tests</summary>" in store.summary_body
+    assert "<summary>Review Activity</summary>" in store.summary_body
+    assert "Files scanned by automated checks: 1" in store.summary_body
     assert "Inline code comments posted: 0" in store.summary_body
-    assert "Tree-sitter parsed files: 1" in store.summary_body
+    assert "Files parsed for code context: 1" in store.summary_body
     assert "Avoid eval on untrusted input" in store.summary_body
     assert "`src/widget.ts:2`" in store.summary_body
+    assert "<details open>" not in store.summary_body
+    assert "Semgrep" not in store.summary_body
+    assert "Tree-sitter" not in store.summary_body
     assert store.dry_run is True
     assert len(github.scanning_bodies) >= 4
     assert "## FirmcodeAI Analysis Progress" in github.scanning_bodies[0]
     assert "Status: `running`" in github.scanning_bodies[0]
     assert "scan new changes" not in "\n".join(github.scanning_bodies)
     assert "Files selected for processing: 1" in "\n".join(github.scanning_bodies)
-    assert "Semgrep findings so far: 1" in "\n".join(github.scanning_bodies)
-    assert "Semgrep scanned files: 1" in github.scanning_bodies[-1]
-    assert "Tree-sitter parsed files: 1" in github.scanning_bodies[-1]
+    assert "Findings so far: 1" in "\n".join(github.scanning_bodies)
+    assert "Files checked: 1" in github.scanning_bodies[-1]
+    assert "Files parsed for code context: 1" in github.scanning_bodies[-1]
     assert "Inline code comments posted: 0" in github.scanning_bodies[-1]
     assert "Status: `completed`" in github.scanning_bodies[-1]
+    assert "Processing details" in github.scanning_bodies[-1]
+    assert "<details open>" not in "\n".join(github.scanning_bodies)
+    assert "Semgrep" not in "\n".join(github.scanning_bodies)
+    assert "Tree-sitter" not in "\n".join(github.scanning_bodies)
 
 
 def _stub_semgrep_runner(**_kwargs: Any) -> StubSemgrepResult:

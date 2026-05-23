@@ -798,7 +798,7 @@ class DeterministicReviewPipeline:
                 context=context,
                 payload=payload,
                 status="running",
-                phase="Running Semgrep on selected changed files",
+                phase="Running automated checks on selected changed files",
                 selected_file_count=len(changed_files),
                 skipped_file_count=len(skipped_files),
             )
@@ -810,7 +810,7 @@ class DeterministicReviewPipeline:
                 context=context,
                 payload=payload,
                 status="running",
-                phase="Extracting Tree-sitter semantic facts",
+                phase="Building code context",
                 selected_file_count=len(changed_files),
                 skipped_file_count=len(skipped_files),
                 semgrep_finding_count=len(_read_list(semgrep_artifact.get("findings"))),
@@ -829,7 +829,7 @@ class DeterministicReviewPipeline:
                     context=context,
                     payload=payload,
                     status="running",
-                    phase="Publishing inline code scan comments",
+                    phase="Publishing inline code review comments",
                     selected_file_count=len(changed_files),
                     skipped_file_count=len(skipped_files),
                     semgrep_finding_count=len(_read_list(semgrep_artifact.get("findings"))),
@@ -1140,8 +1140,19 @@ def render_summary_comment(
     components = _changed_components(changed_files)
     finding_lines = [_render_semgrep_finding(finding) for finding in semgrep_findings[:8]]
     if not finding_lines:
-        finding_lines = ["No Semgrep findings were reported for the selected changed files."]
+        finding_lines = ["No actionable issues were found in the selected changed files."]
     suggestions = _test_suggestions(changed_files, semgrep_findings)
+    review_lines = [f"- {line}" for line in finding_lines]
+    coverage_lines = [
+        f"- Files scanned by automated checks: {len(semgrep_scanned_paths)}",
+        f"- Files skipped by automated checks: {len(semgrep_skipped_paths)}",
+        f"- Check errors: {len(semgrep_errors)}",
+        f"- Inline code comments posted: {inline_comment_count}",
+        f"- Files parsed for code context: {parsed_count}",
+        *(_render_scan_path_block("Scanned paths", semgrep_scanned_paths) if semgrep_scanned_paths else []),
+        *(_render_scan_path_block("Skipped paths", _format_semgrep_skipped_paths(semgrep_skipped_paths)) if semgrep_skipped_paths else []),
+        *(_render_semgrep_error_block(semgrep_errors) if semgrep_errors else []),
+    ]
 
     return "\n".join(
         [
@@ -1150,51 +1161,33 @@ def render_summary_comment(
             "## FirmcodeAI Summary",
             "",
             (
-                f"FirmcodeAI analyzed {len(changed_files)} changed file(s) in this PR and skipped "
-                f"{len(skipped_files)} file(s). Semgrep reported {len(semgrep_findings)} finding(s); "
-                f"Tree-sitter parsed {parsed_count} file(s)"
-                + (f" with {partial_count} partial parse(s)." if partial_count else ".")
+                f"FirmcodeAI reviewed {len(changed_files)} changed file(s), skipped "
+                f"{len(skipped_files)} file(s), and posted {inline_comment_count} inline code comment(s). "
+                f"Automated checks reported {len(semgrep_findings)} actionable finding(s)."
             ),
             "",
-            "### Risk",
+            "### Code Review",
             "",
-            f"- Level: {risk_level}",
+            *review_lines,
             "",
-            "### Changed components",
-            "",
-            *[f"- {component}" for component in (components or ["No supported changed files were selected."])],
-            "",
-            "### Code scan",
-            "",
-            f"- Semgrep scanned files: {len(semgrep_scanned_paths)}",
-            f"- Semgrep skipped files: {len(semgrep_skipped_paths)}",
-            f"- Semgrep errors: {len(semgrep_errors)}",
-            f"- Inline code comments posted: {inline_comment_count}",
-            f"- Tree-sitter parsed files: {parsed_count}",
-            *(_render_scan_path_block("Semgrep scanned paths", semgrep_scanned_paths) if semgrep_scanned_paths else []),
-            *(_render_scan_path_block("Semgrep skipped paths", _format_semgrep_skipped_paths(semgrep_skipped_paths)) if semgrep_skipped_paths else []),
-            *(_render_semgrep_error_block(semgrep_errors) if semgrep_errors else []),
-            "",
-            "### Key findings",
-            "",
-            *[f"- {line}" for line in finding_lines],
-            "",
-            "### Suggested tests",
-            "",
-            *[f"- {suggestion}" for suggestion in suggestions],
-            "",
-            "### Review activity",
-            "",
-            f"- Repository: `{context.repository_full_name}`",
-            f"- Pull request: #{context.pull_request_number}",
-            f"- Trigger: `{payload.trigger_event}`",
-            f"- Head SHA: `{context.head_sha[:12]}`",
-            f"- Review run: `{payload.review_run_id}`",
-            f"- Files selected: {len(changed_files)}",
-            f"- Files skipped: {len(skipped_files)}",
-            f"- Semgrep errors: {len(semgrep_errors)}",
-            "",
-            "<sub>FirmcodeAI grounds this summary in changed files, Semgrep output, and Tree-sitter parse facts.</sub>",
+            *_details_section("Risk", [f"- Level: {risk_level}"]),
+            *_details_section("Changed Components", [f"- {component}" for component in (components or ["No supported changed files were selected."])]),
+            *_details_section("Analysis Coverage", coverage_lines),
+            *_details_section("Suggested Tests", [f"- {suggestion}" for suggestion in suggestions]),
+            *_details_section(
+                "Review Activity",
+                [
+                    f"- Repository: `{context.repository_full_name}`",
+                    f"- Pull request: #{context.pull_request_number}",
+                    f"- Trigger: `{payload.trigger_event}`",
+                    f"- Head SHA: `{context.head_sha[:12]}`",
+                    f"- Review run: `{payload.review_run_id}`",
+                    f"- Files selected: {len(changed_files)}",
+                    f"- Files skipped: {len(skipped_files)}",
+                    f"- Check errors: {len(semgrep_errors)}",
+                ],
+            ),
+            "<sub>FirmcodeAI grounds this summary in changed files and automated review evidence.</sub>",
         ]
     )
 
@@ -1216,14 +1209,13 @@ def render_scanning_progress_comment(
 ) -> str:
     status_message = {
         "running": "FirmcodeAI is actively analyzing this PR.",
-        "completed": "FirmcodeAI finished deterministic analysis for this PR.",
+        "completed": "FirmcodeAI finished analysis for this PR.",
         "failed": "FirmcodeAI could not finish analysis for this PR.",
     }.get(status, "FirmcodeAI is processing this PR.")
     activity_lines = [
         "- Webhook accepted",
         "- Review job picked up by worker",
         f"- Current phase: {phase}",
-        "- Changed-file workspace preserves repository-relative paths",
     ]
     if selected_file_count is not None:
         activity_lines.append(f"- Files selected for processing: {selected_file_count}")
@@ -1234,17 +1226,17 @@ def render_scanning_progress_comment(
     else:
         activity_lines.append("- Skipped files: pending")
     if semgrep_finding_count is not None:
-        activity_lines.append(f"- Semgrep findings so far: {semgrep_finding_count}")
+        activity_lines.append(f"- Findings so far: {semgrep_finding_count}")
     if semgrep_scanned_count is not None:
-        activity_lines.append(f"- Semgrep scanned files: {semgrep_scanned_count}")
+        activity_lines.append(f"- Files checked: {semgrep_scanned_count}")
     if semgrep_error_count is not None:
-        activity_lines.append(f"- Semgrep errors: {semgrep_error_count}")
+        activity_lines.append(f"- Check errors: {semgrep_error_count}")
     if tree_sitter_parsed_count is not None:
-        activity_lines.append(f"- Tree-sitter parsed files: {tree_sitter_parsed_count}")
+        activity_lines.append(f"- Files parsed for code context: {tree_sitter_parsed_count}")
     if inline_comment_count is not None:
         activity_lines.append(f"- Inline code comments posted: {inline_comment_count}")
     if error_message:
-        activity_lines.append(f"- Failure: {_single_line(error_message)[:300]}")
+        activity_lines.append(f"- Failure: {_public_message(_single_line(error_message))[:300]}")
 
     return "\n".join(
         [
@@ -1271,8 +1263,8 @@ def render_scanning_progress_comment(
             "",
             "</details>",
             "",
-            "<details open>",
-            "<summary>FirmcodeAI activity</summary>",
+            "<details>",
+            "<summary>Processing details</summary>",
             "",
             *activity_lines,
             "",
@@ -1506,15 +1498,19 @@ def _semgrep_evidence(finding: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
+def _details_section(title: str, lines: Sequence[str]) -> list[str]:
+    content = list(lines) or ["- No details available."]
+    return ["<details>", f"<summary>{title}</summary>", "", *content, "", "</details>", ""]
+
+
 def _render_semgrep_finding(value: Any) -> str:
     finding = _read_object(value)
     start = _read_object(finding.get("start"))
     path = _read_str(finding.get("path"), "unknown")
     line = _read_int(start.get("line"), 1)
     severity = _read_str(finding.get("severity"), "info").capitalize()
-    message = _read_str(finding.get("message"), "Semgrep finding")
-    rule_id = _read_str(finding.get("ruleId"), "unknown")
-    return f"{severity}: {message} (`{path}:{line}`, `{rule_id}`)"
+    message = _public_message(_read_str(finding.get("message"), "Automated finding"))
+    return f"{severity}: {message} (`{path}:{line}`)"
 
 
 def _build_semgrep_inline_review_comments(
@@ -1556,11 +1552,10 @@ def _build_semgrep_inline_review_comments(
 
 def _render_inline_semgrep_comment(finding: Mapping[str, Any]) -> str:
     severity = _read_str(finding.get("severity"), "info")
-    rule_id = _read_str(finding.get("ruleId"), "semgrep")
-    message = _read_str(finding.get("message"), "Semgrep finding")
+    message = _public_message(_read_str(finding.get("message"), "Automated finding"))
     lines = _read_str(finding.get("lines"), "")
     metadata = _read_object(finding.get("metadata"))
-    remediation = _read_optional_str(metadata.get("remediation")) or _read_optional_str(finding.get("fix"))
+    remediation = _public_message(_read_optional_str(metadata.get("remediation")) or _read_optional_str(finding.get("fix")) or "")
     alert = "CAUTION" if severity in {"critical", "high"} else "WARNING" if severity == "medium" else "NOTE"
     severity_label = _inline_severity_label(severity)
     language = _inline_comment_language(_read_str(finding.get("path"), ""))
@@ -1573,11 +1568,11 @@ def _render_inline_semgrep_comment(finding: Mapping[str, Any]) -> str:
         f"> **{message}**",
         "",
         "<details>",
-        "<summary>🧩 Analysis chain</summary>",
+        "<summary>Review rationale</summary>",
         "",
-        f"- Semgrep rule `{rule_id}` matched this changed line.",
-        f"- Severity was normalized to `{severity}` from the scanner output.",
-        "- The comment is anchored only because the finding maps to a line added or modified in this PR.",
+        "- An automated check matched this changed line.",
+        f"- Severity: `{severity}`.",
+        "- This comment is anchored because the finding maps to a line added or modified in this PR.",
         "",
         "</details>",
         "",
@@ -1596,15 +1591,15 @@ def _render_inline_semgrep_comment(finding: Mapping[str, Any]) -> str:
         )
 
     if fix:
-        body.extend(["", "<details open>", "<summary>🛠 Suggested patch</summary>", "", "```diff", _render_semgrep_fix_diff(lines, fix), "```", "", "</details>"])
+        body.extend(["", "<details>", "<summary>🛠 Suggested patch</summary>", "", "```diff", _render_semgrep_fix_diff(lines, fix), "```", "", "</details>"])
     else:
         body.extend(
             [
                 "",
-                "<details open>",
+                "<details>",
                 "<summary>🛠 Suggested resolution</summary>",
                 "",
-                remediation or "Review this changed line and update it to satisfy the Semgrep rule before merging.",
+                remediation or "Review this changed line and update it before merging.",
                 "",
                 "</details>",
             ]
@@ -1772,10 +1767,10 @@ def _format_semgrep_skipped_paths(values: Sequence[Any]) -> list[str]:
 
 
 def _render_semgrep_error_block(errors: Sequence[Any]) -> list[str]:
-    lines = ["", "<details open>", "<summary>Semgrep scan errors</summary>", ""]
+    lines = ["", "<details>", "<summary>Check errors</summary>", ""]
     for error in errors[:5]:
         item = _read_object(error)
-        message = _single_line(_read_str(item.get("message"), "Semgrep scan failed"))[:500]
+        message = _public_message(_single_line(_read_str(item.get("message"), "Automated check failed")))[:500]
         code = _read_str(item.get("code"), "error")
         lines.append(f"- `{code}`: {message}")
     hidden_count = max(0, len(errors) - 5)
@@ -1813,10 +1808,18 @@ def _test_suggestions(files: Sequence[ChangedFile], findings: Sequence[Any]) -> 
     if any(_is_infrastructure_path(file.path) for file in files):
         suggestions.append("Run deployment or compose validation for the changed infrastructure files.")
     if findings:
-        suggestions.append("Add or update tests that exercise each Semgrep finding before merging.")
+        suggestions.append("Add or update tests that exercise each automated finding before merging.")
     if not suggestions:
         suggestions.append("Run the project test suite that owns the changed files.")
     return suggestions
+
+
+def _public_message(value: str) -> str:
+    sanitized = re.sub(r"\bSemgrep\b", "automated check", value, flags=re.IGNORECASE)
+    sanitized = re.sub(r"\bTree[- ]sitter\b", "code context parser", sanitized, flags=re.IGNORECASE)
+    sanitized = re.sub(r"\bsemgrep\b", "automated-check", sanitized)
+    sanitized = re.sub(r"\btree_sitter\b", "code_context", sanitized)
+    return sanitized
 
 
 def _single_line(value: str) -> str:
