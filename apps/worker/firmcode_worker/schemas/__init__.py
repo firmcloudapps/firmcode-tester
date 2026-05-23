@@ -1,5 +1,7 @@
 from firmcode_worker.schemas.contracts import (
     ContractValidationError,
+    CiFailureExplanationArtifact,
+    CiLogArtifact,
     DiffArtifact,
     LlmReviewOutput,
     PublishPayload,
@@ -10,6 +12,8 @@ from firmcode_worker.schemas.contracts import (
 
 __all__ = [
     "ContractValidationError",
+    "CiFailureExplanationArtifact",
+    "CiLogArtifact",
     "DiffArtifact",
     "LlmReviewOutput",
     "PublishPayload",

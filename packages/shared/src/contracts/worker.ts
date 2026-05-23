@@ -3,6 +3,7 @@ export const WORKER_DIFF_ARTIFACT_SCHEMA_VERSION = "diff-artifact/v1" as const;
 export const WORKER_SEMGREP_ARTIFACT_SCHEMA_VERSION = "semgrep-artifact/v1" as const;
 export const WORKER_TREE_SITTER_ARTIFACT_SCHEMA_VERSION = "tree-sitter-artifact/v1" as const;
 export const WORKER_CI_LOG_ARTIFACT_SCHEMA_VERSION = "ci-log-artifact/v1" as const;
+export const WORKER_CI_FAILURE_EXPLANATION_SCHEMA_VERSION = "ci-failure-explanation/v1" as const;
 export const WORKER_LLM_REVIEW_OUTPUT_SCHEMA_VERSION = "llm-review-output/v1" as const;
 export const WORKER_PUBLISH_PAYLOAD_SCHEMA_VERSION = "publish-payload/v1" as const;
 
@@ -12,6 +13,7 @@ export const WORKER_CONTRACT_SCHEMA_VERSIONS = {
   semgrepArtifact: WORKER_SEMGREP_ARTIFACT_SCHEMA_VERSION,
   treeSitterArtifact: WORKER_TREE_SITTER_ARTIFACT_SCHEMA_VERSION,
   ciLogArtifact: WORKER_CI_LOG_ARTIFACT_SCHEMA_VERSION,
+  ciFailureExplanation: WORKER_CI_FAILURE_EXPLANATION_SCHEMA_VERSION,
   llmReviewOutput: WORKER_LLM_REVIEW_OUTPUT_SCHEMA_VERSION,
   publishPayload: WORKER_PUBLISH_PAYLOAD_SCHEMA_VERSION
 } as const;
@@ -254,6 +256,55 @@ export interface WorkerCiLogArtifact {
   readonly unavailableLogs: WorkerUnavailableCiLog[];
 }
 
+export type WorkerCiFailureCategory =
+  | "test_failure"
+  | "build_failure"
+  | "dependency_failure"
+  | "lint_failure"
+  | "typecheck_failure"
+  | "timeout"
+  | "cancellation"
+  | "infrastructure"
+  | "unknown";
+
+export interface WorkerCiFlakySignal {
+  readonly signal: string;
+  readonly detail: string;
+  readonly confidence: number;
+}
+
+export interface WorkerCiFailureEvidence {
+  readonly checkRunId: number;
+  readonly workflowJobId: number | null;
+  readonly stepName: string | null;
+  readonly excerpt: string;
+}
+
+export interface WorkerCiFailureGroup {
+  readonly id: string;
+  readonly jobName: string;
+  readonly checkRunId: number;
+  readonly conclusion: string;
+  readonly stepName: string | null;
+  readonly category: WorkerCiFailureCategory;
+  readonly rootCauseSummary: string;
+  readonly suggestedFixes: string[];
+  readonly flaky: boolean;
+  readonly flakySignals: WorkerCiFlakySignal[];
+  readonly evidence: WorkerCiFailureEvidence[];
+}
+
+export interface WorkerCiFailureExplanationArtifact {
+  readonly schemaVersion: typeof WORKER_CI_FAILURE_EXPLANATION_SCHEMA_VERSION;
+  readonly reviewRunId: string;
+  readonly repositoryFullName: string;
+  readonly pullRequestNumber: number;
+  readonly headSha: string;
+  readonly summary: string;
+  readonly groups: WorkerCiFailureGroup[];
+  readonly unavailableLogNotes: WorkerUnavailableCiLog[];
+}
+
 export interface WorkerFindingEvidence {
   readonly source: WorkerFindingSource;
   readonly artifactId: string | null;
@@ -331,6 +382,19 @@ const ciLogUnavailableReasonSchema = {
     "workflow_run_unavailable"
   ]
 } as const;
+const ciFailureCategorySchema = {
+  enum: [
+    "test_failure",
+    "build_failure",
+    "dependency_failure",
+    "lint_failure",
+    "typecheck_failure",
+    "timeout",
+    "cancellation",
+    "infrastructure",
+    "unknown"
+  ]
+} as const;
 const workerLineRangeSchema = {
   type: "object",
   additionalProperties: false,
@@ -405,6 +469,18 @@ const reviewFindingSchema = {
     body: nonEmptyStringSchema,
     evidence: { type: "array", minItems: 1, items: evidenceSchema },
     suggestedFix: nullableStringSchema
+  }
+} as const;
+
+const unavailableCiLogSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["checkRunId", "name", "reason", "detail"],
+  properties: {
+    checkRunId: { anyOf: [positiveIntegerSchema, { type: "null" }] },
+    name: nullableStringSchema,
+    reason: ciLogUnavailableReasonSchema,
+    detail: nonEmptyStringSchema
   }
 } as const;
 
@@ -811,18 +887,94 @@ export const workerCiLogArtifactJsonSchema = {
     },
     unavailableLogs: {
       type: "array",
+      items: unavailableCiLogSchema
+    }
+  }
+} as const;
+
+export const workerCiFailureExplanationJsonSchema = {
+  $schema: "https://json-schema.org/draft/2020-12/schema",
+  $id: "https://firmcode.dev/schemas/ci-failure-explanation.v1.json",
+  title: "Firmcode worker CI failure explanation v1",
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "schemaVersion",
+    "reviewRunId",
+    "repositoryFullName",
+    "pullRequestNumber",
+    "headSha",
+    "summary",
+    "groups",
+    "unavailableLogNotes"
+  ],
+  properties: {
+    schemaVersion: { const: WORKER_CI_FAILURE_EXPLANATION_SCHEMA_VERSION },
+    reviewRunId: nonEmptyStringSchema,
+    repositoryFullName: nonEmptyStringSchema,
+    pullRequestNumber: positiveIntegerSchema,
+    headSha: nonEmptyStringSchema,
+    summary: nonEmptyStringSchema,
+    groups: {
+      type: "array",
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["checkRunId", "name", "reason", "detail"],
+        required: [
+          "id",
+          "jobName",
+          "checkRunId",
+          "conclusion",
+          "stepName",
+          "category",
+          "rootCauseSummary",
+          "suggestedFixes",
+          "flaky",
+          "flakySignals",
+          "evidence"
+        ],
         properties: {
-          checkRunId: { anyOf: [positiveIntegerSchema, { type: "null" }] },
-          name: nullableStringSchema,
-          reason: ciLogUnavailableReasonSchema,
-          detail: nonEmptyStringSchema
+          id: nonEmptyStringSchema,
+          jobName: nonEmptyStringSchema,
+          checkRunId: positiveIntegerSchema,
+          conclusion: nonEmptyStringSchema,
+          stepName: nullableStringSchema,
+          category: ciFailureCategorySchema,
+          rootCauseSummary: nonEmptyStringSchema,
+          suggestedFixes: { type: "array", minItems: 1, items: nonEmptyStringSchema },
+          flaky: { type: "boolean" },
+          flakySignals: {
+            type: "array",
+            items: {
+              type: "object",
+              additionalProperties: false,
+              required: ["signal", "detail", "confidence"],
+              properties: {
+                signal: nonEmptyStringSchema,
+                detail: nonEmptyStringSchema,
+                confidence: confidenceSchema
+              }
+            }
+          },
+          evidence: {
+            type: "array",
+            minItems: 1,
+            items: {
+              type: "object",
+              additionalProperties: false,
+              required: ["checkRunId", "workflowJobId", "stepName", "excerpt"],
+              properties: {
+                checkRunId: positiveIntegerSchema,
+                workflowJobId: { anyOf: [positiveIntegerSchema, { type: "null" }] },
+                stepName: nullableStringSchema,
+                excerpt: nonEmptyStringSchema
+              }
+            }
+          }
         }
       }
-    }
+    },
+    unavailableLogNotes: { type: "array", items: unavailableCiLogSchema }
   }
 } as const;
 
@@ -910,6 +1062,7 @@ export const workerContractJsonSchemas = {
   semgrepArtifact: workerSemgrepArtifactJsonSchema,
   treeSitterArtifact: workerTreeSitterArtifactJsonSchema,
   ciLogArtifact: workerCiLogArtifactJsonSchema,
+  ciFailureExplanation: workerCiFailureExplanationJsonSchema,
   llmReviewOutput: workerLlmReviewOutputJsonSchema,
   publishPayload: workerPublishPayloadJsonSchema
 } as const;

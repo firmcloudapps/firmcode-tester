@@ -10,6 +10,7 @@ DIFF_ARTIFACT_SCHEMA_VERSION = "diff-artifact/v1"
 SEMGREP_ARTIFACT_SCHEMA_VERSION = "semgrep-artifact/v1"
 TREE_SITTER_ARTIFACT_SCHEMA_VERSION = "tree-sitter-artifact/v1"
 CI_LOG_ARTIFACT_SCHEMA_VERSION = "ci-log-artifact/v1"
+CI_FAILURE_EXPLANATION_SCHEMA_VERSION = "ci-failure-explanation/v1"
 LLM_REVIEW_OUTPUT_SCHEMA_VERSION = "llm-review-output/v1"
 PUBLISH_PAYLOAD_SCHEMA_VERSION = "publish-payload/v1"
 
@@ -36,6 +37,17 @@ CI_LOG_UNAVAILABLE_REASONS = {
     "not_github_actions",
     "workflow_job_unavailable",
     "workflow_run_unavailable",
+}
+CI_FAILURE_CATEGORIES = {
+    "test_failure",
+    "build_failure",
+    "dependency_failure",
+    "lint_failure",
+    "typecheck_failure",
+    "timeout",
+    "cancellation",
+    "infrastructure",
+    "unknown",
 }
 
 
@@ -383,6 +395,71 @@ class CiLogArtifact:
 
 
 @dataclass(frozen=True)
+class CiFlakySignal:
+    signal: str
+    detail: str
+    confidence: float
+
+
+@dataclass(frozen=True)
+class CiFailureEvidence:
+    check_run_id: int
+    workflow_job_id: int | None
+    step_name: str | None
+    excerpt: str
+
+
+@dataclass(frozen=True)
+class CiFailureGroup:
+    id: str
+    job_name: str
+    check_run_id: int
+    conclusion: str
+    step_name: str | None
+    category: str
+    root_cause_summary: str
+    suggested_fixes: list[str]
+    flaky: bool
+    flaky_signals: list[CiFlakySignal]
+    evidence: list[CiFailureEvidence]
+
+
+@dataclass(frozen=True)
+class CiFailureExplanationArtifact:
+    schema_version: str
+    review_run_id: str
+    repository_full_name: str
+    pull_request_number: int
+    head_sha: str
+    summary: str
+    groups: list[CiFailureGroup]
+    unavailable_log_notes: list[UnavailableCiLog]
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> "CiFailureExplanationArtifact":
+        errors: list[str] = []
+        _read_literal(value, "schemaVersion", CI_FAILURE_EXPLANATION_SCHEMA_VERSION, errors)
+        artifact = cls(
+            schema_version=CI_FAILURE_EXPLANATION_SCHEMA_VERSION,
+            review_run_id=_read_non_empty_str(value, "reviewRunId", errors),
+            repository_full_name=_read_non_empty_str(value, "repositoryFullName", errors),
+            pull_request_number=_read_positive_int(value, "pullRequestNumber", errors),
+            head_sha=_read_non_empty_str(value, "headSha", errors),
+            summary=_read_non_empty_str(value, "summary", errors),
+            groups=[
+                _read_ci_failure_group(group, f"groups[{index}]", errors)
+                for index, group in enumerate(_read_list(value, "groups", errors))
+            ],
+            unavailable_log_notes=[
+                _read_unavailable_ci_log(note, f"unavailableLogNotes[{index}]", errors)
+                for index, note in enumerate(_read_list(value, "unavailableLogNotes", errors))
+            ],
+        )
+        _raise_if_errors(errors)
+        return artifact
+
+
+@dataclass(frozen=True)
 class FindingEvidence:
     source: str
     artifact_id: str | None
@@ -704,6 +781,58 @@ def _read_unavailable_ci_log(value: Any, path: str, errors: list[str]) -> Unavai
         name=_read_nullable_str(item, "name", errors, path),
         reason=_read_literal_from_set(item, "reason", CI_LOG_UNAVAILABLE_REASONS, errors, path),
         detail=_read_non_empty_str(item, "detail", errors, path),
+    )
+
+
+def _read_ci_failure_group(value: Any, path: str, errors: list[str]) -> CiFailureGroup:
+    item = _as_object(value, path, errors)
+    suggested_fixes = [
+        _read_value_non_empty_str(fix, f"{path}.suggestedFixes[{index}]", errors)
+        for index, fix in enumerate(_read_list(item, "suggestedFixes", errors, f"{path}.suggestedFixes"))
+    ]
+    if not suggested_fixes:
+        errors.append(f"{path}.suggestedFixes must include at least one item")
+    evidence = [
+        _read_ci_failure_evidence(evidence, f"{path}.evidence[{index}]", errors)
+        for index, evidence in enumerate(_read_list(item, "evidence", errors, f"{path}.evidence"))
+    ]
+    if not evidence:
+        errors.append(f"{path}.evidence must include at least one item")
+
+    return CiFailureGroup(
+        id=_read_non_empty_str(item, "id", errors, path),
+        job_name=_read_non_empty_str(item, "jobName", errors, path),
+        check_run_id=_read_positive_int(item, "checkRunId", errors, path),
+        conclusion=_read_non_empty_str(item, "conclusion", errors, path),
+        step_name=_read_nullable_str(item, "stepName", errors, path),
+        category=_read_literal_from_set(item, "category", CI_FAILURE_CATEGORIES, errors, path),
+        root_cause_summary=_read_non_empty_str(item, "rootCauseSummary", errors, path),
+        suggested_fixes=suggested_fixes,
+        flaky=_read_bool(item, "flaky", errors, path),
+        flaky_signals=[
+            _read_ci_flaky_signal(signal, f"{path}.flakySignals[{index}]", errors)
+            for index, signal in enumerate(_read_list(item, "flakySignals", errors, f"{path}.flakySignals"))
+        ],
+        evidence=evidence,
+    )
+
+
+def _read_ci_flaky_signal(value: Any, path: str, errors: list[str]) -> CiFlakySignal:
+    item = _as_object(value, path, errors)
+    return CiFlakySignal(
+        signal=_read_non_empty_str(item, "signal", errors, path),
+        detail=_read_non_empty_str(item, "detail", errors, path),
+        confidence=_read_confidence(item, "confidence", errors, path),
+    )
+
+
+def _read_ci_failure_evidence(value: Any, path: str, errors: list[str]) -> CiFailureEvidence:
+    item = _as_object(value, path, errors)
+    return CiFailureEvidence(
+        check_run_id=_read_positive_int(item, "checkRunId", errors, path),
+        workflow_job_id=_read_nullable_positive_int(item, "workflowJobId", errors, path),
+        step_name=_read_nullable_str(item, "stepName", errors, path),
+        excerpt=_read_non_empty_str(item, "excerpt", errors, path),
     )
 
 

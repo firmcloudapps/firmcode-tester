@@ -1,0 +1,58 @@
+{
+  "schemaVersion": "ci-log-artifact/v1",
+  "reviewRunId": "run-ci-flaky",
+  "repositoryFullName": "openclaw/firmcode",
+  "pullRequestNumber": 43,
+  "headSha": "abc123flaky",
+  "checkRuns": [
+    {
+      "id": 201,
+      "name": "integration tests",
+      "status": "completed",
+      "conclusion": "failure",
+      "appSlug": "github-actions",
+      "detailsUrl": "https://github.com/openclaw/firmcode/actions/runs/302/jobs/403",
+      "htmlUrl": "https://github.com/openclaw/firmcode/actions/runs/302/job/403",
+      "workflowRunId": 302,
+      "workflowJobId": 403,
+      "startedAt": "2026-05-23T11:00:00Z",
+      "completedAt": "2026-05-23T11:15:00Z"
+    },
+    {
+      "id": 202,
+      "name": "deploy preview",
+      "status": "completed",
+      "conclusion": "failure",
+      "appSlug": "github-actions",
+      "detailsUrl": "https://github.com/openclaw/firmcode/actions/runs/302/jobs/404",
+      "htmlUrl": "https://github.com/openclaw/firmcode/actions/runs/302/job/404",
+      "workflowRunId": 302,
+      "workflowJobId": 404,
+      "startedAt": "2026-05-23T11:00:00Z",
+      "completedAt": "2026-05-23T11:01:00Z"
+    }
+  ],
+  "logs": [
+    {
+      "checkRunId": 201,
+      "name": "integration tests",
+      "source": "github_actions_job",
+      "workflowRunId": 302,
+      "workflowJobId": 403,
+      "content": "2026-05-23T11:02:00Z ##[group]Run pytest apps/api/tests/test_webhook.py\n2026-05-23T11:02:01Z waiting for postgres container to accept connections\n2026-05-23T11:12:01Z TimeoutError: waited 60000ms for http://localhost:5432/health\n2026-05-23T11:12:02Z The same test passed on retry in a previous run and is marked flaky upstream\n2026-05-23T11:12:03Z ##[error]Process completed with exit code 1.",
+      "originalBytes": 406,
+      "redactedBytes": 406,
+      "storedBytes": 406,
+      "truncated": false,
+      "redacted": false
+    }
+  ],
+  "unavailableLogs": [
+    {
+      "checkRunId": 202,
+      "name": "deploy preview",
+      "reason": "missing_actions_permission",
+      "detail": "GitHub returned 403 while fetching Actions logs."
+    }
+  ]
+}

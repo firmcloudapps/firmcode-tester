@@ -1,0 +1,53 @@
+{
+  "schemaVersion": "ci-failure-explanation/v1",
+  "reviewRunId": "run-ci-flaky",
+  "repositoryFullName": "openclaw/firmcode",
+  "pullRequestNumber": 43,
+  "headSha": "abc123flaky",
+  "summary": "Found 1 CI failure group across 1 failed job. Most likely: The integration tests job failed in step `pytest apps/api/tests/test_webhook.py` with a timeout because the log reports: TimeoutError: waited 60000ms for http://localhost:5432/health. This may be flaky because explicit flaky: the same test passed on retry in a previous run and is marked flaky upstream.",
+  "groups": [
+    {
+      "id": "ci:201:pytest-apps-api-tests-test-webhook-py:1c3bc4b95e53",
+      "jobName": "integration tests",
+      "checkRunId": 201,
+      "conclusion": "failure",
+      "stepName": "pytest apps/api/tests/test_webhook.py",
+      "category": "timeout",
+      "rootCauseSummary": "The integration tests job failed in step `pytest apps/api/tests/test_webhook.py` with a timeout because the log reports: TimeoutError: waited 60000ms for http://localhost:5432/health. This may be flaky because explicit flaky: the same test passed on retry in a previous run and is marked flaky upstream.",
+      "suggestedFixes": [
+        "Reproduce the failing command locally: `pytest apps/api/tests/test_webhook.py`.",
+        "Check for hung tests or long-running setup, then add deterministic waits, timeouts, or test isolation.",
+        "Rerun the failed job once; if it passes, harden or quarantine the unstable test instead of masking it."
+      ],
+      "flaky": true,
+      "flakySignals": [
+        {
+          "signal": "explicit_flaky",
+          "detail": "explicit flaky: The same test passed on retry in a previous run and is marked flaky upstream",
+          "confidence": 0.9
+        },
+        {
+          "signal": "timeout",
+          "detail": "timeout: TimeoutError: waited 60000ms for http://localhost:5432/health",
+          "confidence": 0.74
+        }
+      ],
+      "evidence": [
+        {
+          "checkRunId": 201,
+          "workflowJobId": 403,
+          "stepName": "pytest apps/api/tests/test_webhook.py",
+          "excerpt": "waiting for postgres container to accept connections\nTimeoutError: waited 60000ms for http://localhost:5432/health\nThe same test passed on retry in a previous run and is marked flaky upstream\n##[error]Process completed with exit code 1."
+        }
+      ]
+    }
+  ],
+  "unavailableLogNotes": [
+    {
+      "checkRunId": 202,
+      "name": "deploy preview",
+      "reason": "missing_actions_permission",
+      "detail": "GitHub returned 403 while fetching Actions logs."
+    }
+  ]
+}
