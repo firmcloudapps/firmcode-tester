@@ -177,12 +177,30 @@ export class GitHubWebhookService {
       const repository = await this.store.upsertRepository({
         ...normalized.repository,
         installationId: installation.id,
-        enabled: true
+        enabled: true,
+        preserveExistingEnabled: true
       });
       const pullRequest = await this.store.upsertPullRequest({
         ...normalized.pullRequest,
         repositoryId: repository.id
       });
+
+      if (!repository.enabled) {
+        await this.store.markDeliveryProcessed(deliveryId, "ignored");
+
+        return {
+          status: "accepted",
+          eventName,
+          action,
+          supported,
+          deliveryId,
+          duplicate: false,
+          ignored: true,
+          reason: "repository_disabled",
+          reviewRunId: null,
+          jobId: null
+        };
+      }
 
       if (pullRequest.draft && this.config.review.skipDraftPullRequests) {
         await this.store.markDeliveryProcessed(deliveryId, "ignored");
@@ -411,12 +429,30 @@ export class GitHubWebhookService {
       const repository = await this.store.upsertRepository({
         ...normalized.repository,
         installationId: installation.id,
-        enabled: true
+        enabled: true,
+        preserveExistingEnabled: true
       });
       const pullRequest = await this.store.upsertPullRequest({
         ...associatedPullRequest,
         repositoryId: repository.id
       });
+
+      if (!repository.enabled) {
+        await this.store.markDeliveryProcessed(input.deliveryId, "ignored");
+
+        return {
+          status: "accepted",
+          eventName: input.eventName,
+          action: input.action,
+          supported: true,
+          deliveryId: input.deliveryId,
+          duplicate: false,
+          ignored: true,
+          reason: "repository_disabled",
+          reviewRunId: null,
+          jobId: null
+        };
+      }
 
       if (pullRequest.draft && this.config.review.skipDraftPullRequests) {
         await this.store.markDeliveryProcessed(input.deliveryId, "ignored");

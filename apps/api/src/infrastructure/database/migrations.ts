@@ -1,6 +1,7 @@
 import { initialReviewSchemaMigration } from "./migrations/001_initial_review_schema";
 import { dryRunPublishedCommentsMigration } from "./migrations/002_dry_run_published_comments";
 import { dashboardAuthRetryStateMigration } from "./migrations/003_dashboard_auth_retry_state";
+import { repositoryReviewConfigurationMigration } from "./migrations/004_repository_review_configuration";
 
 export interface DatabaseQueryResult<Row = unknown> {
   readonly rows: Row[];
@@ -19,7 +20,8 @@ export interface DatabaseMigration {
 export const DATABASE_MIGRATIONS: readonly DatabaseMigration[] = [
   initialReviewSchemaMigration,
   dryRunPublishedCommentsMigration,
-  dashboardAuthRetryStateMigration
+  dashboardAuthRetryStateMigration,
+  repositoryReviewConfigurationMigration
 ];
 
 interface AppliedMigrationRow {

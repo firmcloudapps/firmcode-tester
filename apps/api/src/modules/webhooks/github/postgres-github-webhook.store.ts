@@ -199,7 +199,7 @@ SET installation_id = EXCLUDED.installation_id,
     full_name = EXCLUDED.full_name,
     private = EXCLUDED.private,
     default_branch = EXCLUDED.default_branch,
-    enabled = EXCLUDED.enabled,
+    enabled = CASE WHEN $10::boolean THEN repositories.enabled ELSE EXCLUDED.enabled END,
     updated_at = now()
 RETURNING *
 `,
@@ -212,7 +212,8 @@ RETURNING *
         input.fullName,
         input.private,
         input.defaultBranch,
-        input.enabled
+        input.enabled,
+        input.preserveExistingEnabled === true
       ]
     );
 

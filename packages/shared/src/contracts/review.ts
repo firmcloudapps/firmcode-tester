@@ -53,6 +53,41 @@ export interface RepositoryListResponse {
   filters: DashboardRepositoryListFilters;
 }
 
+export const REPOSITORY_REVIEW_SEVERITY_THRESHOLDS = ["info", "low", "medium", "high", "critical"] as const;
+
+export type RepositoryReviewSeverityThreshold = (typeof REPOSITORY_REVIEW_SEVERITY_THRESHOLDS)[number];
+
+export interface RepositoryReviewConfiguration {
+  repositoryId: string;
+  automationEnabled: boolean;
+  draftPullRequestReviewsEnabled: boolean;
+  maxInlineComments: number;
+  severityThreshold: RepositoryReviewSeverityThreshold;
+  semgrepEnabled: boolean;
+  treeSitterEnabled: boolean;
+  ciExplanationEnabled: boolean;
+  infrastructureReviewEnabled: boolean;
+  dryRunEnabled: boolean;
+  updatedByClerkUserId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type UpdateRepositoryReviewConfigurationRequest = Partial<
+  Pick<
+    RepositoryReviewConfiguration,
+    | "automationEnabled"
+    | "draftPullRequestReviewsEnabled"
+    | "maxInlineComments"
+    | "severityThreshold"
+    | "semgrepEnabled"
+    | "treeSitterEnabled"
+    | "ciExplanationEnabled"
+    | "infrastructureReviewEnabled"
+    | "dryRunEnabled"
+  >
+>;
+
 export type ReviewRunRiskLevel = "low" | "medium" | "high" | "unknown";
 
 export interface ReviewRunListFilters {
