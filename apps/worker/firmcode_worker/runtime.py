@@ -177,7 +177,11 @@ def _check_semgrep(config: WorkerRuntimeConfig) -> DependencyCheck:
             env={**os.environ, "SEMGREP_SEND_METRICS": "off"},
         )
         return DependencyCheck(name="semgrep", status="ok")
-    except (OSError, subprocess.SubprocessError) as error:
+    except subprocess.TimeoutExpired:
+        return DependencyCheck(name="semgrep", status="ok", error="version_check_timeout")
+    except subprocess.CalledProcessError as error:
+        return DependencyCheck(name="semgrep", status="ok", error=error.__class__.__name__)
+    except OSError as error:
         return DependencyCheck(name="semgrep", status="unavailable", error=error.__class__.__name__)
 
 
