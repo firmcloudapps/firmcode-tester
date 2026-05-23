@@ -8,11 +8,6 @@ import {
   type GitHubAssociatedPullRequest,
   type GitHubPushPullRequestResolver
 } from "../../../infrastructure/github/github-push-pr-resolver";
-import {
-  GITHUB_PR_ACTIVITY_PUBLISHER,
-  NoopGitHubPullRequestActivityPublisher,
-  type GitHubPullRequestActivityPublisher
-} from "../../../infrastructure/github/github-pr-activity-publisher";
 import { REVIEW_QUEUE, type ReviewQueueProducer } from "../../queues/review-queue";
 import { isSupportedGitHubWebhookEvent } from "./github-webhook.events";
 import { GITHUB_WEBHOOK_STORE, type GitHubWebhookStore } from "./github-webhook.store";
@@ -76,9 +71,6 @@ export class GitHubWebhookService {
     @Inject(GITHUB_WEBHOOK_STORE) private readonly store: GitHubWebhookStore,
     @Inject(REVIEW_QUEUE) private readonly reviewQueue: ReviewQueueProducer,
     @Inject(API_RUNTIME_CONFIG) private readonly config: ApiRuntimeConfig,
-    @Optional()
-    @Inject(GITHUB_PR_ACTIVITY_PUBLISHER)
-    private readonly activityPublisher: GitHubPullRequestActivityPublisher = new NoopGitHubPullRequestActivityPublisher(),
     @Optional()
     @Inject(GITHUB_PUSH_PR_RESOLVER)
     private readonly pushPullRequestResolver: GitHubPushPullRequestResolver = new NoopGitHubPushPullRequestResolver()
@@ -246,15 +238,6 @@ export class GitHubWebhookService {
         triggerEvent
       });
 
-      await this.publishScanningActivity({
-        installationId: installation.installationId,
-        repositoryFullName: repository.fullName,
-        pullRequestNumber: pullRequest.number,
-        reviewRunId: reviewRun.id,
-        headSha: pullRequest.headSha,
-        triggerEvent
-      });
-
       await this.store.markDeliveryProcessed(deliveryId, "processed");
 
       return {
@@ -327,35 +310,6 @@ export class GitHubWebhookService {
     }
 
     return deliveryId;
-  }
-
-  private async publishScanningActivity(input: {
-    readonly installationId: number;
-    readonly repositoryFullName: string;
-    readonly pullRequestNumber: number;
-    readonly reviewRunId: string;
-    readonly headSha: string;
-    readonly triggerEvent: string;
-  }): Promise<void> {
-    try {
-      await this.activityPublisher.publishScanningActivity({
-        ...input,
-        status: "queued"
-      });
-    } catch (error) {
-      console.warn(
-        JSON.stringify({
-          event: "github.activity.publish_failed",
-          activity: "scanning",
-          repositoryFullName: input.repositoryFullName,
-          pullRequestNumber: input.pullRequestNumber,
-          reviewRunId: input.reviewRunId,
-          error: error instanceof Error ? error.name : "UnknownError",
-          status: typeof (error as { status?: unknown }).status === "number" ? (error as { status: number }).status : null,
-          message: error instanceof Error ? error.message : "Unknown publishing error"
-        })
-      );
-    }
   }
 
   private async acceptPushDelivery(input: {
@@ -492,15 +446,6 @@ export class GitHubWebhookService {
         repositoryId: repository.id,
         pullRequestId: pullRequest.id,
         pullRequestNumber: pullRequest.number,
-        headSha: pullRequest.headSha,
-        triggerEvent
-      });
-
-      await this.publishScanningActivity({
-        installationId: installation.installationId,
-        repositoryFullName: repository.fullName,
-        pullRequestNumber: pullRequest.number,
-        reviewRunId: reviewRun.id,
         headSha: pullRequest.headSha,
         triggerEvent
       });
