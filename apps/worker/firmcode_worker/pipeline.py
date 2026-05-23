@@ -1470,13 +1470,26 @@ def _render_inline_semgrep_comment(finding: Mapping[str, Any]) -> str:
     metadata = _read_object(finding.get("metadata"))
     remediation = _read_optional_str(metadata.get("remediation")) or _read_optional_str(finding.get("fix"))
     alert = "CAUTION" if severity in {"critical", "high"} else "WARNING" if severity == "medium" else "NOTE"
+    severity_label = _inline_severity_label(severity)
     language = _inline_comment_language(_read_str(finding.get("path"), ""))
+    fix = _read_optional_str(finding.get("fix"))
 
     body = [
-        f"### {message}",
+        f"⚠️ Potential issue | {severity_label} | ⚡ Quick win",
         "",
         f"> [!{alert}]",
-        f"> **{severity.upper()}** Semgrep rule `{rule_id}` flagged this changed line.",
+        f"> **{message}**",
+        "",
+        "<details>",
+        "<summary>🧩 Analysis chain</summary>",
+        "",
+        f"- Semgrep rule `{rule_id}` matched this changed line.",
+        f"- Severity was normalized to `{severity}` from the scanner output.",
+        "- The comment is anchored only because the finding maps to a line added or modified in this PR.",
+        "",
+        "</details>",
+        "",
+        message,
     ]
     if lines.strip():
         body.extend(
@@ -1490,17 +1503,38 @@ def _render_inline_semgrep_comment(finding: Mapping[str, Any]) -> str:
             ]
         )
 
-    body.extend(
-        [
-            "",
-            "**Why this matters:**",
-            message,
-            "",
-            "**Suggested fix:**",
-            remediation or "Review this changed line and update it to satisfy the Semgrep rule before merging.",
-        ]
-    )
+    if fix:
+        body.extend(["", "<details open>", "<summary>🛠 Suggested patch</summary>", "", "```diff", _render_semgrep_fix_diff(lines, fix), "```", "", "</details>"])
+    else:
+        body.extend(
+            [
+                "",
+                "<details open>",
+                "<summary>🛠 Suggested resolution</summary>",
+                "",
+                remediation or "Review this changed line and update it to satisfy the Semgrep rule before merging.",
+                "",
+                "</details>",
+            ]
+        )
     return "\n".join(body)
+
+
+def _inline_severity_label(severity: str) -> str:
+    return {
+        "critical": "🔴 Critical",
+        "high": "🟠 Major",
+        "medium": "🟡 Medium",
+        "low": "🔵 Minor",
+        "info": "⚪ Info",
+    }.get(severity, "⚪ Info")
+
+
+def _render_semgrep_fix_diff(original: str, fix: str) -> str:
+    original_lines = [line for line in original.strip().splitlines() if line.strip()]
+    fix_lines = [line for line in fix.strip().splitlines() if line.strip()]
+    diff_lines = [*(f"- {line}" for line in original_lines[:12]), *(f"+ {line}" for line in fix_lines[:12])]
+    return "\n".join(diff_lines) if diff_lines else f"+ {fix.strip()[:1200]}"
 
 
 def _inline_comment_language(path: str) -> str:
