@@ -1,0 +1,48 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`FirmcodeAI GitHub activity Markdown > matches the summary Markdown snapshot 1`] = `
+"<!-- firmcodeai:activity:summary:v1 -->
+\`\`\`text
+|----------------------|
+|      FIRMCODEAI      |
+|----------------------|
+\`\`\`
+## FirmcodeAI Summary
+
+This PR updates webhook ingestion and review publishing.
+
+### Risk
+
+- Level: high
+
+### Changed components
+
+- Webhook idempotency
+- GitHub publisher
+- Review contracts
+
+### Key findings
+
+- High: Superseded runs must not publish (\`apps/api/src/modules/webhooks/github/github-webhook.store.ts:320-324\`) - Re-check the PR head SHA before writing comments.
+- Medium: Summary reruns should update in place - Use the stable Firmcode marker to find the previous summary comment.
+
+### Suggested tests
+
+- Mock GitHub create and update paths.
+- Snapshot the rendered Markdown summary.
+
+### CI explanation
+
+The lint job failed before tests because the publisher type contract changed.
+
+### Review activity
+
+- Repository: \`firmcloudapps/firmcode-tester\`
+- Pull request: #21
+- Head SHA: \`5ccce2d5f1b0\`
+- Review run: \`run-snapshot\`
+- Findings: 3
+- Inline comments: 1
+
+<sub>FirmcodeAI grounds comments in changed lines, deterministic scanner output, semantic facts, CI logs, or repository policy.</sub>"
+`;
