@@ -7,7 +7,7 @@ COPY apps/api/package.json apps/api/package.json
 COPY packages/shared/package.json packages/shared/package.json
 COPY packages/prompts/package.json packages/prompts/package.json
 
-RUN npm ci \
+RUN npm ci --include=dev \
   --workspace @firmcode/api \
   --workspace @firmcode/shared \
   --workspace @firmcode/prompts \
