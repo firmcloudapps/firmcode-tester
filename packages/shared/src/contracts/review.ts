@@ -161,6 +161,26 @@ export type ReviewFindingSource = "semgrep" | "llm" | "ci" | "policy";
 export type ReviewFindingCategory = "bug" | "security" | "performance" | "maintainability" | "test" | "infra" | "ci";
 export type ReviewFindingSeverity = "info" | "low" | "medium" | "high" | "critical";
 export type ReviewFindingConfidence = "low" | "medium" | "high";
+export type ReviewFindingStatus = "open" | "posted" | "suppressed" | "resolved" | "false_positive";
+
+export const REVIEW_FINDING_SOURCES: readonly ReviewFindingSource[] = ["semgrep", "llm", "ci", "policy"] as const;
+export const REVIEW_FINDING_CATEGORIES: readonly ReviewFindingCategory[] = [
+  "bug",
+  "security",
+  "performance",
+  "maintainability",
+  "test",
+  "infra",
+  "ci"
+] as const;
+export const REVIEW_FINDING_SEVERITIES: readonly ReviewFindingSeverity[] = ["info", "low", "medium", "high", "critical"] as const;
+export const REVIEW_FINDING_STATUSES: readonly ReviewFindingStatus[] = [
+  "open",
+  "posted",
+  "suppressed",
+  "resolved",
+  "false_positive"
+] as const;
 
 export interface ReviewRunFinding {
   id: string;
@@ -179,6 +199,37 @@ export interface ReviewRunFinding {
   postAsInline: boolean;
   postedInline: boolean;
   createdAt: string;
+}
+
+export interface FindingsListFilters {
+  severity?: ReviewFindingSeverity;
+  source?: ReviewFindingSource;
+  category?: ReviewFindingCategory;
+  repositoryId?: string;
+  repository?: string;
+  status?: ReviewFindingStatus;
+  postedInline?: boolean;
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+export interface FindingInboxItem extends ReviewRunFinding {
+  reviewRunId: string;
+  repositoryId: string;
+  repositoryFullName: string;
+  pullRequestNumber: number;
+  pullRequestTitle: string;
+  status: ReviewFindingStatus;
+  semgrepRuleId: string | null;
+  postedAt: string | null;
+  githubCommentId: number | null;
+  githubCommentUrl: string | null;
+  reviewRunCreatedAt: string;
+}
+
+export interface FindingsListResponse {
+  findings: FindingInboxItem[];
+  filters: FindingsListFilters;
 }
 
 export type ReviewRunArtifactType = "diff" | "treesitter" | "semgrep" | "context_pack" | "llm_raw" | "ci_log";

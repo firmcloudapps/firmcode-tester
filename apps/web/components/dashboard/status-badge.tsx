@@ -1,5 +1,5 @@
 import React from "react";
-import type { ReviewPipelineStageStatus, ReviewRunStatus } from "@firmcode/shared";
+import type { ReviewFindingStatus, ReviewPipelineStageStatus, ReviewRunStatus } from "@firmcode/shared";
 
 type Tone = "neutral" | "info" | "success" | "warning" | "critical";
 
@@ -18,6 +18,14 @@ const pipelineTone: Record<ReviewPipelineStageStatus, Tone> = {
   succeeded: "success",
   failed: "critical",
   skipped: "neutral"
+};
+
+const findingStatusTone: Record<ReviewFindingStatus, Tone> = {
+  open: "warning",
+  posted: "success",
+  suppressed: "neutral",
+  resolved: "success",
+  false_positive: "neutral"
 };
 
 const toneClassName: Record<Tone, string> = {
@@ -41,6 +49,10 @@ export function SeverityBadge({ severity }: { severity: string }) {
     severity === "critical" || severity === "high" ? "critical" : severity === "medium" ? "warning" : "neutral";
 
   return <Badge className={toneClassName[tone]}>{formatLabel(severity)}</Badge>;
+}
+
+export function FindingStatusBadge({ status }: { status: ReviewFindingStatus }) {
+  return <Badge className={toneClassName[findingStatusTone[status]]}>{formatLabel(status)}</Badge>;
 }
 
 export function BooleanBadge({ enabled }: { enabled: boolean }) {

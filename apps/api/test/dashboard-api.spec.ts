@@ -3,6 +3,8 @@ import { newDb } from "pg-mem";
 import { runDatabaseMigrations } from "../src/infrastructure/database/migrations";
 import { RepositoriesController } from "../src/modules/repositories/repositories.controller";
 import { PostgresRepositoriesStore } from "../src/modules/repositories/repositories.store";
+import { FindingsController } from "../src/modules/review-runs/findings.controller";
+import { PostgresFindingsStore } from "../src/modules/review-runs/findings.store";
 import { ReviewRunsController } from "../src/modules/review-runs/review-runs.controller";
 import { PostgresReviewRunsStore } from "../src/modules/review-runs/review-runs.store";
 
@@ -21,6 +23,7 @@ function createTestPool(): PgPoolLike {
 describe("dashboard API controllers", () => {
   let pool: PgPoolLike;
   let repositoriesController: RepositoriesController;
+  let findingsController: FindingsController;
   let reviewRunsController: ReviewRunsController;
 
   beforeEach(async () => {
@@ -28,6 +31,7 @@ describe("dashboard API controllers", () => {
     await runDatabaseMigrations(pool);
     await seedDashboardData(pool);
     repositoriesController = new RepositoriesController(new PostgresRepositoriesStore(pool));
+    findingsController = new FindingsController(new PostgresFindingsStore(pool));
     reviewRunsController = new ReviewRunsController(new PostgresReviewRunsStore(pool));
   });
 
@@ -160,8 +164,44 @@ describe("dashboard API controllers", () => {
     });
   });
 
+  it("lists findings with filterable inbox metadata and GitHub comment links", async () => {
+    const response = await findingsController.listFindings({
+      severity: "high",
+      source: "semgrep",
+      category: "security",
+      repository: "openclaw/firmcode",
+      status: "posted",
+      postedInline: "true",
+      dateFrom: "2026-05-22T00:00:00.000Z",
+      dateTo: "2026-05-23T00:00:00.000Z"
+    });
+
+    expect(response.findings).toHaveLength(1);
+    expect(response.findings[0]).toMatchObject({
+      id: "00000000-0000-4000-8000-000000000030",
+      reviewRunId: "00000000-0000-4000-8000-000000000006",
+      repositoryFullName: "openclaw/firmcode",
+      pullRequestNumber: 7,
+      status: "posted",
+      postedInline: true,
+      semgrepRuleId: "typescript.express.security.audit.workspace-scope",
+      githubCommentId: 8002,
+      githubCommentUrl: "https://github.com/openclaw/firmcode/pull/7#discussion_r8002"
+    });
+  });
+
+  it("filters open and unsupported future finding statuses", async () => {
+    const openResponse = await findingsController.listFindings({ status: "open", postedInline: "false" });
+    const resolvedResponse = await findingsController.listFindings({ status: "resolved" });
+
+    expect(openResponse.findings.map((finding) => finding.title)).toEqual(["Keep filters stable"]);
+    expect(resolvedResponse.findings).toEqual([]);
+  });
+
   it("rejects invalid filters and missing review run details", async () => {
     await expect(reviewRunsController.listReviewRuns({ status: "done" })).rejects.toThrow(BadRequestException);
+    await expect(findingsController.listFindings({ severity: "urgent" })).rejects.toThrow(BadRequestException);
+    await expect(findingsController.listFindings({ postedInline: "sometimes" })).rejects.toThrow(BadRequestException);
     await expect(reviewRunsController.getReviewRunDetail("00000000-0000-4000-8000-000000999999")).rejects.toThrow(
       NotFoundException
     );
@@ -361,7 +401,8 @@ INSERT INTO findings (
   evidence_json,
   suggestion,
   dedupe_key,
-  post_as_inline
+  post_as_inline,
+  created_at
 ) VALUES
 (
   '00000000-0000-4000-8000-000000000030',
@@ -375,10 +416,11 @@ INSERT INTO findings (
   42,
   'Guard repository access',
   'Repository access must be workspace scoped.',
-  '[{"source":"semgrep","excerpt":"repositoryId"}]',
+  '[{"source":"semgrep","ruleId":"typescript.express.security.audit.workspace-scope","excerpt":"repositoryId"}]',
   'Check workspace ownership before returning repository rows.',
   'finding-dashboard-1',
-  true
+  true,
+  '2026-05-22T10:00:30.000Z'
 ),
 (
   '00000000-0000-4000-8000-000000000031',
@@ -395,7 +437,8 @@ INSERT INTO findings (
   '[{"source":"llm","excerpt":"filter form"}]',
   NULL,
   'finding-dashboard-2',
-  false
+  false,
+  '2026-05-22T10:01:00.000Z'
 );
 
 INSERT INTO analysis_artifacts (
@@ -438,7 +481,8 @@ INSERT INTO published_comments (
   line,
   body,
   body_hash,
-  dry_run
+  dry_run,
+  created_at
 ) VALUES
 (
   '00000000-0000-4000-8000-000000000050',
@@ -451,7 +495,8 @@ INSERT INTO published_comments (
   NULL,
   'Summary body',
   'summary-body-hash',
-  false
+  false,
+  '2026-05-22T10:01:30.000Z'
 ),
 (
   '00000000-0000-4000-8000-000000000051',
@@ -464,7 +509,8 @@ INSERT INTO published_comments (
   42,
   'Inline body',
   'inline-body-hash',
-  false
+  false,
+  '2026-05-22T10:01:45.000Z'
 );
 `
   );

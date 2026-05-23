@@ -8,13 +8,15 @@ import {
   EmptyDashboardAuthStore,
   PostgresDashboardAuthStore
 } from "./dashboard-auth.store";
+import { FindingsController } from "./findings.controller";
+import { EmptyFindingsStore, FINDINGS_STORE, PostgresFindingsStore } from "./findings.store";
 import { ReviewRunRetryService } from "./review-run-retry.service";
 import { ReviewRunsController } from "./review-runs.controller";
 import { EmptyReviewRunsStore, PostgresReviewRunsStore, REVIEW_RUNS_STORE } from "./review-runs.store";
 
 @Module({
   imports: [ReviewQueueModule],
-  controllers: [ReviewRunsController],
+  controllers: [ReviewRunsController, FindingsController],
   providers: [
     apiRuntimeConfigProvider,
     {
@@ -25,6 +27,22 @@ import { EmptyReviewRunsStore, PostgresReviewRunsStore, REVIEW_RUNS_STORE } from
         }
 
         return new PostgresReviewRunsStore(
+          new Pool({
+            connectionString: config.database.url,
+            ssl: config.database.ssl ? { rejectUnauthorized: false } : false
+          })
+        );
+      },
+      inject: [API_RUNTIME_CONFIG]
+    },
+    {
+      provide: FINDINGS_STORE,
+      useFactory: (config: ApiRuntimeConfig) => {
+        if (config.nodeEnv === "test") {
+          return new EmptyFindingsStore();
+        }
+
+        return new PostgresFindingsStore(
           new Pool({
             connectionString: config.database.url,
             ssl: config.database.ssl ? { rejectUnauthorized: false } : false
