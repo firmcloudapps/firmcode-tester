@@ -192,7 +192,12 @@ def test_deterministic_pipeline_publishes_actual_analysis_summary() -> None:
     assert len(github.inline_review_comments) == 1
     assert github.inline_review_comments[0]["path"] == "src/widget.ts"
     assert github.inline_review_comments[0]["line"] == 2
-    assert "```typescript" in str(github.inline_review_comments[0]["body"])
+    inline_body = str(github.inline_review_comments[0]["body"])
+    assert "⚠️ Potential issue | 🟠 Major | ⚡ Quick win" in inline_body
+    assert "<summary>🧩 Analysis chain</summary>" in inline_body
+    assert "```typescript" in inline_body
+    assert "<summary>🛠 Suggested resolution</summary>" in inline_body
+    assert "Validate and parse trusted input instead of evaluating it." in inline_body
     assert store.summary_body is not None
     assert "FirmcodeAI analyzed 1 changed file(s)" in store.summary_body
     assert "Semgrep reported 1 finding(s)" in store.summary_body
@@ -235,7 +240,7 @@ def _stub_semgrep_runner(**_kwargs: Any) -> StubSemgrepResult:
                     "message": "Avoid eval on untrusted input",
                     "fingerprint": None,
                     "lines": "const value = eval(input);",
-                    "metadata": {"cwe": ["CWE-95"]},
+                    "metadata": {"cwe": ["CWE-95"], "remediation": "Validate and parse trusted input instead of evaluating it."},
                     "fix": None,
                 }
             ],
