@@ -235,6 +235,7 @@ def test_deterministic_pipeline_publishes_actual_analysis_summary() -> None:
     assert "⚠️ Potential issue | 🟠 Major | ⚡ Quick win" in inline_body
     assert "<summary>Analysis chain</summary>" in inline_body
     assert "```typescript" in inline_body
+    assert "  const value = eval(input);" in inline_body
     assert "<summary>🛠 Suggested resolution</summary>" in inline_body
     assert "```text" in inline_body
     assert "Validate and parse trusted input instead of evaluating it." in inline_body
@@ -247,6 +248,7 @@ def test_deterministic_pipeline_publishes_actual_analysis_summary() -> None:
     assert "⚠️ Potential issue | 🟠 Major | ⚡ Quick win" in store.summary_body
     assert "<summary>Analysis chain</summary>" in store.summary_body
     assert "```typescript" in store.summary_body
+    assert "  const value = eval(input);" in store.summary_body
     assert "<summary>🛠 Suggested resolution</summary>" in store.summary_body
     assert "```text" in store.summary_body
     assert "<summary>Risk</summary>" in store.summary_body
