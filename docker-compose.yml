@@ -62,7 +62,7 @@ services:
       REDIS_URL: redis://redis:6379
       LOG_LEVEL: info
       DRY_RUN: "true"
-      SEMGREP_CONFIGS: auto,infra/semgrep
+      SEMGREP_CONFIGS: infra/semgrep/config.yml
       SEMGREP_STARTUP_TIMEOUT_SECONDS: "30"
       SEMGREP_STARTUP_VERSION_CHECK: "false"
       TREESITTER_TIMEOUT_MS: "5000"

@@ -98,7 +98,7 @@ Required worker environment variables:
 | `LLM_SUMMARY_MODEL` | Optional summary or CI explanation model. |
 | `LLM_TIMEOUT_MS` | Optional provider timeout. |
 | `LLM_MAX_RETRIES` | Optional retry count. |
-| `SEMGREP_CONFIGS` | Default `auto,infra/semgrep`. |
+| `SEMGREP_CONFIGS` | Default `infra/semgrep/config.yml`. Do not point this at the `infra/semgrep` directory; that directory also contains rule-test fixtures. Older values such as `auto,infra/semgrep` are normalized by the worker to `infra/semgrep/config.yml`. |
 | `SEMGREP_TIMEOUT_MS` | Optional Semgrep timeout. |
 | `SEMGREP_STARTUP_VERSION_CHECK=false` | Deprecated compatibility setting. Worker startup does not run `semgrep --version`; it only verifies the executable exists. |
 | `SEMGREP_STARTUP_TIMEOUT_SECONDS=30` | Deprecated compatibility setting retained for older deployed env files. |

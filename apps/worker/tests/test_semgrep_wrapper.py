@@ -134,6 +134,12 @@ def test_semgrep_scan_config_replaces_auto_with_local_rules() -> None:
         LOCAL_INFRA_SEMGREP_CONFIG,
         "rules.yml",
     )
+    assert SemgrepScanConfig.from_env({"SEMGREP_CONFIGS": "auto,infra/semgrep"}).configs == (
+        LOCAL_INFRA_SEMGREP_CONFIG,
+    )
+    assert SemgrepScanConfig.from_env({"SEMGREP_CONFIGS": "infra/semgrep/"}).configs == (
+        LOCAL_INFRA_SEMGREP_CONFIG,
+    )
 
 
 def test_semgrep_default_config_uses_local_infra_rules_without_auto() -> None:
