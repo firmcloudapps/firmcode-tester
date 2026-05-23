@@ -64,6 +64,34 @@ Action:
 - Record skipped/timeout artifacts.
 - Consider large-PR prioritized mode.
 
+## Worker Startup Semgrep Timeout
+
+Symptoms:
+
+- Worker logs repeat `worker.startup.completed` with `status="unavailable"`.
+- The Semgrep dependency entry reports `error="TimeoutExpired"`.
+- Redis and database dependency entries are `ok`.
+
+Action:
+
+- Confirm Coolify is deploying `docker-compose.prod.yml`.
+- Pull the latest `obehiaye/firmcode-worker:latest` image and recreate the worker container.
+- Confirm the running worker has `SEMGREP_STARTUP_VERSION_CHECK=false`.
+- Keep `SEMGREP_SEND_METRICS=off` in production.
+- Leave full Semgrep execution to scan jobs; startup should only verify that the executable exists.
+
+## Redis Memory Overcommit Warning
+
+Symptoms:
+
+- Redis logs `WARNING Memory overcommit must be enabled`.
+
+Action:
+
+- Set `vm.overcommit_memory=1` on the Coolify host, not inside application code.
+- Persist the setting in `/etc/sysctl.conf` or `/etc/sysctl.d/*.conf`.
+- Apply with `sysctl vm.overcommit_memory=1` or reboot during a maintenance window.
+
 ## Tree-sitter Parser Failure
 
 Check:

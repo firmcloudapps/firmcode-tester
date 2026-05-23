@@ -100,10 +100,13 @@ Required worker environment variables:
 | `LLM_MAX_RETRIES` | Optional retry count. |
 | `SEMGREP_CONFIGS` | Default `auto,infra/semgrep`. |
 | `SEMGREP_TIMEOUT_MS` | Optional Semgrep timeout. |
+| `SEMGREP_STARTUP_VERSION_CHECK=false` | Production Compose pins this off so worker startup verifies the Semgrep executable without running `semgrep --version`. |
+| `SEMGREP_STARTUP_TIMEOUT_SECONDS=30` | Startup version-check timeout if the probe is intentionally re-enabled for debugging. |
+| `SEMGREP_SEND_METRICS=off` | Disables Semgrep metrics reporting in worker containers. |
 | `TREESITTER_TIMEOUT_MS` | Optional parse timeout. |
 | `TREESITTER_MAX_FILE_BYTES` | Optional parse size limit. |
 
-The worker image installs Semgrep CLI and Tree-sitter runtime dependencies. Treat a missing Semgrep binary or failed worker health check as a release blocker.
+The worker image installs Semgrep CLI and Tree-sitter runtime dependencies. Treat a missing Semgrep binary or failed worker health check as a release blocker. If worker logs show `{"name":"semgrep","status":"unavailable","error":"TimeoutExpired"}`, the deployed worker image is stale or the Compose app is still running with the Semgrep startup version probe enabled. Pull the latest `obehiaye/firmcode-worker:latest`, redeploy/recreate the worker container, and confirm `SEMGREP_STARTUP_VERSION_CHECK=false` in the running container.
 
 ## Redis Options
 
@@ -115,6 +118,8 @@ Use one of these shapes:
 | Managed Redis | Provider URL, often `rediss://...` | Prefer for stronger backups, TLS, or managed operations. Ensure BullMQ supports the TLS settings. |
 
 API and worker must point to the same Redis instance so webhook ingestion and review processing share one BullMQ queue.
+
+Redis may log `WARNING Memory overcommit must be enabled` on Coolify hosts. That is a host kernel setting, not an application error. On the Coolify server, set `vm.overcommit_memory=1` persistently through `/etc/sysctl.conf` or `/etc/sysctl.d/*.conf`, then apply it with `sysctl vm.overcommit_memory=1` or reboot during a maintenance window.
 
 ## NeonDB
 
