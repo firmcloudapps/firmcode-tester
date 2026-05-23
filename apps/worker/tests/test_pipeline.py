@@ -109,7 +109,7 @@ class FakeGitHub:
         pull_number: int,
         body: str,
     ) -> tuple[int | None, bool]:
-        assert "Automated checks reported 1 actionable finding(s)" in body
+        assert "FirmcodeAI reviewed this PR and found 1 actionable issue(s)." in body
         assert "Semgrep" not in body
         assert "Tree-sitter" not in body
         return None, True
@@ -241,17 +241,21 @@ def test_deterministic_pipeline_publishes_actual_analysis_summary() -> None:
     assert "Semgrep" not in inline_body
     assert "Tree-sitter" not in inline_body
     assert store.summary_body is not None
-    assert "FirmcodeAI reviewed 1 changed file(s)" in store.summary_body
-    assert "Automated checks reported 1 actionable finding(s)" in store.summary_body
+    assert "FirmcodeAI reviewed this PR and found 1 actionable issue(s)." in store.summary_body
     assert "### Code Review" in store.summary_body
     assert "<summary>Risk</summary>" in store.summary_body
     assert "<summary>Changed Components</summary>" in store.summary_body
-    assert "<summary>Analysis Coverage</summary>" in store.summary_body
     assert "<summary>Suggested Tests</summary>" in store.summary_body
-    assert "<summary>Review Activity</summary>" in store.summary_body
-    assert "Files scanned by automated checks: 1" in store.summary_body
-    assert "Inline code comments posted: 0" in store.summary_body
-    assert "Files parsed for code context: 1" in store.summary_body
+    assert "<summary>Analysis Coverage</summary>" not in store.summary_body
+    assert "<summary>Review Activity</summary>" not in store.summary_body
+    assert "Repository:" not in store.summary_body
+    assert "Pull request:" not in store.summary_body
+    assert "Trigger:" not in store.summary_body
+    assert "Head SHA:" not in store.summary_body
+    assert "Review run:" not in store.summary_body
+    assert "Files scanned" not in store.summary_body
+    assert "Inline code comments posted" not in store.summary_body
+    assert "Files parsed for code context" not in store.summary_body
     assert "Avoid eval on untrusted input" in store.summary_body
     assert "`src/widget.ts:2`" in store.summary_body
     assert "<details open>" not in store.summary_body
@@ -262,13 +266,25 @@ def test_deterministic_pipeline_publishes_actual_analysis_summary() -> None:
     assert "## FirmcodeAI Analysis Progress" in github.scanning_bodies[0]
     assert "Status: `running`" in github.scanning_bodies[0]
     assert "scan new changes" not in "\n".join(github.scanning_bodies)
-    assert "Files selected for processing: 1" in "\n".join(github.scanning_bodies)
-    assert "Findings so far: 1" in "\n".join(github.scanning_bodies)
-    assert "Files checked: 1" in github.scanning_bodies[-1]
-    assert "Files parsed for code context: 1" in github.scanning_bodies[-1]
-    assert "Inline code comments posted: 0" in github.scanning_bodies[-1]
     assert "Status: `completed`" in github.scanning_bodies[-1]
-    assert "Processing details" in github.scanning_bodies[-1]
+    public_progress = "\n".join(github.scanning_bodies)
+    assert "Run configuration" not in public_progress
+    assert "Processing details" not in public_progress
+    assert "FirmcodeAI activity" not in public_progress
+    assert "Webhook accepted" not in public_progress
+    assert "Review job picked up by worker" not in public_progress
+    assert "Current phase" not in public_progress
+    assert "Repository:" not in public_progress
+    assert "Pull request:" not in public_progress
+    assert "Trigger:" not in public_progress
+    assert "Head SHA:" not in public_progress
+    assert "Review run:" not in public_progress
+    assert "Files selected for processing" not in public_progress
+    assert "Skipped files" not in public_progress
+    assert "Findings so far" not in public_progress
+    assert "Files checked" not in public_progress
+    assert "Files parsed for code context" not in public_progress
+    assert "Inline code comments posted" not in public_progress
     assert "<details open>" not in "\n".join(github.scanning_bodies)
     assert "Semgrep" not in "\n".join(github.scanning_bodies)
     assert "Tree-sitter" not in "\n".join(github.scanning_bodies)
