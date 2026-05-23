@@ -83,8 +83,11 @@ export interface ApiRuntimeConfig {
 export interface ReviewConfig {
   dryRun: boolean;
   skipDraftPullRequests: boolean;
+  ciLogMaxBytes: number;
   largePullRequest: LargePullRequestThresholds;
 }
+
+export const DEFAULT_CI_LOG_MAX_BYTES = 20_000;
 
 const BOOLEAN_VALUES = new Map<string, boolean>([
   ["true", true],
@@ -367,6 +370,7 @@ function readReviewConfig(env: EnvironmentVariables, issues: ConfigValidationIss
   return {
     dryRun: readOptionalBoolean(env, "DRY_RUN", true, issues),
     skipDraftPullRequests: readOptionalBoolean(env, "REVIEW_SKIP_DRAFT_PRS", true, issues),
+    ciLogMaxBytes: readOptionalPositiveInteger(env, "REVIEW_CI_LOG_MAX_BYTES", DEFAULT_CI_LOG_MAX_BYTES, issues),
     largePullRequest: {
       maxChangedFiles: readOptionalPositiveInteger(
         env,

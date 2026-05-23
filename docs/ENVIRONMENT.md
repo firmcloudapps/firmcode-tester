@@ -100,6 +100,7 @@ Clerk owns sign-in, sign-up, sessions, user profile, organizations where enabled
 | `REVIEW_SUMMARY_ONLY_DIFF_BYTES` | no | Diff-byte threshold for summary-only mode. |
 | `REVIEW_SUMMARY_ONLY_CHANGED_LINES` | no | Changed-line threshold for summary-only mode. |
 | `REVIEW_SUMMARY_ONLY_ESTIMATED_TOKENS` | no | Estimated-token threshold for summary-only mode. |
+| `REVIEW_CI_LOG_MAX_BYTES` | no | Maximum redacted CI log bytes retained per failed check for storage and LLM context. Defaults to `20000`. |
 | `ARTIFACT_RETENTION_DAYS` | no | Default artifact retention. |
 
 ## Semgrep

@@ -1,0 +1,45 @@
+{
+  "schemaVersion": "ci-log-artifact/v1",
+  "reviewRunId": "run-1",
+  "repositoryFullName": "openclaw/firmcode",
+  "pullRequestNumber": 7,
+  "headSha": "abc123def456",
+  "checkRuns": [
+    {
+      "id": 101,
+      "name": "test",
+      "status": "completed",
+      "conclusion": "failure",
+      "appSlug": "github-actions",
+      "detailsUrl": "https://github.com/openclaw/firmcode/actions/runs/202/jobs/303",
+      "htmlUrl": "https://github.com/openclaw/firmcode/actions/runs/202/job/303",
+      "workflowRunId": 202,
+      "workflowJobId": 303,
+      "startedAt": "2026-05-23T10:00:00Z",
+      "completedAt": "2026-05-23T10:03:00Z"
+    }
+  ],
+  "logs": [
+    {
+      "checkRunId": 101,
+      "name": "test",
+      "source": "github_actions_job",
+      "workflowRunId": 202,
+      "workflowJobId": 303,
+      "content": "Error: expected 2 to equal 3\nTOKEN=[REDACTED_SECRET]",
+      "originalBytes": 56,
+      "redactedBytes": 51,
+      "storedBytes": 51,
+      "truncated": false,
+      "redacted": true
+    }
+  ],
+  "unavailableLogs": [
+    {
+      "checkRunId": 404,
+      "name": "deploy",
+      "reason": "missing_actions_permission",
+      "detail": "GitHub returned 403 while fetching Actions logs."
+    }
+  ]
+}

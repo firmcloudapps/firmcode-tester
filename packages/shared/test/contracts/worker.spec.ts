@@ -15,6 +15,7 @@ const fixtures = [
   ["diffArtifact", "diff-artifact.v1.json"],
   ["semgrepArtifact", "semgrep-artifact.v1.json"],
   ["treeSitterArtifact", "tree-sitter-artifact.v1.json"],
+  ["ciLogArtifact", "ci-log-artifact.v1.json"],
   ["llmReviewOutput", "llm-review-output.v1.json"],
   ["publishPayload", "publish-payload.v1.json"]
 ] as const;
@@ -62,6 +63,7 @@ describe("worker contract JSON schemas", () => {
       ["diffArtifact", WORKER_CONTRACT_SCHEMA_VERSIONS.diffArtifact],
       ["semgrepArtifact", WORKER_CONTRACT_SCHEMA_VERSIONS.semgrepArtifact],
       ["treeSitterArtifact", WORKER_CONTRACT_SCHEMA_VERSIONS.treeSitterArtifact],
+      ["ciLogArtifact", WORKER_CONTRACT_SCHEMA_VERSIONS.ciLogArtifact],
       ["llmReviewOutput", WORKER_CONTRACT_SCHEMA_VERSIONS.llmReviewOutput],
       ["publishPayload", WORKER_CONTRACT_SCHEMA_VERSIONS.publishPayload]
     ]);

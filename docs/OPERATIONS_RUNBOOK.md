@@ -33,6 +33,20 @@ Action:
 - Reduce concurrency per installation.
 - Avoid fetching full contents for low-priority files.
 
+## CI Logs Unavailable
+
+Symptoms:
+
+- CI log artifact includes `missing_checks_permission`, `missing_actions_permission`, `workflow_job_unavailable`, `log_not_found`, or `log_expired`.
+- Review summary has no CI explanation even though checks failed.
+
+Action:
+
+- Confirm the GitHub App has Checks read and Actions read permissions.
+- Confirm the failed check run is a GitHub Actions check run; external CI systems may not expose logs through GitHub Actions APIs.
+- For expired or deleted logs, rerun the workflow if a fresh explanation is needed.
+- Keep redaction and truncation enabled before storing logs or sending CI excerpts to the LLM.
+
 ## Webhook Verification Failure
 
 Check:

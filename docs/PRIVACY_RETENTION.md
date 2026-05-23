@@ -21,6 +21,7 @@ Firmcode processes sensitive repository data. Treat all diffs, file contents, PR
 ## Redaction Rules
 
 - Redact known secret patterns from logs and CI excerpts before storage or display.
+- Truncate redacted CI logs to the configured byte limit before storage or LLM use.
 - Never log GitHub App private keys, installation tokens, Clerk secrets, LLM keys, webhook signatures, or database URLs.
 - Store raw CI logs only when needed for debugging and always behind retention controls.
 - Show collapsed raw logs by default in the dashboard.
@@ -50,4 +51,3 @@ Firmcode processes sensitive repository data. Treat all diffs, file contents, PR
 - Default artifact retention to 30 days or less.
 - Allow repository allowlist for personal MVP.
 - Do not train or fine-tune on user repository content.
-

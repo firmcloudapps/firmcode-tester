@@ -2,6 +2,7 @@ export const WORKER_REVIEW_JOB_INPUT_SCHEMA_VERSION = "review-job-input/v1" as c
 export const WORKER_DIFF_ARTIFACT_SCHEMA_VERSION = "diff-artifact/v1" as const;
 export const WORKER_SEMGREP_ARTIFACT_SCHEMA_VERSION = "semgrep-artifact/v1" as const;
 export const WORKER_TREE_SITTER_ARTIFACT_SCHEMA_VERSION = "tree-sitter-artifact/v1" as const;
+export const WORKER_CI_LOG_ARTIFACT_SCHEMA_VERSION = "ci-log-artifact/v1" as const;
 export const WORKER_LLM_REVIEW_OUTPUT_SCHEMA_VERSION = "llm-review-output/v1" as const;
 export const WORKER_PUBLISH_PAYLOAD_SCHEMA_VERSION = "publish-payload/v1" as const;
 
@@ -10,6 +11,7 @@ export const WORKER_CONTRACT_SCHEMA_VERSIONS = {
   diffArtifact: WORKER_DIFF_ARTIFACT_SCHEMA_VERSION,
   semgrepArtifact: WORKER_SEMGREP_ARTIFACT_SCHEMA_VERSION,
   treeSitterArtifact: WORKER_TREE_SITTER_ARTIFACT_SCHEMA_VERSION,
+  ciLogArtifact: WORKER_CI_LOG_ARTIFACT_SCHEMA_VERSION,
   llmReviewOutput: WORKER_LLM_REVIEW_OUTPUT_SCHEMA_VERSION,
   publishPayload: WORKER_PUBLISH_PAYLOAD_SCHEMA_VERSION
 } as const;
@@ -195,6 +197,63 @@ export interface WorkerTreeSitterArtifact {
   readonly files: WorkerTreeSitterFileArtifact[];
 }
 
+export type WorkerCiLogUnavailableReason =
+  | "checks_unavailable"
+  | "github_request_failed"
+  | "log_expired"
+  | "log_not_found"
+  | "missing_actions_permission"
+  | "missing_checks_permission"
+  | "not_github_actions"
+  | "workflow_job_unavailable"
+  | "workflow_run_unavailable";
+
+export interface WorkerCiCheckRun {
+  readonly id: number;
+  readonly name: string;
+  readonly status: string;
+  readonly conclusion: string;
+  readonly appSlug: string | null;
+  readonly detailsUrl: string | null;
+  readonly htmlUrl: string | null;
+  readonly workflowRunId: number | null;
+  readonly workflowJobId: number | null;
+  readonly startedAt: string | null;
+  readonly completedAt: string | null;
+}
+
+export interface WorkerCiLogEntry {
+  readonly checkRunId: number;
+  readonly name: string;
+  readonly source: "github_actions_job";
+  readonly workflowRunId: number | null;
+  readonly workflowJobId: number;
+  readonly content: string;
+  readonly originalBytes: number;
+  readonly redactedBytes: number;
+  readonly storedBytes: number;
+  readonly truncated: boolean;
+  readonly redacted: boolean;
+}
+
+export interface WorkerUnavailableCiLog {
+  readonly checkRunId: number | null;
+  readonly name: string | null;
+  readonly reason: WorkerCiLogUnavailableReason;
+  readonly detail: string;
+}
+
+export interface WorkerCiLogArtifact {
+  readonly schemaVersion: typeof WORKER_CI_LOG_ARTIFACT_SCHEMA_VERSION;
+  readonly reviewRunId: string;
+  readonly repositoryFullName: string;
+  readonly pullRequestNumber: number;
+  readonly headSha: string;
+  readonly checkRuns: WorkerCiCheckRun[];
+  readonly logs: WorkerCiLogEntry[];
+  readonly unavailableLogs: WorkerUnavailableCiLog[];
+}
+
 export interface WorkerFindingEvidence {
   readonly source: WorkerFindingSource;
   readonly artifactId: string | null;
@@ -259,6 +318,19 @@ const confidenceSchema = { type: "number", minimum: 0, maximum: 1 } as const;
 const workerSeveritySchema = { enum: ["info", "low", "medium", "high", "critical"] } as const;
 const workerFileStatusSchema = { enum: ["added", "deleted", "modified", "renamed", "copied", "unknown"] } as const;
 const workerFindingSourceSchema = { enum: ["llm", "semgrep", "tree_sitter", "ci", "policy"] } as const;
+const ciLogUnavailableReasonSchema = {
+  enum: [
+    "checks_unavailable",
+    "github_request_failed",
+    "log_expired",
+    "log_not_found",
+    "missing_actions_permission",
+    "missing_checks_permission",
+    "not_github_actions",
+    "workflow_job_unavailable",
+    "workflow_run_unavailable"
+  ]
+} as const;
 const workerLineRangeSchema = {
   type: "object",
   additionalProperties: false,
@@ -649,6 +721,111 @@ export const workerTreeSitterArtifactJsonSchema = {
   }
 } as const;
 
+export const workerCiLogArtifactJsonSchema = {
+  $schema: "https://json-schema.org/draft/2020-12/schema",
+  $id: "https://firmcode.dev/schemas/ci-log-artifact.v1.json",
+  title: "Firmcode worker CI log artifact v1",
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "schemaVersion",
+    "reviewRunId",
+    "repositoryFullName",
+    "pullRequestNumber",
+    "headSha",
+    "checkRuns",
+    "logs",
+    "unavailableLogs"
+  ],
+  properties: {
+    schemaVersion: { const: WORKER_CI_LOG_ARTIFACT_SCHEMA_VERSION },
+    reviewRunId: nonEmptyStringSchema,
+    repositoryFullName: nonEmptyStringSchema,
+    pullRequestNumber: positiveIntegerSchema,
+    headSha: nonEmptyStringSchema,
+    checkRuns: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: [
+          "id",
+          "name",
+          "status",
+          "conclusion",
+          "appSlug",
+          "detailsUrl",
+          "htmlUrl",
+          "workflowRunId",
+          "workflowJobId",
+          "startedAt",
+          "completedAt"
+        ],
+        properties: {
+          id: positiveIntegerSchema,
+          name: nonEmptyStringSchema,
+          status: nonEmptyStringSchema,
+          conclusion: nonEmptyStringSchema,
+          appSlug: nullableStringSchema,
+          detailsUrl: nullableStringSchema,
+          htmlUrl: nullableStringSchema,
+          workflowRunId: { anyOf: [positiveIntegerSchema, { type: "null" }] },
+          workflowJobId: { anyOf: [positiveIntegerSchema, { type: "null" }] },
+          startedAt: nullableStringSchema,
+          completedAt: nullableStringSchema
+        }
+      }
+    },
+    logs: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: [
+          "checkRunId",
+          "name",
+          "source",
+          "workflowRunId",
+          "workflowJobId",
+          "content",
+          "originalBytes",
+          "redactedBytes",
+          "storedBytes",
+          "truncated",
+          "redacted"
+        ],
+        properties: {
+          checkRunId: positiveIntegerSchema,
+          name: nonEmptyStringSchema,
+          source: { enum: ["github_actions_job"] },
+          workflowRunId: { anyOf: [positiveIntegerSchema, { type: "null" }] },
+          workflowJobId: positiveIntegerSchema,
+          content: { type: "string" },
+          originalBytes: nonNegativeIntegerSchema,
+          redactedBytes: nonNegativeIntegerSchema,
+          storedBytes: nonNegativeIntegerSchema,
+          truncated: { type: "boolean" },
+          redacted: { type: "boolean" }
+        }
+      }
+    },
+    unavailableLogs: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["checkRunId", "name", "reason", "detail"],
+        properties: {
+          checkRunId: { anyOf: [positiveIntegerSchema, { type: "null" }] },
+          name: nullableStringSchema,
+          reason: ciLogUnavailableReasonSchema,
+          detail: nonEmptyStringSchema
+        }
+      }
+    }
+  }
+} as const;
+
 export const workerLlmReviewOutputJsonSchema = {
   $schema: "https://json-schema.org/draft/2020-12/schema",
   $id: "https://firmcode.dev/schemas/llm-review-output.v1.json",
@@ -732,6 +909,7 @@ export const workerContractJsonSchemas = {
   diffArtifact: workerDiffArtifactJsonSchema,
   semgrepArtifact: workerSemgrepArtifactJsonSchema,
   treeSitterArtifact: workerTreeSitterArtifactJsonSchema,
+  ciLogArtifact: workerCiLogArtifactJsonSchema,
   llmReviewOutput: workerLlmReviewOutputJsonSchema,
   publishPayload: workerPublishPayloadJsonSchema
 } as const;
