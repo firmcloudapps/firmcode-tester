@@ -1,11 +1,15 @@
-import { HealthSummary } from "../components/health-summary";
+import { DashboardShell } from "../components/dashboard/dashboard-shell";
+import { OverviewView } from "../components/dashboard/overview-view";
+import { loadOverviewState } from "../lib/dashboard-data";
 
-export default function Page() {
+export const dynamic = "force-dynamic";
+
+export default async function Page() {
+  const state = await loadOverviewState();
+
   return (
-    <main className="min-h-screen px-6 py-8">
-      <div className="mx-auto max-w-5xl">
-        <HealthSummary />
-      </div>
-    </main>
+    <DashboardShell activeItem="Overview">
+      <OverviewView state={state} />
+    </DashboardShell>
   );
 }
