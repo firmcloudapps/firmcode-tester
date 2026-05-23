@@ -6,6 +6,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "db:migrate": "npm run build && node dist/infrastructure/database/run-migrations.js",
+    "db:migrate:runtime": "node dist/infrastructure/database/run-migrations.js",
     "dev": "nest start --watch",
     "lint": "tsc -p tsconfig.json --noEmit",
     "start": "node dist/main.js",

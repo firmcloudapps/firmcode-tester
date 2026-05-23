@@ -13,6 +13,7 @@ services:
 
   api:
     image: obehiaye/firmcode-api:latest
+    pull_policy: always
     restart: unless-stopped
     env_file:
       - .env
@@ -34,6 +35,7 @@ services:
 
   worker:
     image: obehiaye/firmcode-worker:latest
+    pull_policy: always
     restart: unless-stopped
     env_file:
       - .env

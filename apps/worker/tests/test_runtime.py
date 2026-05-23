@@ -1,5 +1,3 @@
-import subprocess
-
 from firmcode_worker.runtime import _check_semgrep, load_worker_config, run_startup_checks
 
 
@@ -79,7 +77,7 @@ def test_worker_config_rejects_invalid_semgrep_startup_version_check() -> None:
         raise AssertionError("Expected invalid Semgrep startup version check to fail")
 
 
-def test_semgrep_startup_version_timeout_does_not_block_worker(monkeypatch) -> None:
+def test_semgrep_startup_check_only_requires_executable(monkeypatch) -> None:
     config = load_worker_config(
         {
             "DATABASE_URL": "postgresql://firmcode:firmcode@ep-example.us-east-2.aws.neon.tech:5432/firmcode",
@@ -90,15 +88,10 @@ def test_semgrep_startup_version_timeout_does_not_block_worker(monkeypatch) -> N
 
     monkeypatch.setattr("firmcode_worker.runtime.shutil.which", lambda executable: "/usr/local/bin/semgrep")
 
-    def raise_timeout(*_args, **_kwargs):
-        raise subprocess.TimeoutExpired(cmd=["semgrep", "--version"], timeout=1)
-
-    monkeypatch.setattr("firmcode_worker.runtime.subprocess.run", raise_timeout)
-
     check = _check_semgrep(config)
 
     assert check.status == "ok"
-    assert check.error == "version_check_timeout"
+    assert check.error is None
 
 
 def test_worker_startup_checks_report_unavailable_dependencies() -> None:

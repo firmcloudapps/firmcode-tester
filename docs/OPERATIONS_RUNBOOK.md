@@ -76,7 +76,7 @@ Action:
 
 - Confirm Coolify is deploying `docker-compose.prod.yml`.
 - Pull the latest `obehiaye/firmcode-worker:latest` image and recreate the worker container.
-- Confirm the running worker has `SEMGREP_STARTUP_VERSION_CHECK=false`.
+- Confirm new startup logs include `semgrep_startup_probe="executable_only"`.
 - Keep `SEMGREP_SEND_METRICS=off` in production.
 - Leave full Semgrep execution to scan jobs; startup should only verify that the executable exists.
 

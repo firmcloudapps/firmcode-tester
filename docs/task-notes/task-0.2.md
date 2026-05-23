@@ -21,7 +21,7 @@ No code was imported from or written into `pr-agent/`, `semgrep/`, or `tree-sitt
 - API and worker use external NeonDB through host-provided `DATABASE_URL` and internal Redis through `redis:6379`.
 - Web runs outside Docker with `npm run dev --workspace @firmcode/web` locally and deploys to Vercel in production.
 - API exposes `/health` for liveness and `/health/ready` for NeonDB/Redis reachability.
-- Worker starts through `python -m firmcode_worker.runtime`, validates `DATABASE_URL`/`REDIS_URL`, checks NeonDB/Redis sockets, verifies `semgrep --version`, verifies `tree_sitter` importability, logs `worker.queue.connected`, and stays alive for future queue processing.
+- Worker starts through `python -m firmcode_worker.runtime`, validates `DATABASE_URL`/`REDIS_URL`, checks NeonDB/Redis sockets, verifies that the Semgrep executable exists, verifies `tree_sitter` importability, logs `worker.queue.connected`, and stays alive for future queue processing.
 - Host port bindings are configurable with `API_PORT` and `REDIS_PORT`; container networking still uses stable service names and container ports.
 
 ## Smoke Commands
