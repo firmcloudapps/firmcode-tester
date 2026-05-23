@@ -233,9 +233,10 @@ def test_deterministic_pipeline_publishes_actual_analysis_summary() -> None:
     assert github.inline_review_comments[0]["line"] == 2
     inline_body = str(github.inline_review_comments[0]["body"])
     assert "⚠️ Potential issue | 🟠 Major | ⚡ Quick win" in inline_body
-    assert "<summary>Review rationale</summary>" in inline_body
+    assert "<summary>Analysis chain</summary>" in inline_body
     assert "```typescript" in inline_body
     assert "<summary>🛠 Suggested resolution</summary>" in inline_body
+    assert "```text" in inline_body
     assert "Validate and parse trusted input instead of evaluating it." in inline_body
     assert "<details open>" not in inline_body
     assert "Semgrep" not in inline_body
@@ -243,6 +244,11 @@ def test_deterministic_pipeline_publishes_actual_analysis_summary() -> None:
     assert store.summary_body is not None
     assert "FirmcodeAI reviewed this PR and found 1 actionable issue(s)." in store.summary_body
     assert "### Code Review" in store.summary_body
+    assert "⚠️ Potential issue | 🟠 Major | ⚡ Quick win" in store.summary_body
+    assert "<summary>Analysis chain</summary>" in store.summary_body
+    assert "```typescript" in store.summary_body
+    assert "<summary>🛠 Suggested resolution</summary>" in store.summary_body
+    assert "```text" in store.summary_body
     assert "<summary>Risk</summary>" in store.summary_body
     assert "<summary>Changed Components</summary>" in store.summary_body
     assert "<summary>Suggested Tests</summary>" in store.summary_body
