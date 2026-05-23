@@ -1,10 +1,20 @@
-import { BadRequestException, Controller, Get, Inject, NotFoundException, Param, Query } from "@nestjs/common";
-import { REVIEW_RUN_STATUSES, type ReviewRunDetail, type ReviewRunListFilters, type ReviewRunListResponse } from "@firmcode/shared";
+import { BadRequestException, Controller, Get, Headers, Inject, NotFoundException, Param, Post, Query } from "@nestjs/common";
+import {
+  REVIEW_RUN_STATUSES,
+  type ReviewRunDetail,
+  type ReviewRunListFilters,
+  type ReviewRunListResponse,
+  type ReviewRunRetryResponse
+} from "@firmcode/shared";
+import { ReviewRunRetryService } from "./review-run-retry.service";
 import { REVIEW_RUNS_STORE, type ReviewRunsStore } from "./review-runs.store";
 
 @Controller("api/review-runs")
 export class ReviewRunsController {
-  constructor(@Inject(REVIEW_RUNS_STORE) private readonly reviewRunsStore: ReviewRunsStore) {}
+  constructor(
+    @Inject(REVIEW_RUNS_STORE) private readonly reviewRunsStore: ReviewRunsStore,
+    private readonly retryService?: ReviewRunRetryService
+  ) {}
 
   @Get()
   async listReviewRuns(@Query() query: Record<string, string | string[] | undefined>): Promise<ReviewRunListResponse> {
@@ -20,6 +30,23 @@ export class ReviewRunsController {
     }
 
     return detail;
+  }
+
+  @Post(":id/retry")
+  async retryReviewRun(
+    @Param("id") id: string,
+    @Headers("x-firmcode-workspace-id") workspaceIdHeader: string | string[] | undefined,
+    @Headers("x-firmcode-user-id") userIdHeader: string | string[] | undefined
+  ): Promise<ReviewRunRetryResponse> {
+    if (this.retryService === undefined) {
+      throw new NotFoundException("Review run not found");
+    }
+
+    return this.retryService.retryReviewRun({
+      reviewRunId: id,
+      workspaceId: readSingleValue(workspaceIdHeader) ?? null,
+      clerkUserId: readSingleValue(userIdHeader) ?? null
+    });
   }
 }
 
