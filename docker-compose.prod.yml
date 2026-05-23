@@ -12,8 +12,9 @@ services:
       retries: 10
 
   api:
-    image: obehiaye/firmcode-api:latest
-    pull_policy: always
+    build:
+      context: .
+      dockerfile: infra/docker/api.prod.Dockerfile
     restart: unless-stopped
     env_file:
       - .env
@@ -34,8 +35,9 @@ services:
       retries: 10
 
   worker:
-    image: obehiaye/firmcode-worker:latest
-    pull_policy: always
+    build:
+      context: .
+      dockerfile: infra/docker/worker.prod.Dockerfile
     restart: unless-stopped
     env_file:
       - .env
