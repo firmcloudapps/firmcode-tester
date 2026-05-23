@@ -10,6 +10,8 @@ Firmcode should use typed configuration validation in every runtime. Missing req
 | `APP_URL` | yes | Public web app URL. |
 | `API_URL` | yes | Public API URL for webhooks and dashboard calls. |
 | `NEXT_PUBLIC_API_URL` | web | Public API URL used by the Vercel dashboard. |
+| `FIRMCODE_DASHBOARD_WORKSPACE_ID` | web server, temporary | Internal workspace ID forwarded by dashboard mutation proxy routes until Clerk-backed API session validation replaces the local header shim. |
+| `FIRMCODE_DASHBOARD_CLERK_USER_ID` | web server, temporary | Clerk user ID forwarded by dashboard mutation proxy routes until Clerk-backed API session validation replaces the local header shim. |
 | `CORS_ALLOWED_ORIGINS` | api | Comma-separated Vercel production, Vercel preview, and local web origins. |
 | `VERCEL_URL` | Vercel | Auto-provided Vercel deployment URL, useful for preview handling. |
 | `LOG_LEVEL` | no | `debug`, `info`, `warn`, or `error`. Default `info`. |

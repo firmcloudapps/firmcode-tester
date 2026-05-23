@@ -2,6 +2,7 @@ import React from "react";
 import type { ReviewRunDetail } from "@firmcode/shared";
 import type { ViewState } from "../../lib/view-state";
 import { formatDateTime, formatDuration, shortSha } from "./format";
+import { RetryReviewRunButton } from "./retry-review-run-button";
 import { PipelineStatusBadge, SeverityBadge, StatusBadge } from "./status-badge";
 
 interface ReviewRunDetailViewProps {
@@ -66,7 +67,10 @@ function ReviewRunDetailContent({ detail }: { detail: ReviewRunDetail }) {
             </p>
             <p className="mt-1 max-w-2xl text-sm leading-6 text-secondary">{detail.pullRequestTitle}</p>
           </div>
-          <StatusBadge status={detail.status} />
+          <div className="flex flex-col items-start gap-3 md:items-end">
+            <StatusBadge status={detail.status} />
+            <RetryReviewRunButton errorCode={detail.errorCode} reviewRunId={detail.id} status={detail.status} />
+          </div>
         </div>
         {detail.errorMessage === null ? null : (
           <div className="mt-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">{detail.errorMessage}</div>
