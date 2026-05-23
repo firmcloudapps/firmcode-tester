@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "ci-failure-explanation/v1",
+  "reviewRunId": "run-ci-node",
+  "repositoryFullName": "openclaw/firmcode",
+  "pullRequestNumber": 42,
+  "headSha": "abc123node",
+  "summary": "Found 1 CI failure group across 1 failed job. Most likely: The unit tests job failed in step `npm test` with a test failure because the log reports: AssertionError: expected 201 to equal 200.",
+  "groups": [
+    {
+      "id": "ci:101:npm-test:25b37e264f9c",
+      "jobName": "unit tests",
+      "checkRunId": 101,
+      "conclusion": "failure",
+      "stepName": "npm test",
+      "category": "test_failure",
+      "rootCauseSummary": "The unit tests job failed in step `npm test` with a test failure because the log reports: AssertionError: expected 201 to equal 200.",
+      "suggestedFixes": [
+        "Reproduce the failing command locally: `npm test`.",
+        "Inspect the failing assertion and update either the changed behavior or the expected value."
+      ],
+      "flaky": false,
+      "flakySignals": [],
+      "evidence": [
+        {
+          "checkRunId": 101,
+          "workflowJobId": 303,
+          "stepName": "npm test",
+          "excerpt": "> firmcode@0.1.0 test\nFAIL src/pricing.test.ts\nAssertionError: expected 201 to equal 200\nat src/pricing.test.ts:18:22\n##[error]Process completed with exit code 1."
+        }
+      ]
+    }
+  ],
+  "unavailableLogNotes": []
+}

@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "ci-log-artifact/v1",
+  "reviewRunId": "run-ci-node",
+  "repositoryFullName": "openclaw/firmcode",
+  "pullRequestNumber": 42,
+  "headSha": "abc123node",
+  "checkRuns": [
+    {
+      "id": 101,
+      "name": "unit tests",
+      "status": "completed",
+      "conclusion": "failure",
+      "appSlug": "github-actions",
+      "detailsUrl": "https://github.com/openclaw/firmcode/actions/runs/202/jobs/303",
+      "htmlUrl": "https://github.com/openclaw/firmcode/actions/runs/202/job/303",
+      "workflowRunId": 202,
+      "workflowJobId": 303,
+      "startedAt": "2026-05-23T10:00:00Z",
+      "completedAt": "2026-05-23T10:04:00Z"
+    }
+  ],
+  "logs": [
+    {
+      "checkRunId": 101,
+      "name": "unit tests",
+      "source": "github_actions_job",
+      "workflowRunId": 202,
+      "workflowJobId": 303,
+      "content": "2026-05-23T10:01:00Z ##[group]Run npm test\n2026-05-23T10:01:01Z > firmcode@0.1.0 test\n2026-05-23T10:01:02Z FAIL src/pricing.test.ts\n2026-05-23T10:01:03Z AssertionError: expected 201 to equal 200\n2026-05-23T10:01:04Z at src/pricing.test.ts:18:22\n2026-05-23T10:01:05Z ##[error]Process completed with exit code 1.",
+      "originalBytes": 344,
+      "redactedBytes": 344,
+      "storedBytes": 344,
+      "truncated": false,
+      "redacted": false
+    }
+  ],
+  "unavailableLogs": []
+}
