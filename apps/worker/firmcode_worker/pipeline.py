@@ -314,6 +314,11 @@ class GitHubClient:
 
         token = self._installation_token(installation_id)
         owner, repo = split_repository_full_name(repository_full_name)
+        existing_comments = self._fetch_pull_request_review_comments(token=token, owner=owner, repo=repo, pull_number=pull_number)
+        existing_published, missing_comments = _partition_existing_inline_comments(selected_comments, existing_comments)
+        if not missing_comments:
+            return None, existing_published, False
+
         created = self._request_json(
             "POST",
             f"/repos/{owner}/{repo}/pulls/{pull_number}/reviews",
@@ -329,7 +334,7 @@ class GitHubClient:
                         "side": "RIGHT",
                         "body": _read_str(comment.get("body"), ""),
                     }
-                    for comment in selected_comments
+                    for comment in missing_comments
                 ],
             },
         )
@@ -337,15 +342,62 @@ class GitHubClient:
             raise ReviewPipelineError("github_response_invalid", "GitHub create review response did not include an id.")
         review_id = created["id"]
 
-        review_comments = self._request_json(
-            "GET",
-            f"/repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}/comments?per_page=100",
+        new_published = self._fetch_created_review_comments(
             token=token,
+            owner=owner,
+            repo=repo,
+            pull_number=pull_number,
+            review_id=review_id,
+            selected_comments=missing_comments,
         )
-        if not isinstance(review_comments, list):
-            raise ReviewPipelineError("github_response_invalid", "GitHub review comments response was not a list.")
 
-        return review_id, _match_published_inline_comments(review_id, selected_comments, review_comments), False
+        return review_id, [*existing_published, *new_published], False
+
+    def _fetch_pull_request_review_comments(self, *, token: str, owner: str, repo: str, pull_number: int) -> list[Any]:
+        comments: list[Any] = []
+        page = 1
+        while True:
+            response = self._request_json(
+                "GET",
+                f"/repos/{owner}/{repo}/pulls/{pull_number}/comments?per_page=100&page={page}",
+                token=token,
+            )
+            if not isinstance(response, list):
+                raise ReviewPipelineError("github_response_invalid", "GitHub pull review comments response was not a list.")
+            comments.extend(response)
+            if len(response) < 100:
+                break
+            page += 1
+        return comments
+
+    def _fetch_created_review_comments(
+        self,
+        *,
+        token: str,
+        owner: str,
+        repo: str,
+        pull_number: int,
+        review_id: int,
+        selected_comments: Sequence[Mapping[str, Any]],
+    ) -> list[PublishedInlineComment]:
+        last_error: ReviewPipelineError | None = None
+        for attempt in range(5):
+            review_comments = self._request_json(
+                "GET",
+                f"/repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}/comments?per_page=100",
+                token=token,
+            )
+            if not isinstance(review_comments, list):
+                raise ReviewPipelineError("github_response_invalid", "GitHub review comments response was not a list.")
+            try:
+                return _match_published_inline_comments(review_id, selected_comments, review_comments)
+            except ReviewPipelineError as error:
+                last_error = error
+                if attempt < 4:
+                    time.sleep(1)
+        if last_error is not None:
+            raise last_error
+        return []
 
     def _installation_token(self, installation_id: int) -> str:
         cached = self._tokens.get(installation_id)
@@ -1595,6 +1647,50 @@ def _match_published_inline_comments(
         )
 
     return published
+
+
+def _partition_existing_inline_comments(
+    selected_comments: Sequence[Mapping[str, Any]],
+    review_comments: Sequence[Any],
+) -> tuple[list[PublishedInlineComment], list[Mapping[str, Any]]]:
+    remaining = [_read_object(comment) for comment in review_comments]
+    published: list[PublishedInlineComment] = []
+    missing: list[Mapping[str, Any]] = []
+
+    for selected in selected_comments:
+        selected_body = _read_str(selected.get("body"), "")
+        selected_path = _read_str(selected.get("path"), "")
+        selected_line = _read_int(selected.get("line"), 1)
+        match_index = next(
+            (
+                index
+                for index, comment in enumerate(remaining)
+                if _read_str(comment.get("body"), "") == selected_body
+                and _read_str(comment.get("path"), "") == selected_path
+                and _read_int(comment.get("line"), 0) == selected_line
+                and isinstance(comment.get("id"), int)
+            ),
+            None,
+        )
+        if match_index is None:
+            missing.append(selected)
+            continue
+
+        match = remaining.pop(match_index)
+        review_id = match.get("pull_request_review_id")
+        published.append(
+            PublishedInlineComment(
+                finding_id=_read_str(selected.get("findingId"), ""),
+                github_review_id=int(review_id) if isinstance(review_id, int) else None,
+                github_comment_id=int(match["id"]),
+                file_path=selected_path,
+                line=selected_line,
+                body=selected_body,
+                dry_run=False,
+            )
+        )
+
+    return published, missing
 
 
 def _semgrep_scanned_paths(semgrep_artifact: Mapping[str, Any]) -> list[str]:
