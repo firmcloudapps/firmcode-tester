@@ -1,10 +1,8 @@
 import { createSign } from "crypto";
 import {
   firmcodeAiActivityMarker,
-  renderFirmcodeAiScanningActivity,
   renderFirmcodeAiSummaryActivity,
   type ApiRuntimeConfig,
-  type FirmcodeAiScanningActivityInput,
   type FirmcodeAiSummaryActivityInput,
   type GitHubAppConfig
 } from "@firmcode/shared";
@@ -15,10 +13,6 @@ import {
 } from "./published-comment-store";
 
 export const GITHUB_PR_ACTIVITY_PUBLISHER = Symbol("GITHUB_PR_ACTIVITY_PUBLISHER");
-
-export interface PublishPullRequestScanningActivityInput extends FirmcodeAiScanningActivityInput {
-  readonly installationId: number;
-}
 
 export interface PublishPullRequestSummaryActivityInput extends FirmcodeAiSummaryActivityInput {
   readonly installationId: number;
@@ -31,15 +25,10 @@ export interface PublishPullRequestActivityResult {
 }
 
 export interface GitHubPullRequestActivityPublisher {
-  publishScanningActivity(input: PublishPullRequestScanningActivityInput): Promise<void>;
   publishSummaryActivity(input: PublishPullRequestSummaryActivityInput): Promise<PublishPullRequestActivityResult>;
 }
 
 export class NoopGitHubPullRequestActivityPublisher implements GitHubPullRequestActivityPublisher {
-  async publishScanningActivity(_input: PublishPullRequestScanningActivityInput): Promise<void> {
-    return undefined;
-  }
-
   async publishSummaryActivity(input: PublishPullRequestSummaryActivityInput): Promise<PublishPullRequestActivityResult> {
     return {
       action: "created",
@@ -51,19 +40,6 @@ export class NoopGitHubPullRequestActivityPublisher implements GitHubPullRequest
 
 export class DryRunGitHubPullRequestActivityPublisher implements GitHubPullRequestActivityPublisher {
   constructor(private readonly publishedCommentStore: PublishedCommentStore = new NoopPublishedCommentStore()) {}
-
-  async publishScanningActivity(input: PublishPullRequestScanningActivityInput): Promise<void> {
-    console.info(
-      JSON.stringify({
-        event: "github.activity.dry_run",
-        activity: "scanning",
-        repositoryFullName: input.repositoryFullName,
-        pullRequestNumber: input.pullRequestNumber,
-        reviewRunId: input.reviewRunId,
-        githubWriteCallsSkipped: true
-      })
-    );
-  }
 
   async publishSummaryActivity(input: PublishPullRequestSummaryActivityInput): Promise<PublishPullRequestActivityResult> {
     const body = renderFirmcodeAiSummaryActivity(input);
@@ -131,16 +107,6 @@ export class GitHubAppPullRequestActivityPublisher implements GitHubPullRequestA
     }
 
     return new GitHubAppPullRequestActivityPublisher(config.github);
-  }
-
-  async publishScanningActivity(input: PublishPullRequestScanningActivityInput): Promise<void> {
-    await this.publishIssueCommentActivity({
-      installationId: input.installationId,
-      repositoryFullName: input.repositoryFullName,
-      pullRequestNumber: input.pullRequestNumber,
-      marker: firmcodeAiActivityMarker("scanning"),
-      body: renderFirmcodeAiScanningActivity(input)
-    });
   }
 
   async publishSummaryActivity(input: PublishPullRequestSummaryActivityInput): Promise<PublishPullRequestActivityResult> {

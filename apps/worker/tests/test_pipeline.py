@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 from dataclasses import dataclass, field
 from typing import Any, Mapping, Sequence
 
@@ -139,10 +140,14 @@ def test_parse_patch_hunks_tracks_added_lines() -> None:
 def test_normalize_private_key_accepts_quoted_escaped_and_base64_pem() -> None:
     pem = "-----BEGIN PRIVATE KEY-----\nabc123\n-----END PRIVATE KEY-----"
     escaped = pem.replace("\n", "\\n")
-    encoded = "LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCmFiYzEyMwotLS0tLUVORCBQUklWQVRFIEtFWS0tLS0t"
+    encoded = base64.b64encode(pem.encode("utf-8")).decode("ascii")
+    unpadded = encoded.rstrip("=")
+    spaced = f"{unpadded[:16]}\n {unpadded[16:40]}\n{unpadded[40:]}"
 
     assert normalize_private_key(f"'{escaped}'") == pem
     assert normalize_private_key(f'"{encoded}"') == pem
+    assert normalize_private_key(unpadded) == pem
+    assert normalize_private_key(spaced) == pem
 
 
 def test_deterministic_pipeline_publishes_actual_analysis_summary() -> None:
@@ -167,7 +172,9 @@ def test_deterministic_pipeline_publishes_actual_analysis_summary() -> None:
     assert "`src/widget.ts:2`" in store.summary_body
     assert store.dry_run is True
     assert len(github.scanning_bodies) >= 4
+    assert "## FirmcodeAI Analysis Progress" in github.scanning_bodies[0]
     assert "Status: `running`" in github.scanning_bodies[0]
+    assert "scan new changes" not in "\n".join(github.scanning_bodies)
     assert "Files selected for processing: 1" in "\n".join(github.scanning_bodies)
     assert "Semgrep findings so far: 1" in "\n".join(github.scanning_bodies)
     assert "Status: `completed`" in github.scanning_bodies[-1]

@@ -1,7 +1,6 @@
 import { generateKeyPairSync } from "crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  FIRMCODEAI_SCANNING_COMMENT_MARKER,
   FIRMCODEAI_SUMMARY_COMMENT_MARKER,
   type GitHubAppConfig
 } from "@firmcode/shared";
@@ -16,35 +15,6 @@ describe("GitHubAppPullRequestActivityPublisher", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
-  });
-
-  it("updates an existing FirmcodeAI scanning activity comment", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(jsonResponse({ token: "installation-token" }))
-      .mockResolvedValueOnce(jsonResponse([{ id: 99, body: `${FIRMCODEAI_SCANNING_COMMENT_MARKER}\nold body` }]))
-      .mockResolvedValueOnce(jsonResponse({ id: 99 }));
-    vi.stubGlobal("fetch", fetchMock);
-
-    await new GitHubAppPullRequestActivityPublisher(testGitHubConfig()).publishScanningActivity({
-      installationId: 101,
-      repositoryFullName: "openclaw/firmcode-fixture",
-      pullRequestNumber: 7,
-      reviewRunId: "run-1",
-      headSha: "abc123def456",
-      triggerEvent: "pull_request.synchronize",
-      status: "queued"
-    });
-
-    expect(fetchMock).toHaveBeenCalledTimes(3);
-    expect(fetchMock.mock.calls[0][0]).toBe("https://api.github.com/app/installations/101/access_tokens");
-    expect(fetchMock.mock.calls[1][0]).toBe(
-      "https://api.github.com/repos/openclaw/firmcode-fixture/issues/7/comments?per_page=100"
-    );
-    expect(fetchMock.mock.calls[2][0]).toBe("https://api.github.com/repos/openclaw/firmcode-fixture/issues/comments/99");
-    expect(JSON.parse(String(fetchMock.mock.calls[2][1]?.body))).toMatchObject({
-      body: expect.stringContaining("## FirmcodeAI Scanning")
-    });
   });
 
   it("creates a FirmcodeAI summary comment when no previous summary exists", async () => {
@@ -126,13 +96,20 @@ describe("GitHubAppPullRequestActivityPublisher", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({ message: "Resource not accessible by integration" }, 403)));
 
     await expect(
-      new GitHubAppPullRequestActivityPublisher(testGitHubConfig()).publishScanningActivity({
+      new GitHubAppPullRequestActivityPublisher(testGitHubConfig()).publishSummaryActivity({
         installationId: 101,
         repositoryFullName: "openclaw/firmcode-fixture",
         pullRequestNumber: 7,
         reviewRunId: "run-1",
         headSha: "abc123def456",
-        triggerEvent: "pull_request.opened"
+        summaryBody: "This PR updates the review publisher.",
+        riskLevel: "medium",
+        changedComponents: [],
+        keyFindings: [],
+        findingCount: 0,
+        inlineCommentCount: 0,
+        testSuggestions: [],
+        ciExplanation: null
       })
     ).rejects.toMatchObject({
       name: "GitHubActivityPublishError",
@@ -178,23 +155,6 @@ describe("GitHubAppPullRequestActivityPublisher", () => {
       body: result.body
     });
     expect(info).toHaveBeenCalledWith(expect.stringContaining("\"event\":\"github.activity.dry_run\""));
-  });
-
-  it("skips scanning activity GitHub writes in dry run", async () => {
-    const fetchMock = vi.fn();
-    vi.spyOn(console, "info").mockImplementation(() => undefined);
-    vi.stubGlobal("fetch", fetchMock);
-
-    await new DryRunGitHubPullRequestActivityPublisher().publishScanningActivity({
-      installationId: 101,
-      repositoryFullName: "openclaw/firmcode-fixture",
-      pullRequestNumber: 7,
-      reviewRunId: "run-1",
-      headSha: "abc123def456",
-      triggerEvent: "pull_request.opened"
-    });
-
-    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("creates a valid three-part GitHub App JWT", () => {
