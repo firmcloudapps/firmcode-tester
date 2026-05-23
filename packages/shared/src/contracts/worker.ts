@@ -158,6 +158,7 @@ export interface WorkerTreeSitterSymbol {
     readonly startByte: number;
     readonly endByte: number;
   };
+  readonly changed: boolean;
 }
 
 export interface WorkerTreeSitterImport {
@@ -596,7 +597,7 @@ export const workerTreeSitterArtifactJsonSchema = {
             items: {
               type: "object",
               additionalProperties: false,
-              required: ["name", "kind", "range", "byteRange"],
+              required: ["name", "kind", "range", "byteRange", "changed"],
               properties: {
                 name: nonEmptyStringSchema,
                 kind: nonEmptyStringSchema,
@@ -609,7 +610,8 @@ export const workerTreeSitterArtifactJsonSchema = {
                     startByte: nonNegativeIntegerSchema,
                     endByte: nonNegativeIntegerSchema
                   }
-                }
+                },
+                changed: { type: "boolean" }
               }
             }
           },

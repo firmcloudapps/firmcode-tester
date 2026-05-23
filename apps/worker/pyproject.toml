@@ -9,7 +9,12 @@ description = "Python worker package for Firmcode review pipeline stages."
 requires-python = ">=3.9"
 dependencies = [
   "bullmq>=2.19.0",
-  "psycopg[binary]>=3.2.0"
+  "psycopg[binary]>=3.2.0",
+  "tree-sitter>=0.22.0",
+  "tree-sitter-go>=0.23.0",
+  "tree-sitter-python>=0.23.0",
+  "tree-sitter-typescript>=0.23.0",
+  "tree-sitter-yaml>=0.7.0"
 ]
 
 [project.scripts]

@@ -237,6 +237,7 @@ class TreeSitterSymbol:
     range: LineRange
     start_byte: int
     end_byte: int
+    changed: bool
 
 
 @dataclass(frozen=True)
@@ -548,6 +549,7 @@ def _read_tree_sitter_symbol(value: Any, path: str, errors: list[str]) -> TreeSi
         range=_read_line_range(item.get("range"), f"{path}.range", errors),
         start_byte=_read_non_negative_int(byte_range, "startByte", errors, f"{path}.byteRange"),
         end_byte=_read_non_negative_int(byte_range, "endByte", errors, f"{path}.byteRange"),
+        changed=_read_bool(item, "changed", errors, path),
     )
 
 
