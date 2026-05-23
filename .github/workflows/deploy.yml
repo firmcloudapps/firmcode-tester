@@ -99,7 +99,12 @@ jobs:
           COOLIFY_URL: ${{ env.COOLIFY_URL }}
         run: |
           DEPLOY_URL="${COOLIFY_URL%/}/api/v1/deploy?uuid=${COOLIFY_APP_UUID}&force=true"
+          if [[ "${COOLIFY_API_TOKEN}" == Bearer\ * ]]; then
+            AUTH_HEADER="Authorization: ${COOLIFY_API_TOKEN}"
+          else
+            AUTH_HEADER="Authorization: Bearer ${COOLIFY_API_TOKEN}"
+          fi
           echo "Triggering Coolify deploy: ${DEPLOY_URL}"
           curl --fail-with-body --show-error --request GET \
-            --header "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
+            --header "${AUTH_HEADER}" \
             "${DEPLOY_URL}"
