@@ -3,7 +3,7 @@ name: Deploy Firmcode to Coolify
 on:
   push:
     branches:
-      - main
+      - main2
   workflow_dispatch:
 
 concurrency:
