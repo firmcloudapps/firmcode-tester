@@ -17,6 +17,14 @@ describe("web Clerk config", () => {
     expect(() => createWebClerkConfig({})).toThrow(/NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is required/);
   });
 
+  it("allows a missing billing portal URL so the dashboard can render a disabled Clerk Billing action", () => {
+    expect(
+      createWebClerkConfig({
+        NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_example"
+      }).billingPortalUrl
+    ).toBeNull();
+  });
+
   it("rejects a relative billing portal URL", () => {
     expect(() =>
       createWebClerkConfig({

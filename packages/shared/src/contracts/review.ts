@@ -61,6 +61,10 @@ export function canManageSensitiveWorkspaceSettings(role: DashboardWorkspaceRole
   return role === "owner" || role === "admin";
 }
 
+export function canManageWorkspaceBilling(role: DashboardWorkspaceRole, hasClerkManagedBillingRole = false): boolean {
+  return role === "owner" || role === "admin" || hasClerkManagedBillingRole;
+}
+
 export const REPOSITORY_REVIEW_SEVERITY_THRESHOLDS = ["info", "low", "medium", "high", "critical"] as const;
 
 export type RepositoryReviewSeverityThreshold = (typeof REPOSITORY_REVIEW_SEVERITY_THRESHOLDS)[number];
@@ -289,6 +293,35 @@ export interface WorkspaceSettingsResponse {
     enabled: boolean;
     message: string;
   };
+}
+
+export interface WorkspaceBillingUsage {
+  monthlyReviewRuns: number | null;
+  aiTokens: number | null;
+  repositories: number | null;
+  seats: number | null;
+  periodStart: string | null;
+  periodEnd: string | null;
+}
+
+export interface WorkspaceBillingResponse {
+  workspace: {
+    id: string;
+    name: string;
+    role: DashboardWorkspaceRole;
+    canManageBilling: boolean;
+    billingAccessSource: "workspace_role" | "clerk_billing_role";
+  };
+  plan: {
+    name: string;
+    source: "clerk";
+    description: string;
+  };
+  billingStatus: {
+    label: string;
+    source: "clerk";
+  };
+  usage: WorkspaceBillingUsage;
 }
 
 export type ReviewRunArtifactType = "diff" | "treesitter" | "semgrep" | "context_pack" | "llm_raw" | "ci_log";

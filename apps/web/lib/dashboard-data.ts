@@ -7,6 +7,7 @@ import type {
   ReviewRunDetail,
   ReviewRunListFilters,
   ReviewRunListResponse,
+  WorkspaceBillingResponse,
   WorkspaceSettingsResponse
 } from "@firmcode/shared";
 import { createDashboardApiHeaders } from "./dashboard-api-proxy";
@@ -84,6 +85,16 @@ export async function loadSettingsState(): Promise<ViewState<WorkspaceSettingsRe
     return data.githubApp.installations.length === 0 ? { status: "empty", data } : { status: "populated", data };
   } catch (error) {
     return { status: "error", message: toErrorMessage(error) };
+  }
+}
+
+export async function loadBillingState(): Promise<ViewState<WorkspaceBillingResponse>> {
+  try {
+    const data = await requestAuthenticatedJson<WorkspaceBillingResponse>("/api/billing");
+
+    return { status: "populated", data };
+  } catch (error) {
+    return { status: "error", message: toBillingErrorMessage(error) };
   }
 }
 
@@ -206,4 +217,12 @@ function toErrorMessage(error: unknown): string {
   }
 
   return "Dashboard data could not be loaded.";
+}
+
+function toBillingErrorMessage(error: unknown): string {
+  if (error instanceof DashboardApiError && (error.status === 401 || error.status === 403)) {
+    return "Billing access requires workspace Owner/Admin or Clerk billing role.";
+  }
+
+  return toErrorMessage(error);
 }
