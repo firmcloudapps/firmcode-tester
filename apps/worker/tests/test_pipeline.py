@@ -9,6 +9,7 @@ from firmcode_worker.pipeline import (
     DeterministicReviewPipeline,
     GitHubFile,
     ReviewContext,
+    normalize_private_key,
     parse_patch_hunks,
 )
 from firmcode_worker.schemas.contracts import ReviewJobInput
@@ -116,6 +117,15 @@ def test_parse_patch_hunks_tracks_added_lines() -> None:
         "oldLineNumber": None,
         "newLineNumber": 11,
     }
+
+
+def test_normalize_private_key_accepts_quoted_escaped_and_base64_pem() -> None:
+    pem = "-----BEGIN PRIVATE KEY-----\nabc123\n-----END PRIVATE KEY-----"
+    escaped = pem.replace("\n", "\\n")
+    encoded = "LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCmFiYzEyMwotLS0tLUVORCBQUklWQVRFIEtFWS0tLS0t"
+
+    assert normalize_private_key(f"'{escaped}'") == pem
+    assert normalize_private_key(f'"{encoded}"') == pem
 
 
 def test_deterministic_pipeline_publishes_actual_analysis_summary() -> None:

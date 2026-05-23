@@ -774,7 +774,31 @@ def create_github_app_jwt(*, app_id: str, private_key: str, now_seconds: int | N
 
 
 def normalize_private_key(value: str) -> str:
+    candidate = _normalize_private_key_text(_strip_matching_quotes(value.strip()))
+    if _is_private_key_pem(candidate):
+        return candidate
+
+    try:
+        decoded = base64.b64decode(_strip_matching_quotes(value.strip()), validate=True).decode("utf-8")
+    except Exception:
+        return candidate
+
+    decoded_candidate = _normalize_private_key_text(_strip_matching_quotes(decoded.strip()))
+    return decoded_candidate if _is_private_key_pem(decoded_candidate) else candidate
+
+
+def _strip_matching_quotes(value: str) -> str:
+    if len(value) >= 2 and ((value[0] == value[-1] == "\"") or (value[0] == value[-1] == "'")):
+        return value[1:-1].strip()
+    return value
+
+
+def _normalize_private_key_text(value: str) -> str:
     return value.strip().replace("\r\n", "\n").replace("\r", "\n").replace("\\n", "\n")
+
+
+def _is_private_key_pem(value: str) -> bool:
+    return bool(re.match(r"^-----BEGIN (?:RSA )?PRIVATE KEY-----\n[\s\S]+\n-----END (?:RSA )?PRIVATE KEY-----$", value))
 
 
 def split_repository_full_name(value: str) -> tuple[str, str]:
