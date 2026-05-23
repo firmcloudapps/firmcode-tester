@@ -31,6 +31,7 @@ describe("API runtime config", () => {
     expect(config.github?.appId).toBe(12345);
     expect(config.github?.privateKey).toBe(RAW_PRIVATE_KEY);
     expect(config.port).toBe(3001);
+    expect(config.review.dryRun).toBe(true);
     expect(config.review.largePullRequest.maxChangedFiles).toBe(100);
   });
 
@@ -131,6 +132,15 @@ describe("API runtime config", () => {
       summaryOnlyEstimatedTokens: 25000,
       maxFullContextFiles: 12
     });
+  });
+
+  it("allows GitHub publishing to be enabled explicitly", () => {
+    const config = createApiRuntimeConfig({
+      ...VALID_ENV,
+      DRY_RUN: "false"
+    });
+
+    expect(config.review.dryRun).toBe(false);
   });
 
   it("rejects invalid large-PR threshold values", () => {

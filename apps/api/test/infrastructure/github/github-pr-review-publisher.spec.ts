@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { GitHubAppConfig } from "@firmcode/shared";
 import {
   buildGitHubInlineReviewPayload,
+  DryRunGitHubPullRequestReviewPublisher,
   GitHubAppPullRequestReviewPublisher,
   InMemoryPublishedCommentStore,
   type InlineReviewChangedLine,
@@ -109,6 +110,7 @@ describe("buildGitHubInlineReviewPayload", () => {
 describe("GitHubAppPullRequestReviewPublisher", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   it("posts a GitHub review and persists returned inline comment ids", async () => {
@@ -184,6 +186,50 @@ describe("GitHubAppPullRequestReviewPublisher", () => {
         }
       ]
     });
+  });
+
+  it("persists would-be inline comments without GitHub write calls in dry run", async () => {
+    const store = new InMemoryPublishedCommentStore();
+    const fetchMock = vi.fn();
+    const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await new DryRunGitHubPullRequestReviewPublisher(store).publishInlineReview({
+      installationId: 101,
+      repositoryFullName: "openclaw/firmcode-fixture",
+      pullRequestNumber: 7,
+      reviewRunId: "00000000-0000-4000-8000-000000000010",
+      headSha: "abc123def456",
+      changedLines,
+      maxInlineComments: 1,
+      inlineComments: [
+        comment({
+          findingId: "00000000-0000-4000-8000-000000000020",
+          path: "src/server.ts",
+          line: 42,
+          severity: "high",
+          confidence: 0.98
+        })
+      ]
+    });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      reviewId: null,
+      selectedCommentCount: 1,
+      publishedComments: [
+        {
+          githubReviewId: null,
+          githubCommentId: null,
+          dryRun: true,
+          filePath: "src/server.ts",
+          line: 42,
+          body: expect.stringContaining("**Severity:** HIGH")
+        }
+      ]
+    });
+    expect(store.inlineComments).toEqual(result.publishedComments);
+    expect(info).toHaveBeenCalledWith(expect.stringContaining("\"event\":\"github.review.dry_run\""));
   });
 });
 

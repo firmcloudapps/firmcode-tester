@@ -12,6 +12,32 @@ export interface ReviewRunSummary {
   createdAt: string;
 }
 
+export interface ReviewRunPublishedComment {
+  id: string;
+  commentType: "summary" | "inline" | "review";
+  findingId: string | null;
+  githubCommentId: number | null;
+  githubReviewId: number | null;
+  filePath: string | null;
+  line: number | null;
+  body: string | null;
+  bodyHash: string;
+  dryRun: boolean;
+  createdAt: string;
+}
+
+export interface ReviewRunDetail extends ReviewRunSummary {
+  repositoryId: string;
+  pullRequestId: string;
+  triggerEvent: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+  errorCode: string | null;
+  errorMessage: string | null;
+  metrics: Record<string, unknown>;
+  publishedComments: ReviewRunPublishedComment[];
+}
+
 export const DEFAULT_REVIEW_LIMITS = {
   maxInlineComments: 10,
   artifactRetentionDays: 30

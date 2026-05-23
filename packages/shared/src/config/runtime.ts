@@ -81,6 +81,7 @@ export interface ApiRuntimeConfig {
 }
 
 export interface ReviewConfig {
+  dryRun: boolean;
   skipDraftPullRequests: boolean;
   largePullRequest: LargePullRequestThresholds;
 }
@@ -364,6 +365,7 @@ function readQueueConfig(env: EnvironmentVariables, issues: ConfigValidationIssu
 
 function readReviewConfig(env: EnvironmentVariables, issues: ConfigValidationIssue[]): ReviewConfig {
   return {
+    dryRun: readOptionalBoolean(env, "DRY_RUN", true, issues),
     skipDraftPullRequests: readOptionalBoolean(env, "REVIEW_SKIP_DRAFT_PRS", true, issues),
     largePullRequest: {
       maxChangedFiles: readOptionalPositiveInteger(

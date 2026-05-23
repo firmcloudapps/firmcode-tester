@@ -7,12 +7,15 @@ import {
 } from "@firmcode/shared";
 import {
   createGitHubAppJwt,
+  DryRunGitHubPullRequestActivityPublisher,
   GitHubAppPullRequestActivityPublisher
 } from "../../../src/infrastructure/github/github-pr-activity-publisher";
+import { InMemoryPublishedCommentStore } from "../../../src/infrastructure/github/published-comment-store";
 
 describe("GitHubAppPullRequestActivityPublisher", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   it("updates an existing FirmcodeAI scanning activity comment", async () => {
@@ -137,6 +140,61 @@ describe("GitHubAppPullRequestActivityPublisher", () => {
       githubMessage: "Resource not accessible by integration",
       message: expect.stringContaining("Resource not accessible by integration")
     });
+  });
+
+  it("persists a would-be summary without GitHub write calls in dry run", async () => {
+    const store = new InMemoryPublishedCommentStore();
+    const fetchMock = vi.fn();
+    const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await new DryRunGitHubPullRequestActivityPublisher(store).publishSummaryActivity({
+      installationId: 101,
+      repositoryFullName: "openclaw/firmcode-fixture",
+      pullRequestNumber: 7,
+      reviewRunId: "run-1",
+      headSha: "abc123def456",
+      summaryBody: "This PR updates the review publisher.",
+      riskLevel: "medium",
+      changedComponents: ["GitHub publisher"],
+      keyFindings: [],
+      findingCount: 0,
+      inlineCommentCount: 0,
+      testSuggestions: ["Run the publisher unit test suite."],
+      ciExplanation: null
+    });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      action: "dry_run",
+      githubCommentId: null,
+      body: expect.stringContaining(FIRMCODEAI_SUMMARY_COMMENT_MARKER)
+    });
+    expect(store.summaryComments).toHaveLength(1);
+    expect(store.summaryComments[0]).toMatchObject({
+      reviewRunId: "run-1",
+      githubCommentId: null,
+      dryRun: true,
+      body: result.body
+    });
+    expect(info).toHaveBeenCalledWith(expect.stringContaining("\"event\":\"github.activity.dry_run\""));
+  });
+
+  it("skips scanning activity GitHub writes in dry run", async () => {
+    const fetchMock = vi.fn();
+    vi.spyOn(console, "info").mockImplementation(() => undefined);
+    vi.stubGlobal("fetch", fetchMock);
+
+    await new DryRunGitHubPullRequestActivityPublisher().publishScanningActivity({
+      installationId: 101,
+      repositoryFullName: "openclaw/firmcode-fixture",
+      pullRequestNumber: 7,
+      reviewRunId: "run-1",
+      headSha: "abc123def456",
+      triggerEvent: "pull_request.opened"
+    });
+
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("creates a valid three-part GitHub App JWT", () => {

@@ -1,7 +1,21 @@
-import { createHash, randomUUID } from "crypto";
 import { DEFAULT_REVIEW_LIMITS, type ApiRuntimeConfig, type GitHubAppConfig, type WorkerSeverity } from "@firmcode/shared";
-import type { DatabaseExecutor } from "../database/migrations";
 import { createGitHubAppJwt } from "./github-pr-activity-publisher";
+import {
+  hashPublishedCommentBody,
+  InMemoryPublishedCommentStore,
+  NoopPublishedCommentStore,
+  PostgresPublishedCommentStore,
+  type PublishedCommentStore,
+  type PublishedInlineCommentRecord
+} from "./published-comment-store";
+
+export {
+  InMemoryPublishedCommentStore,
+  NoopPublishedCommentStore,
+  PostgresPublishedCommentStore,
+  type PublishedCommentStore,
+  type PublishedInlineCommentRecord
+} from "./published-comment-store";
 
 export const GITHUB_PR_REVIEW_PUBLISHER = Symbol("GITHUB_PR_REVIEW_PUBLISHER");
 
@@ -55,73 +69,6 @@ export interface PublishPullRequestInlineReviewResult {
   readonly publishedComments: readonly PublishedInlineCommentRecord[];
 }
 
-export interface PublishedInlineCommentRecord {
-  readonly reviewRunId: string;
-  readonly findingId: string;
-  readonly githubCommentId: number;
-  readonly filePath: string;
-  readonly line: number;
-  readonly bodyHash: string;
-}
-
-export interface PublishedCommentStore {
-  recordPublishedInlineComments(records: readonly PublishedInlineCommentRecord[]): Promise<void>;
-}
-
-export class NoopPublishedCommentStore implements PublishedCommentStore {
-  async recordPublishedInlineComments(_records: readonly PublishedInlineCommentRecord[]): Promise<void> {
-    return undefined;
-  }
-}
-
-export class InMemoryPublishedCommentStore implements PublishedCommentStore {
-  readonly inlineComments: PublishedInlineCommentRecord[] = [];
-
-  async recordPublishedInlineComments(records: readonly PublishedInlineCommentRecord[]): Promise<void> {
-    this.inlineComments.push(...records);
-  }
-}
-
-export class PostgresPublishedCommentStore implements PublishedCommentStore {
-  constructor(
-    private readonly database: DatabaseExecutor,
-    private readonly createId: () => string = randomUUID
-  ) {}
-
-  async recordPublishedInlineComments(records: readonly PublishedInlineCommentRecord[]): Promise<void> {
-    for (const record of records) {
-      await this.database.query(
-        `
-INSERT INTO published_comments (
-  id,
-  review_run_id,
-  finding_id,
-  github_comment_id,
-  comment_type,
-  file_path,
-  line,
-  body_hash
-) VALUES ($1, $2, $3, $4, 'inline', $5, $6, $7)
-ON CONFLICT (review_run_id, comment_type, body_hash) DO UPDATE
-SET github_comment_id = EXCLUDED.github_comment_id,
-    finding_id = COALESCE(EXCLUDED.finding_id, published_comments.finding_id),
-    file_path = EXCLUDED.file_path,
-    line = EXCLUDED.line
-`,
-        [
-          this.createId(),
-          record.reviewRunId,
-          isUuid(record.findingId) ? record.findingId : null,
-          record.githubCommentId,
-          record.filePath,
-          record.line,
-          record.bodyHash
-        ]
-      );
-    }
-  }
-}
-
 export class NoopGitHubPullRequestReviewPublisher implements GitHubPullRequestReviewPublisher {
   async publishInlineReview(input: PublishPullRequestInlineReviewInput): Promise<PublishPullRequestInlineReviewResult> {
     const build = buildGitHubInlineReviewPayload(input);
@@ -131,6 +78,38 @@ export class NoopGitHubPullRequestReviewPublisher implements GitHubPullRequestRe
       skippedCommentCount: build.skippedCommentCount,
       cappedCommentCount: build.cappedCommentCount,
       publishedComments: []
+    };
+  }
+}
+
+export class DryRunGitHubPullRequestReviewPublisher implements GitHubPullRequestReviewPublisher {
+  constructor(private readonly publishedCommentStore: PublishedCommentStore = new NoopPublishedCommentStore()) {}
+
+  async publishInlineReview(input: PublishPullRequestInlineReviewInput): Promise<PublishPullRequestInlineReviewResult> {
+    const build = buildGitHubInlineReviewPayload(input);
+    const publishedComments = build.selectedComments.map((comment) => toDryRunPublishedInlineComment(input.reviewRunId, comment));
+
+    await this.publishedCommentStore.recordPublishedInlineComments(publishedComments);
+
+    console.info(
+      JSON.stringify({
+        event: "github.review.dry_run",
+        repositoryFullName: input.repositoryFullName,
+        pullRequestNumber: input.pullRequestNumber,
+        reviewRunId: input.reviewRunId,
+        selectedCommentCount: build.selectedComments.length,
+        skippedCommentCount: build.skippedCommentCount,
+        cappedCommentCount: build.cappedCommentCount,
+        githubWriteCallsSkipped: true
+      })
+    );
+
+    return {
+      reviewId: null,
+      selectedCommentCount: build.selectedComments.length,
+      skippedCommentCount: build.skippedCommentCount,
+      cappedCommentCount: build.cappedCommentCount,
+      publishedComments
     };
   }
 }
@@ -209,6 +188,10 @@ export class GitHubAppPullRequestReviewPublisher implements GitHubPullRequestRev
     config: ApiRuntimeConfig,
     publishedCommentStore: PublishedCommentStore = new NoopPublishedCommentStore()
   ): GitHubPullRequestReviewPublisher {
+    if (config.review.dryRun) {
+      return new DryRunGitHubPullRequestReviewPublisher(publishedCommentStore);
+    }
+
     if (config.github === null) {
       return new NoopGitHubPullRequestReviewPublisher();
     }
@@ -247,7 +230,7 @@ export class GitHubAppPullRequestReviewPublisher implements GitHubPullRequestRev
       token,
       path: `/repos/${owner}/${repo}/pulls/${input.pullRequestNumber}/reviews/${review.id}/comments?per_page=100`
     });
-    const publishedComments = matchPublishedComments(input.reviewRunId, build.selectedComments, reviewComments);
+    const publishedComments = matchPublishedComments(input.reviewRunId, review.id, build.selectedComments, reviewComments);
 
     await this.publishedCommentStore.recordPublishedInlineComments(publishedComments);
 
@@ -454,6 +437,7 @@ function renderEvidenceLocation(evidence: InlineReviewEvidence): string {
 
 function matchPublishedComments(
   reviewRunId: string,
+  reviewId: number,
   selectedComments: readonly SelectedInlineReviewComment[],
   reviewComments: readonly GitHubReviewCommentResponse[]
 ): PublishedInlineCommentRecord[] {
@@ -477,24 +461,42 @@ function matchPublishedComments(
     return {
       reviewRunId,
       findingId: selectedComment.findingId,
+      githubReviewId: reviewId,
       githubCommentId: matched.id,
       filePath: selectedComment.path,
       line: selectedComment.line,
-      bodyHash: hashPublishedInlineComment(selectedComment)
+      body: selectedComment.body,
+      bodyHash: hashPublishedInlineComment(reviewRunId, selectedComment),
+      dryRun: false
     };
   });
 }
 
-function hashPublishedInlineComment(comment: SelectedInlineReviewComment): string {
-  return createHash("sha256")
-    .update(comment.findingId)
-    .update("\0")
-    .update(comment.path)
-    .update("\0")
-    .update(String(comment.line))
-    .update("\0")
-    .update(comment.body)
-    .digest("hex");
+function toDryRunPublishedInlineComment(
+  reviewRunId: string,
+  selectedComment: SelectedInlineReviewComment
+): PublishedInlineCommentRecord {
+  return {
+    reviewRunId,
+    findingId: selectedComment.findingId,
+    githubReviewId: null,
+    githubCommentId: null,
+    filePath: selectedComment.path,
+    line: selectedComment.line,
+    body: selectedComment.body,
+    bodyHash: hashPublishedInlineComment(reviewRunId, selectedComment),
+    dryRun: true
+  };
+}
+
+function hashPublishedInlineComment(reviewRunId: string, comment: SelectedInlineReviewComment): string {
+  return hashPublishedCommentBody({
+    reviewRunId,
+    findingId: comment.findingId,
+    path: comment.path,
+    line: comment.line,
+    body: comment.body
+  });
 }
 
 function splitRepositoryFullName(value: string): [string, string] {
@@ -554,8 +556,4 @@ async function readGitHubErrorMessage(response: Response): Promise<string | null
   }
 
   return boundedText(text, 500);
-}
-
-function isUuid(value: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(value);
 }

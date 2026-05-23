@@ -36,6 +36,98 @@ function createDeterministicUuidFactory(): () => string {
   };
 }
 
+async function insertMinimalReviewRun(pool: PgPoolLike): Promise<void> {
+  await pool.query(
+    `
+INSERT INTO github_installations (
+  id,
+  installation_id,
+  permissions_json
+) VALUES (
+  '00000000-0000-4000-8000-000000000001',
+  101,
+  '{"pull_requests":"write"}'
+);
+
+INSERT INTO repositories (
+  id,
+  installation_id,
+  github_repository_id,
+  owner,
+  name,
+  full_name,
+  private,
+  default_branch,
+  enabled
+) VALUES (
+  '00000000-0000-4000-8000-000000000002',
+  '00000000-0000-4000-8000-000000000001',
+  202,
+  'openclaw',
+  'firmcode',
+  'openclaw/firmcode',
+  false,
+  'main',
+  true
+);
+
+INSERT INTO pull_requests (
+  id,
+  repository_id,
+  github_pr_id,
+  number,
+  title,
+  author_login,
+  base_ref,
+  head_ref,
+  base_sha,
+  head_sha,
+  state,
+  draft
+) VALUES (
+  '00000000-0000-4000-8000-000000000003',
+  '00000000-0000-4000-8000-000000000002',
+  303,
+  7,
+  'Add dry run mode',
+  'kelly',
+  'main',
+  'feature/dry-run',
+  'base-sha',
+  'head-sha',
+  'open',
+  false
+);
+
+INSERT INTO github_deliveries (
+  delivery_id,
+  event_name,
+  action
+) VALUES (
+  'delivery-dry-run',
+  'pull_request',
+  'opened'
+);
+
+INSERT INTO review_runs (
+  id,
+  repository_id,
+  pull_request_id,
+  delivery_id,
+  trigger_event,
+  head_sha
+) VALUES (
+  '00000000-0000-4000-8000-000000000006',
+  '00000000-0000-4000-8000-000000000002',
+  '00000000-0000-4000-8000-000000000003',
+  'delivery-dry-run',
+  'pull_request.opened',
+  'head-sha'
+);
+`
+  );
+}
+
 describe("database migrations", () => {
   let pool: PgPoolLike;
 
@@ -60,10 +152,50 @@ ORDER BY table_name
     );
     const applied = await pool.query<{ id: string }>("SELECT id FROM schema_migrations ORDER BY id");
 
-    expect(appliedMigrationIds).toEqual(["001_initial_review_schema"]);
+    expect(appliedMigrationIds).toEqual(["001_initial_review_schema", "002_dry_run_published_comments"]);
     expect(secondRunMigrationIds).toEqual([]);
     expect(tables.rows.map((row) => row.table_name)).toEqual(EXPECTED_TABLES);
-    expect(applied.rows).toEqual([{ id: "001_initial_review_schema" }]);
+    expect(applied.rows).toEqual([{ id: "001_initial_review_schema" }, { id: "002_dry_run_published_comments" }]);
+  });
+
+  it("stores dry-run comment bodies for dashboard inspection", async () => {
+    await runDatabaseMigrations(pool);
+    await insertMinimalReviewRun(pool);
+
+    await pool.query(
+      `
+INSERT INTO published_comments (
+  id,
+  review_run_id,
+  github_comment_id,
+  comment_type,
+  body,
+  body_hash,
+  dry_run
+) VALUES (
+  '00000000-0000-4000-8000-000000000007',
+  '00000000-0000-4000-8000-000000000006',
+  NULL,
+  'summary',
+  'Would-be summary body',
+  'summary-hash',
+  true
+)
+`
+    );
+
+    const comments = await pool.query<{ github_comment_id: string | null; body: string; dry_run: boolean }>(
+      "SELECT github_comment_id, body, dry_run FROM published_comments WHERE review_run_id = $1",
+      ["00000000-0000-4000-8000-000000000006"]
+    );
+
+    expect(comments.rows).toEqual([
+      {
+        github_comment_id: null,
+        body: "Would-be summary body",
+        dry_run: true
+      }
+    ]);
   });
 
   it("enforces foreign keys and idempotency constraints", async () => {
