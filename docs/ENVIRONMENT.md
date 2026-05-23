@@ -112,7 +112,7 @@ Repository-level dashboard configuration is persisted in PostgreSQL separately f
 | Variable | Required | Description |
 | --- | --- | --- |
 | `SEMGREP_TIMEOUT_MS` | no | Semgrep process timeout. |
-| `SEMGREP_CONFIGS` | no | Comma-separated configs. Default uses `infra/semgrep/config.yml`. `auto` is treated as the local config because Semgrep auto config is incompatible with `--metrics=off`. |
+| `SEMGREP_CONFIGS` | no | Comma-separated configs. Default uses `infra/semgrep/config.yml`. `auto`, `infra/semgrep`, and `infra/semgrep/` are treated as the local config file so production never scans rule-test fixtures as configs. |
 | `SEMGREP_MAX_TARGET_BYTES` | no | Per-file scan size limit. |
 | `SEMGREP_SCAN_TEMP_DIR` | no | Base directory for isolated changed-file scan workspaces. Defaults to the system temp directory under `firmcode-semgrep`. |
 | `SEMGREP_STARTUP_TIMEOUT_SECONDS` | no | Deprecated compatibility setting. Worker startup no longer executes `semgrep --version`; full Semgrep execution happens during scan jobs. |

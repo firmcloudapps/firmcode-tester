@@ -18,6 +18,7 @@ from firmcode_worker.semgrep.normalizer import (
 DEFAULT_SEMGREP_TIMEOUT_MS = 30_000
 FIRMCODE_REPO_ROOT = Path(__file__).resolve().parents[4]
 LOCAL_INFRA_SEMGREP_CONFIG = "infra/semgrep/config.yml"
+LOCAL_INFRA_SEMGREP_CONFIG_ALIASES = {"infra/semgrep", "infra/semgrep/"}
 DEFAULT_SEMGREP_CONFIGS = (LOCAL_INFRA_SEMGREP_CONFIG,)
 SEMGREP_RAW_ARTIFACT_SCHEMA_VERSION = "semgrep-raw-output/v1"
 
@@ -111,10 +112,23 @@ def _read_semgrep_configs(value: str | None) -> tuple[str, ...]:
     if value is None:
         return DEFAULT_SEMGREP_CONFIGS
 
-    configs = tuple(config.strip() for config in value.split(",") if config.strip())
-    if configs == ("auto",):
+    raw_configs = tuple(config.strip() for config in value.split(",") if config.strip())
+    if raw_configs == ("auto",):
         return DEFAULT_SEMGREP_CONFIGS
-    return tuple(LOCAL_INFRA_SEMGREP_CONFIG if config == "auto" else config for config in configs)
+    configs: list[str] = []
+    seen: set[str] = set()
+    for config in raw_configs:
+        normalized_config = _normalize_semgrep_config(config)
+        if normalized_config not in seen:
+            configs.append(normalized_config)
+            seen.add(normalized_config)
+    return tuple(configs)
+
+
+def _normalize_semgrep_config(config: str) -> str:
+    if config == "auto" or config in LOCAL_INFRA_SEMGREP_CONFIG_ALIASES:
+        return LOCAL_INFRA_SEMGREP_CONFIG
+    return config
 
 
 def _config_roots() -> tuple[Path, ...]:
