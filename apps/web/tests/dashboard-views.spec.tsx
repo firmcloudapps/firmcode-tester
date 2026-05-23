@@ -1,6 +1,7 @@
 import React from "react";
 import { renderToString } from "react-dom/server";
-import type { RepositoryListResponse, ReviewRunDetail, ReviewRunListResponse } from "@firmcode/shared";
+import type { FindingsListResponse, RepositoryListResponse, ReviewRunDetail, ReviewRunListResponse } from "@firmcode/shared";
+import { FindingsView } from "../components/dashboard/findings-view";
 import { RepositoriesView } from "../components/dashboard/repositories-view";
 import { ReviewRunDetailView } from "../components/dashboard/review-run-detail-view";
 import { ReviewRunsView } from "../components/dashboard/review-runs-view";
@@ -72,6 +73,55 @@ describe("ReviewRunDetailView", () => {
     expect(html).toContain("PASS apps/web tests");
     expect(html).toContain("Published comments");
     expect(html).toContain("Inline body");
+  });
+});
+
+describe("FindingsView", () => {
+  it("renders loading, empty, and error states", () => {
+    expect(renderToString(<FindingsView state={{ status: "loading" }} />)).toContain("Loading findings");
+    expect(renderToString(<FindingsView state={{ status: "empty", data: emptyFindingsList }} />)).toContain(
+      "No findings match these filters"
+    );
+    expect(renderToString(<FindingsView state={{ status: "error", message: "API unavailable" }} />)).toContain(
+      "Findings could not be loaded"
+    );
+  });
+
+  it("renders all planned filters with selected values", () => {
+    const html = renderToString(<FindingsView state={{ status: "populated", data: findingsList }} />);
+
+    expect(html).toContain('name="severity"');
+    expect(html).toContain('value="high" selected="">High');
+    expect(html).toContain('name="source"');
+    expect(html).toContain('value="semgrep" selected="">Semgrep');
+    expect(html).toContain('name="category"');
+    expect(html).toContain('value="security" selected="">Security');
+    expect(html).toContain('name="repository"');
+    expect(html).toContain('value="openclaw/firmcode"');
+    expect(html).toContain('name="status"');
+    expect(html).toContain('value="posted" selected="">Posted');
+    expect(html).toContain('name="postedInline"');
+    expect(html).toContain('value="true" selected="">Posted');
+    expect(html).toContain('name="dateFrom"');
+    expect(html).toContain('value="2026-05-22"');
+    expect(html).toContain('name="dateTo"');
+    expect(html).toContain('value="2026-05-23"');
+  });
+
+  it("renders populated finding rows and detail panels with evidence, suggested fix, rule ID, and links", () => {
+    const html = renderToString(<FindingsView state={{ status: "populated", data: findingsList }} />);
+
+    expect(html).toContain("Findings inbox");
+    expect(html).toContain("Guard repository access");
+    expect(html).toContain("apps/web/app/repositories/page.tsx");
+    expect(html).toContain("High");
+    expect(html).toContain("Posted inline");
+    expect(html).toContain("View finding detail");
+    expect(html).toContain("Repository access must be workspace scoped.");
+    expect(html).toContain("workspace-scope");
+    expect(html).toContain("Check workspace ownership");
+    expect(html).toContain('href="/review-runs/00000000-0000-4000-8000-000000000006"');
+    expect(html).toContain('href="https://github.com/openclaw/firmcode/pull/7#discussion_r8002"');
   });
 });
 
@@ -240,6 +290,61 @@ const reviewRunDetail: ReviewRunDetail = {
       body: "Inline body",
       bodyHash: "inline-body-hash",
       dryRun: false,
+      createdAt: "2026-05-22T10:00:00.000Z"
+    }
+  ]
+};
+
+const emptyFindingsList: FindingsListResponse = {
+  filters: {},
+  findings: []
+};
+
+const findingsList: FindingsListResponse = {
+  filters: {
+    severity: "high",
+    source: "semgrep",
+    category: "security",
+    repository: "openclaw/firmcode",
+    status: "posted",
+    postedInline: true,
+    dateFrom: "2026-05-22",
+    dateTo: "2026-05-23"
+  },
+  findings: [
+    {
+      id: "finding-1",
+      reviewRunId: "00000000-0000-4000-8000-000000000006",
+      repositoryId: "repo-1",
+      repositoryFullName: "openclaw/firmcode",
+      pullRequestNumber: 7,
+      pullRequestTitle: "Add repository dashboard",
+      source: "semgrep",
+      category: "security",
+      severity: "high",
+      confidence: "high",
+      filePath: "apps/web/app/repositories/page.tsx",
+      startLine: 42,
+      endLine: 42,
+      title: "Guard repository access",
+      body: "Repository access must be workspace scoped.",
+      evidence: [
+        {
+          source: "semgrep",
+          ruleId: "typescript.express.security.audit.workspace-scope",
+          excerpt: "repositoryId"
+        }
+      ],
+      suggestion: "Check workspace ownership before returning repository rows.",
+      dedupeKey: "finding-dashboard-1",
+      postAsInline: true,
+      postedInline: true,
+      status: "posted",
+      semgrepRuleId: "typescript.express.security.audit.workspace-scope",
+      postedAt: "2026-05-22T10:01:00.000Z",
+      githubCommentId: 8002,
+      githubCommentUrl: "https://github.com/openclaw/firmcode/pull/7#discussion_r8002",
+      reviewRunCreatedAt: "2026-05-22T10:00:00.000Z",
       createdAt: "2026-05-22T10:00:00.000Z"
     }
   ]

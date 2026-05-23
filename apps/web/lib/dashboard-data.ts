@@ -1,5 +1,7 @@
 import type {
   DashboardRepositoryListFilters,
+  FindingsListFilters,
+  FindingsListResponse,
   OverviewDashboardData,
   RepositoryListResponse,
   ReviewRunDetail,
@@ -62,6 +64,17 @@ export async function loadReviewRunsState(searchParams: SearchParams): Promise<V
   }
 }
 
+export async function loadFindingsState(searchParams: SearchParams): Promise<ViewState<FindingsListResponse>> {
+  try {
+    const filters = pickFindingsFilters(searchParams);
+    const data = await requestJson<FindingsListResponse>("/api/findings", filters);
+
+    return data.findings.length === 0 ? { status: "empty", data } : { status: "populated", data };
+  } catch (error) {
+    return { status: "error", message: toErrorMessage(error) };
+  }
+}
+
 export async function loadReviewRunDetailState(reviewRunId: string): Promise<ViewState<ReviewRunDetail>> {
   try {
     const data = await requestJson<ReviewRunDetail>(`/api/review-runs/${encodeURIComponent(reviewRunId)}`, {});
@@ -87,6 +100,20 @@ function pickReviewRunFilters(searchParams: SearchParams): ReviewRunListFilters 
     repository: readSingleValue(searchParams.repository),
     triggerEvent: readSingleValue(searchParams.triggerEvent),
     risk: readSingleValue(searchParams.risk) as ReviewRunListFilters["risk"],
+    dateFrom: readSingleValue(searchParams.dateFrom),
+    dateTo: readSingleValue(searchParams.dateTo)
+  });
+}
+
+function pickFindingsFilters(searchParams: SearchParams): FindingsListFilters {
+  return removeUndefinedValues({
+    severity: readSingleValue(searchParams.severity) as FindingsListFilters["severity"],
+    source: readSingleValue(searchParams.source) as FindingsListFilters["source"],
+    category: readSingleValue(searchParams.category) as FindingsListFilters["category"],
+    repositoryId: readSingleValue(searchParams.repositoryId),
+    repository: readSingleValue(searchParams.repository),
+    status: readSingleValue(searchParams.status) as FindingsListFilters["status"],
+    postedInline: parseBoolean(readSingleValue(searchParams.postedInline)),
     dateFrom: readSingleValue(searchParams.dateFrom),
     dateTo: readSingleValue(searchParams.dateTo)
   });
