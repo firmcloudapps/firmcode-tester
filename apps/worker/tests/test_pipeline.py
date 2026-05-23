@@ -60,6 +60,9 @@ class RecordingStore:
 
 
 class FakeGitHub:
+    def __init__(self) -> None:
+        self.scanning_bodies: list[str] = []
+
     def fetch_pull_request_files(self, *, installation_id: int, repository_full_name: str, pull_number: int) -> list[GitHubFile]:
         assert installation_id == 123
         assert repository_full_name == "acme/widgets"
@@ -101,6 +104,20 @@ class FakeGitHub:
         assert "Semgrep reported 1 finding(s)" in body
         return None, True
 
+    def publish_scanning_comment(
+        self,
+        *,
+        installation_id: int,
+        repository_full_name: str,
+        pull_number: int,
+        body: str,
+    ) -> tuple[int | None, bool]:
+        assert installation_id == 123
+        assert repository_full_name == "acme/widgets"
+        assert pull_number == 7
+        self.scanning_bodies.append(body)
+        return None, True
+
 
 @dataclass(frozen=True)
 class StubSemgrepResult:
@@ -130,9 +147,10 @@ def test_normalize_private_key_accepts_quoted_escaped_and_base64_pem() -> None:
 
 def test_deterministic_pipeline_publishes_actual_analysis_summary() -> None:
     store = RecordingStore()
+    github = FakeGitHub()
     pipeline = DeterministicReviewPipeline(
         store=store,  # type: ignore[arg-type]
-        github=FakeGitHub(),  # type: ignore[arg-type]
+        github=github,  # type: ignore[arg-type]
         semgrep_runner=_stub_semgrep_runner,
         env={"SEMGREP_CONFIGS": "auto"},
     )
@@ -148,6 +166,11 @@ def test_deterministic_pipeline_publishes_actual_analysis_summary() -> None:
     assert "Avoid eval on untrusted input" in store.summary_body
     assert "`src/widget.ts:2`" in store.summary_body
     assert store.dry_run is True
+    assert len(github.scanning_bodies) >= 4
+    assert "Status: `running`" in github.scanning_bodies[0]
+    assert "Files selected for processing: 1" in "\n".join(github.scanning_bodies)
+    assert "Semgrep findings so far: 1" in "\n".join(github.scanning_bodies)
+    assert "Status: `completed`" in github.scanning_bodies[-1]
 
 
 def _stub_semgrep_runner(**_kwargs: Any) -> StubSemgrepResult:

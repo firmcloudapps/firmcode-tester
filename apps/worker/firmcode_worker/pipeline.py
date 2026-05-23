@@ -26,6 +26,7 @@ from firmcode_worker.semgrep.workspace import ChangedFileScanInput, create_chang
 from firmcode_worker.tree_sitter.extractor import ChangedHunk, SemanticExtractionFile, extract_tree_sitter_artifact
 
 
+FIRMCODEAI_SCANNING_COMMENT_MARKER = "<!-- firmcodeai:activity:scanning:v1 -->"
 FIRMCODEAI_SUMMARY_COMMENT_MARKER = "<!-- firmcodeai:activity:summary:v1 -->"
 FIRMCODEAI_BANNER = "\n".join(
     [
@@ -219,6 +220,43 @@ class GitHubClient:
         for comment in comments:
             if isinstance(comment, Mapping) and isinstance(comment.get("body"), str):
                 if FIRMCODEAI_SUMMARY_COMMENT_MARKER in comment["body"] and isinstance(comment.get("id"), int):
+                    existing_id = comment["id"]
+                    break
+
+        if existing_id is not None:
+            self._request_json("PATCH", f"/repos/{owner}/{repo}/issues/comments/{existing_id}", token=token, body={"body": body})
+            return existing_id, False
+
+        created = self._request_json("POST", f"/repos/{owner}/{repo}/issues/{pull_number}/comments", token=token, body={"body": body})
+        if not isinstance(created, Mapping) or not isinstance(created.get("id"), int):
+            raise ReviewPipelineError("github_response_invalid", "GitHub create comment response did not include an id.")
+        return created["id"], False
+
+    def publish_scanning_comment(
+        self,
+        *,
+        installation_id: int,
+        repository_full_name: str,
+        pull_number: int,
+        body: str,
+    ) -> tuple[int | None, bool]:
+        if self.dry_run:
+            return None, True
+
+        token = self._installation_token(installation_id)
+        owner, repo = split_repository_full_name(repository_full_name)
+        comments = self._request_json(
+            "GET",
+            f"/repos/{owner}/{repo}/issues/{pull_number}/comments?per_page=100",
+            token=token,
+        )
+        if not isinstance(comments, list):
+            raise ReviewPipelineError("github_response_invalid", "GitHub issue comments response was not a list.")
+
+        existing_id: int | None = None
+        for comment in comments:
+            if isinstance(comment, Mapping) and isinstance(comment.get("body"), str):
+                if FIRMCODEAI_SCANNING_COMMENT_MARKER in comment["body"] and isinstance(comment.get("id"), int):
                     existing_id = comment["id"]
                     break
 
@@ -495,55 +533,105 @@ class DeterministicReviewPipeline:
 
     async def run(self, payload: ReviewJobInput) -> None:
         context = await self.store.load_context(payload.review_run_id)
-        github_files = self.github.fetch_pull_request_files(
-            installation_id=context.installation_id,
-            repository_full_name=context.repository_full_name,
-            pull_number=context.pull_request_number,
-        )
-        changed_files, skipped_files = self._prepare_changed_files(context, github_files)
-        diff_artifact = _build_diff_artifact(context, payload.review_run_id, changed_files, skipped_files)
+        changed_files: list[ChangedFile] = []
+        skipped_files: list[SkippedFile] = []
 
-        await self.store.save_changed_files(payload.review_run_id, changed_files)
-        await self.store.save_artifact(payload.review_run_id, "diff", "diff-artifact/v1", diff_artifact)
+        try:
+            self._publish_progress(context=context, payload=payload, status="running", phase="Fetching pull request changes")
+            github_files = self.github.fetch_pull_request_files(
+                installation_id=context.installation_id,
+                repository_full_name=context.repository_full_name,
+                pull_number=context.pull_request_number,
+            )
+            changed_files, skipped_files = self._prepare_changed_files(context, github_files)
+            self._publish_progress(
+                context=context,
+                payload=payload,
+                status="running",
+                phase="Changed files selected for deterministic analysis",
+                selected_file_count=len(changed_files),
+                skipped_file_count=len(skipped_files),
+            )
+            diff_artifact = _build_diff_artifact(context, payload.review_run_id, changed_files, skipped_files)
 
-        semgrep_artifact = self._run_semgrep(payload.review_run_id, changed_files, skipped_files)
-        await self.store.save_artifact(payload.review_run_id, "semgrep", "semgrep-artifact/v1", semgrep_artifact)
-        await self.store.save_semgrep_findings(payload.review_run_id, _read_list(semgrep_artifact.get("findings")))
+            await self.store.save_changed_files(payload.review_run_id, changed_files)
+            await self.store.save_artifact(payload.review_run_id, "diff", "diff-artifact/v1", diff_artifact)
 
-        tree_sitter_artifact = _run_tree_sitter(payload.review_run_id, changed_files)
-        await self.store.save_artifact(payload.review_run_id, "treesitter", "tree-sitter-artifact/v1", tree_sitter_artifact)
+            self._publish_progress(
+                context=context,
+                payload=payload,
+                status="running",
+                phase="Running Semgrep on selected changed files",
+                selected_file_count=len(changed_files),
+                skipped_file_count=len(skipped_files),
+            )
+            semgrep_artifact = self._run_semgrep(payload.review_run_id, changed_files, skipped_files)
+            await self.store.save_artifact(payload.review_run_id, "semgrep", "semgrep-artifact/v1", semgrep_artifact)
+            await self.store.save_semgrep_findings(payload.review_run_id, _read_list(semgrep_artifact.get("findings")))
 
-        summary = render_summary_comment(
-            context=context,
-            payload=payload,
-            changed_files=changed_files,
-            skipped_files=skipped_files,
-            semgrep_artifact=semgrep_artifact,
-            tree_sitter_artifact=tree_sitter_artifact,
-        )
-        github_comment_id, dry_run = self.github.publish_summary_comment(
-            installation_id=context.installation_id,
-            repository_full_name=context.repository_full_name,
-            pull_number=context.pull_request_number,
-            body=summary,
-        )
-        await self.store.record_summary_comment(
-            review_run_id=payload.review_run_id,
-            github_comment_id=github_comment_id,
-            body=summary,
-            dry_run=dry_run,
-        )
+            self._publish_progress(
+                context=context,
+                payload=payload,
+                status="running",
+                phase="Extracting Tree-sitter semantic facts",
+                selected_file_count=len(changed_files),
+                skipped_file_count=len(skipped_files),
+                semgrep_finding_count=len(_read_list(semgrep_artifact.get("findings"))),
+            )
+            tree_sitter_artifact = _run_tree_sitter(payload.review_run_id, changed_files)
+            await self.store.save_artifact(payload.review_run_id, "treesitter", "tree-sitter-artifact/v1", tree_sitter_artifact)
 
-        _log(
-            "review.pipeline.completed",
-            reviewRunId=payload.review_run_id,
-            repositoryFullName=context.repository_full_name,
-            pullRequestNumber=context.pull_request_number,
-            changedFileCount=len(changed_files),
-            skippedFileCount=len(skipped_files),
-            semgrepFindingCount=len(_read_list(semgrep_artifact.get("findings"))),
-            dryRun=dry_run,
-        )
+            summary = render_summary_comment(
+                context=context,
+                payload=payload,
+                changed_files=changed_files,
+                skipped_files=skipped_files,
+                semgrep_artifact=semgrep_artifact,
+                tree_sitter_artifact=tree_sitter_artifact,
+            )
+            github_comment_id, dry_run = self.github.publish_summary_comment(
+                installation_id=context.installation_id,
+                repository_full_name=context.repository_full_name,
+                pull_number=context.pull_request_number,
+                body=summary,
+            )
+            await self.store.record_summary_comment(
+                review_run_id=payload.review_run_id,
+                github_comment_id=github_comment_id,
+                body=summary,
+                dry_run=dry_run,
+            )
+            self._publish_progress(
+                context=context,
+                payload=payload,
+                status="completed",
+                phase="Analysis complete; summary comment published",
+                selected_file_count=len(changed_files),
+                skipped_file_count=len(skipped_files),
+                semgrep_finding_count=len(_read_list(semgrep_artifact.get("findings"))),
+            )
+
+            _log(
+                "review.pipeline.completed",
+                reviewRunId=payload.review_run_id,
+                repositoryFullName=context.repository_full_name,
+                pullRequestNumber=context.pull_request_number,
+                changedFileCount=len(changed_files),
+                skippedFileCount=len(skipped_files),
+                semgrepFindingCount=len(_read_list(semgrep_artifact.get("findings"))),
+                dryRun=dry_run,
+            )
+        except Exception as error:
+            self._publish_progress(
+                context=context,
+                payload=payload,
+                status="failed",
+                phase="Analysis failed before completion",
+                selected_file_count=len(changed_files) if changed_files else None,
+                skipped_file_count=len(skipped_files) if skipped_files else None,
+                error_message=str(error),
+            )
+            raise
 
     def _prepare_changed_files(
         self,
@@ -654,6 +742,56 @@ class DeterministicReviewPipeline:
         artifact["paths"] = paths
         return artifact
 
+    def _publish_progress(
+        self,
+        *,
+        context: ReviewContext,
+        payload: ReviewJobInput,
+        status: str,
+        phase: str,
+        selected_file_count: int | None = None,
+        skipped_file_count: int | None = None,
+        semgrep_finding_count: int | None = None,
+        error_message: str | None = None,
+    ) -> None:
+        body = render_scanning_progress_comment(
+            context=context,
+            payload=payload,
+            status=status,
+            phase=phase,
+            selected_file_count=selected_file_count,
+            skipped_file_count=skipped_file_count,
+            semgrep_finding_count=semgrep_finding_count,
+            error_message=error_message,
+        )
+        try:
+            _comment_id, dry_run = self.github.publish_scanning_comment(
+                installation_id=context.installation_id,
+                repository_full_name=context.repository_full_name,
+                pull_number=context.pull_request_number,
+                body=body,
+            )
+            _log(
+                "review.progress.published",
+                reviewRunId=payload.review_run_id,
+                repositoryFullName=context.repository_full_name,
+                pullRequestNumber=context.pull_request_number,
+                status=status,
+                phase=phase,
+                dryRun=dry_run,
+            )
+        except Exception as error:
+            _log(
+                "review.progress.publish_failed",
+                reviewRunId=payload.review_run_id,
+                repositoryFullName=context.repository_full_name,
+                pullRequestNumber=context.pull_request_number,
+                status=status,
+                phase=phase,
+                error=error.__class__.__name__,
+                message=str(error)[:500],
+            )
+
 
 def parse_patch_hunks(patch: str) -> list[dict[str, Any]]:
     hunks: list[dict[str, Any]] = []
@@ -762,6 +900,78 @@ def render_summary_comment(
             f"- Semgrep errors: {len(semgrep_errors)}",
             "",
             "<sub>FirmcodeAI grounds this summary in changed files, Semgrep output, and Tree-sitter parse facts.</sub>",
+        ]
+    )
+
+
+def render_scanning_progress_comment(
+    *,
+    context: ReviewContext,
+    payload: ReviewJobInput,
+    status: str,
+    phase: str,
+    selected_file_count: int | None = None,
+    skipped_file_count: int | None = None,
+    semgrep_finding_count: int | None = None,
+    error_message: str | None = None,
+) -> str:
+    status_message = {
+        "running": "FirmcodeAI is actively analyzing this PR.",
+        "completed": "FirmcodeAI finished deterministic analysis for this PR.",
+        "failed": "FirmcodeAI could not finish analysis for this PR.",
+    }.get(status, "FirmcodeAI is processing this PR.")
+    activity_lines = [
+        "- Webhook accepted",
+        "- Review job picked up by worker",
+        f"- Current phase: {phase}",
+        "- Changed-file workspace preserves repository-relative paths",
+    ]
+    if selected_file_count is not None:
+        activity_lines.append(f"- Files selected for processing: {selected_file_count}")
+    else:
+        activity_lines.append("- Files selected for processing: pending")
+    if skipped_file_count is not None:
+        activity_lines.append(f"- Skipped files: {skipped_file_count}")
+    else:
+        activity_lines.append("- Skipped files: pending")
+    if semgrep_finding_count is not None:
+        activity_lines.append(f"- Semgrep findings so far: {semgrep_finding_count}")
+    if error_message:
+        activity_lines.append(f"- Failure: {_single_line(error_message)[:300]}")
+
+    return "\n".join(
+        [
+            FIRMCODEAI_SCANNING_COMMENT_MARKER,
+            FIRMCODEAI_BANNER,
+            "## FirmcodeAI Scanning",
+            "",
+            f"> [!{'CAUTION' if status == 'failed' else 'NOTE'}]",
+            f"> {status_message}",
+            "",
+            "### Progress",
+            "",
+            f"- Status: `{status}`",
+            f"- Phase: `{phase}`",
+            "",
+            "<details>",
+            "<summary>Run configuration</summary>",
+            "",
+            f"- Repository: `{context.repository_full_name}`",
+            f"- Pull request: #{context.pull_request_number}",
+            f"- Trigger: `{payload.trigger_event}`",
+            f"- Head SHA: `{context.head_sha[:12]}`",
+            f"- Review run: `{payload.review_run_id}`",
+            "",
+            "</details>",
+            "",
+            "<details open>",
+            "<summary>FirmcodeAI activity</summary>",
+            "",
+            *activity_lines,
+            "",
+            "</details>",
+            "",
+            "<sub>This comment is updated by the worker as analysis progresses.</sub>",
         ]
     )
 
@@ -1018,6 +1228,10 @@ def _test_suggestions(files: Sequence[ChangedFile], findings: Sequence[Any]) -> 
     if not suggestions:
         suggestions.append("Run the project test suite that owns the changed files.")
     return suggestions
+
+
+def _single_line(value: str) -> str:
+    return " ".join(value.replace("\r", " ").replace("\n", " ").split())
 
 
 def _read_required_env(env: Mapping[str, str], name: str) -> str:
