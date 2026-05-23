@@ -13,3 +13,4 @@ jobs:
       - run: echo "firmcode live semgrep smoke verify"
       - run: echo "firmcode live semgrep smoke final"
       - run: echo "firmcode live semgrep smoke post-deploy"
+      - run: echo "firmcode live semgrep smoke db-upsert"
