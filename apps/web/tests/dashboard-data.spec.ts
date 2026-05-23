@@ -1,11 +1,15 @@
 import type { FindingsListResponse } from "@firmcode/shared";
-import { loadFindingsState } from "../lib/dashboard-data";
+import { loadFindingsState, loadSettingsState } from "../lib/dashboard-data";
 
 describe("dashboard findings data loader", () => {
   const originalApiUrl = process.env.NEXT_PUBLIC_API_URL;
+  const originalWorkspaceId = process.env.FIRMCODE_DASHBOARD_WORKSPACE_ID;
+  const originalClerkUserId = process.env.FIRMCODE_DASHBOARD_CLERK_USER_ID;
 
   afterEach(() => {
     process.env.NEXT_PUBLIC_API_URL = originalApiUrl;
+    process.env.FIRMCODE_DASHBOARD_WORKSPACE_ID = originalWorkspaceId;
+    process.env.FIRMCODE_DASHBOARD_CLERK_USER_ID = originalClerkUserId;
     vi.unstubAllGlobals();
   });
 
@@ -42,6 +46,42 @@ describe("dashboard findings data loader", () => {
     expect(url.searchParams.get("dateFrom")).toBe("2026-05-22");
     expect(url.searchParams.get("dateTo")).toBe("2026-05-23");
   });
+
+  it("fetches settings data with the temporary Clerk workspace headers", async () => {
+    process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
+    process.env.FIRMCODE_DASHBOARD_WORKSPACE_ID = "workspace-1";
+    process.env.FIRMCODE_DASHBOARD_CLERK_USER_ID = "user-1";
+    const fetcher = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => jsonResponse(settingsResponse));
+
+    vi.stubGlobal("fetch", fetcher);
+
+    await expect(loadSettingsState()).resolves.toMatchObject({ status: "populated" });
+
+    const url = new URL(String(fetcher.mock.calls[0]?.[0]));
+    const init = fetcher.mock.calls[0]?.[1] as RequestInit;
+    const headers = new Headers(init.headers);
+
+    expect(url.pathname).toBe("/api/settings");
+    expect(headers.get("x-firmcode-workspace-id")).toBe("workspace-1");
+    expect(headers.get("x-firmcode-user-id")).toBe("user-1");
+  });
+
+  it("treats settings with no GitHub installation as empty", async () => {
+    process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
+    const fetcher = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      jsonResponse({
+        ...settingsResponse,
+        githubApp: {
+          ...settingsResponse.githubApp,
+          installations: []
+        }
+      })
+    );
+
+    vi.stubGlobal("fetch", fetcher);
+
+    await expect(loadSettingsState()).resolves.toMatchObject({ status: "empty" });
+  });
 });
 
 const findingsResponse: FindingsListResponse = {
@@ -77,6 +117,55 @@ const findingsResponse: FindingsListResponse = {
       createdAt: "2026-05-22T10:00:00.000Z"
     }
   ]
+};
+
+const settingsResponse = {
+  workspace: {
+    id: "workspace-1",
+    name: "Firmcode",
+    clerkOrgId: "org_firmcode",
+    role: "owner",
+    canManageSensitiveSettings: true
+  },
+  clerk: {
+    userProfileUrl: "/user-profile",
+    organizationProfileUrl: "/organization-profile",
+    memberManagementUrl: "/organization-profile/members"
+  },
+  githubApp: {
+    installUrl: "/github/installations",
+    repositoryConfigurationUrl: "/repositories",
+    installations: [
+      {
+        id: "install-1",
+        installationId: 301,
+        accountLogin: "openclaw",
+        accountType: "Organization",
+        repositoryCount: 2,
+        enabledRepositoryCount: 1,
+        updatedAt: "2026-05-22T10:00:00.000Z"
+      }
+    ]
+  },
+  retention: {
+    artifactRetentionDays: 30,
+    changedFilePatchDays: 30,
+    fullSnapshotDays: 14,
+    ciLogDays: 14,
+    llmArtifactDays: 14,
+    semgrepArtifactDays: 30,
+    treeSitterArtifactDays: 30,
+    findingMetadataDays: 180,
+    aggregatedMetricDays: 365
+  },
+  apiKeys: {
+    enabled: false,
+    message: "Workspace API key creation is not enabled in the MVP."
+  },
+  notifications: {
+    enabled: false,
+    message: "Email and Slack notification routing is planned after review delivery stabilizes."
+  }
 };
 
 function jsonResponse(body: unknown, status = 200): Response {

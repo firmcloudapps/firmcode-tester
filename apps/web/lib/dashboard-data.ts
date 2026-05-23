@@ -6,8 +6,10 @@ import type {
   RepositoryListResponse,
   ReviewRunDetail,
   ReviewRunListFilters,
-  ReviewRunListResponse
+  ReviewRunListResponse,
+  WorkspaceSettingsResponse
 } from "@firmcode/shared";
+import { createDashboardApiHeaders } from "./dashboard-api-proxy";
 import { buildOverviewDashboardData } from "./overview-data";
 import type { ViewState } from "./view-state";
 
@@ -75,6 +77,16 @@ export async function loadFindingsState(searchParams: SearchParams): Promise<Vie
   }
 }
 
+export async function loadSettingsState(): Promise<ViewState<WorkspaceSettingsResponse>> {
+  try {
+    const data = await requestAuthenticatedJson<WorkspaceSettingsResponse>("/api/settings");
+
+    return data.githubApp.installations.length === 0 ? { status: "empty", data } : { status: "populated", data };
+  } catch (error) {
+    return { status: "error", message: toErrorMessage(error) };
+  }
+}
+
 export async function loadReviewRunDetailState(reviewRunId: string): Promise<ViewState<ReviewRunDetail>> {
   try {
     const data = await requestJson<ReviewRunDetail>(`/api/review-runs/${encodeURIComponent(reviewRunId)}`, {});
@@ -133,6 +145,20 @@ async function requestJson<T>(path: string, query: object): Promise<T> {
     headers: {
       accept: "application/json"
     }
+  });
+
+  if (!response.ok) {
+    throw new DashboardApiError(`Dashboard API returned ${response.status}`, response.status);
+  }
+
+  return (await response.json()) as T;
+}
+
+async function requestAuthenticatedJson<T>(path: string): Promise<T> {
+  const url = new URL(path, getApiBaseUrl());
+  const response = await fetch(url, {
+    cache: "no-store",
+    headers: createDashboardApiHeaders(process.env, false)
   });
 
   if (!response.ok) {
