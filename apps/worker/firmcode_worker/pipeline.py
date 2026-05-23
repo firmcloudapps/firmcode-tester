@@ -141,6 +141,17 @@ class SkippedFile:
     excluded_from_llm_context: bool
 
 
+@dataclass(frozen=True)
+class PublishedInlineComment:
+    finding_id: str
+    github_review_id: int | None
+    github_comment_id: int | None
+    file_path: str
+    line: int
+    body: str
+    dry_run: bool
+
+
 class GitHubClient:
     def __init__(self, *, app_id: str, private_key: str, dry_run: bool = False) -> None:
         self.app_id = app_id
@@ -268,6 +279,73 @@ class GitHubClient:
         if not isinstance(created, Mapping) or not isinstance(created.get("id"), int):
             raise ReviewPipelineError("github_response_invalid", "GitHub create comment response did not include an id.")
         return created["id"], False
+
+    def publish_inline_review_comments(
+        self,
+        *,
+        installation_id: int,
+        repository_full_name: str,
+        pull_number: int,
+        head_sha: str,
+        review_run_id: str,
+        comments: Sequence[Mapping[str, Any]],
+    ) -> tuple[int | None, list[PublishedInlineComment], bool]:
+        if not comments:
+            return None, [], self.dry_run
+
+        selected_comments = [dict(comment) for comment in comments]
+        if self.dry_run:
+            return (
+                None,
+                [
+                    PublishedInlineComment(
+                        finding_id=_read_str(comment.get("findingId"), ""),
+                        github_review_id=None,
+                        github_comment_id=None,
+                        file_path=_read_str(comment.get("path"), ""),
+                        line=_read_int(comment.get("line"), 1),
+                        body=_read_str(comment.get("body"), ""),
+                        dry_run=True,
+                    )
+                    for comment in selected_comments
+                ],
+                True,
+            )
+
+        token = self._installation_token(installation_id)
+        owner, repo = split_repository_full_name(repository_full_name)
+        created = self._request_json(
+            "POST",
+            f"/repos/{owner}/{repo}/pulls/{pull_number}/reviews",
+            token=token,
+            body={
+                "commit_id": head_sha,
+                "event": "COMMENT",
+                "body": f"FirmcodeAI code scan review for review run `{review_run_id}`.",
+                "comments": [
+                    {
+                        "path": _read_str(comment.get("path"), ""),
+                        "line": _read_int(comment.get("line"), 1),
+                        "side": "RIGHT",
+                        "body": _read_str(comment.get("body"), ""),
+                    }
+                    for comment in selected_comments
+                ],
+            },
+        )
+        if not isinstance(created, Mapping) or not isinstance(created.get("id"), int):
+            raise ReviewPipelineError("github_response_invalid", "GitHub create review response did not include an id.")
+        review_id = created["id"]
+
+        review_comments = self._request_json(
+            "GET",
+            f"/repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}/comments?per_page=100",
+            token=token,
+        )
+        if not isinstance(review_comments, list):
+            raise ReviewPipelineError("github_response_invalid", "GitHub review comments response was not a list.")
+
+        return review_id, _match_published_inline_comments(review_id, selected_comments, review_comments), False
 
     def _installation_token(self, installation_id: int) -> str:
         cached = self._tokens.get(installation_id)
@@ -527,6 +605,50 @@ SET github_comment_id = EXCLUDED.github_comment_id,
                     (str(uuid4()), review_run_id, github_comment_id, body, _body_hash(review_run_id, body), dry_run),
                 )
 
+    async def record_inline_comments(self, review_run_id: str, comments: Sequence[PublishedInlineComment]) -> None:
+        if not comments:
+            return
+
+        import psycopg
+
+        async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
+            async with connection.cursor() as cursor:
+                for comment in comments:
+                    await cursor.execute(
+                        """
+INSERT INTO published_comments (
+  id,
+  review_run_id,
+  github_review_id,
+  github_comment_id,
+  comment_type,
+  file_path,
+  line,
+  body,
+  body_hash,
+  dry_run
+) VALUES (%s, %s, %s, %s, 'inline', %s, %s, %s, %s, %s)
+ON CONFLICT (review_run_id, comment_type, body_hash) DO UPDATE
+SET github_review_id = EXCLUDED.github_review_id,
+    github_comment_id = EXCLUDED.github_comment_id,
+    file_path = EXCLUDED.file_path,
+    line = EXCLUDED.line,
+    body = EXCLUDED.body,
+    dry_run = EXCLUDED.dry_run
+""",
+                        (
+                            str(uuid4()),
+                            review_run_id,
+                            comment.github_review_id,
+                            comment.github_comment_id,
+                            comment.file_path,
+                            comment.line,
+                            comment.body,
+                            _body_hash(review_run_id, f"{comment.finding_id}\0{comment.file_path}\0{comment.line}\0{comment.body}"),
+                            comment.dry_run,
+                        ),
+                    )
+
 
 class DeterministicReviewPipeline:
     def __init__(
@@ -604,6 +726,36 @@ class DeterministicReviewPipeline:
             tree_sitter_artifact = _run_tree_sitter(payload.review_run_id, changed_files)
             await self.store.save_artifact(payload.review_run_id, "treesitter", "tree-sitter-artifact/v1", tree_sitter_artifact)
 
+            inline_comments = _build_semgrep_inline_review_comments(
+                semgrep_artifact=semgrep_artifact,
+                changed_files=changed_files,
+                max_comments=_read_positive_int(self.env.get("REVIEW_MAX_INLINE_COMMENTS"), 10),
+            )
+            inline_comment_count = 0
+            if inline_comments:
+                self._publish_progress(
+                    context=context,
+                    payload=payload,
+                    status="running",
+                    phase="Publishing inline code scan comments",
+                    selected_file_count=len(changed_files),
+                    skipped_file_count=len(skipped_files),
+                    semgrep_finding_count=len(_read_list(semgrep_artifact.get("findings"))),
+                    semgrep_scanned_count=len(_semgrep_scanned_paths(semgrep_artifact)),
+                    semgrep_error_count=len(_read_list(semgrep_artifact.get("errors"))),
+                    tree_sitter_parsed_count=_tree_sitter_parsed_count(tree_sitter_artifact),
+                )
+                _review_id, published_inline_comments, _inline_dry_run = self.github.publish_inline_review_comments(
+                    installation_id=context.installation_id,
+                    repository_full_name=context.repository_full_name,
+                    pull_number=context.pull_request_number,
+                    head_sha=context.head_sha,
+                    review_run_id=payload.review_run_id,
+                    comments=inline_comments,
+                )
+                await self.store.record_inline_comments(payload.review_run_id, published_inline_comments)
+                inline_comment_count = len(published_inline_comments)
+
             summary = render_summary_comment(
                 context=context,
                 payload=payload,
@@ -611,6 +763,7 @@ class DeterministicReviewPipeline:
                 skipped_files=skipped_files,
                 semgrep_artifact=semgrep_artifact,
                 tree_sitter_artifact=tree_sitter_artifact,
+                inline_comment_count=inline_comment_count,
             )
             github_comment_id, dry_run = self.github.publish_summary_comment(
                 installation_id=context.installation_id,
@@ -635,6 +788,7 @@ class DeterministicReviewPipeline:
                 semgrep_scanned_count=len(_semgrep_scanned_paths(semgrep_artifact)),
                 semgrep_error_count=len(_read_list(semgrep_artifact.get("errors"))),
                 tree_sitter_parsed_count=_tree_sitter_parsed_count(tree_sitter_artifact),
+                inline_comment_count=inline_comment_count,
             )
 
             _log(
@@ -645,6 +799,7 @@ class DeterministicReviewPipeline:
                 changedFileCount=len(changed_files),
                 skippedFileCount=len(skipped_files),
                 semgrepFindingCount=len(_read_list(semgrep_artifact.get("findings"))),
+                inlineCommentCount=inline_comment_count,
                 dryRun=dry_run,
             )
         except Exception as error:
@@ -781,6 +936,7 @@ class DeterministicReviewPipeline:
         semgrep_scanned_count: int | None = None,
         semgrep_error_count: int | None = None,
         tree_sitter_parsed_count: int | None = None,
+        inline_comment_count: int | None = None,
         error_message: str | None = None,
     ) -> None:
         body = render_scanning_progress_comment(
@@ -794,6 +950,7 @@ class DeterministicReviewPipeline:
             semgrep_scanned_count=semgrep_scanned_count,
             semgrep_error_count=semgrep_error_count,
             tree_sitter_parsed_count=tree_sitter_parsed_count,
+            inline_comment_count=inline_comment_count,
             error_message=error_message,
         )
         try:
@@ -878,6 +1035,7 @@ def render_summary_comment(
     skipped_files: Sequence[SkippedFile],
     semgrep_artifact: Mapping[str, Any],
     tree_sitter_artifact: Mapping[str, Any],
+    inline_comment_count: int = 0,
 ) -> str:
     semgrep_findings = _read_list(semgrep_artifact.get("findings"))
     semgrep_errors = _read_list(semgrep_artifact.get("errors"))
@@ -919,6 +1077,7 @@ def render_summary_comment(
             f"- Semgrep scanned files: {len(semgrep_scanned_paths)}",
             f"- Semgrep skipped files: {len(semgrep_skipped_paths)}",
             f"- Semgrep errors: {len(semgrep_errors)}",
+            f"- Inline code comments posted: {inline_comment_count}",
             f"- Tree-sitter parsed files: {parsed_count}",
             *(_render_scan_path_block("Semgrep scanned paths", semgrep_scanned_paths) if semgrep_scanned_paths else []),
             *(_render_scan_path_block("Semgrep skipped paths", _format_semgrep_skipped_paths(semgrep_skipped_paths)) if semgrep_skipped_paths else []),
@@ -960,6 +1119,7 @@ def render_scanning_progress_comment(
     semgrep_scanned_count: int | None = None,
     semgrep_error_count: int | None = None,
     tree_sitter_parsed_count: int | None = None,
+    inline_comment_count: int | None = None,
     error_message: str | None = None,
 ) -> str:
     status_message = {
@@ -989,6 +1149,8 @@ def render_scanning_progress_comment(
         activity_lines.append(f"- Semgrep errors: {semgrep_error_count}")
     if tree_sitter_parsed_count is not None:
         activity_lines.append(f"- Tree-sitter parsed files: {tree_sitter_parsed_count}")
+    if inline_comment_count is not None:
+        activity_lines.append(f"- Inline code comments posted: {inline_comment_count}")
     if error_message:
         activity_lines.append(f"- Failure: {_single_line(error_message)[:300]}")
 
@@ -1261,6 +1423,144 @@ def _render_semgrep_finding(value: Any) -> str:
     message = _read_str(finding.get("message"), "Semgrep finding")
     rule_id = _read_str(finding.get("ruleId"), "unknown")
     return f"{severity}: {message} (`{path}:{line}`, `{rule_id}`)"
+
+
+def _build_semgrep_inline_review_comments(
+    *,
+    semgrep_artifact: Mapping[str, Any],
+    changed_files: Sequence[ChangedFile],
+    max_comments: int,
+) -> list[dict[str, Any]]:
+    if max_comments <= 0:
+        return []
+
+    changed_lines_by_path = {file.path: set(file.changed_new_lines) for file in changed_files}
+    candidates: list[dict[str, Any]] = []
+
+    for finding in _read_list(semgrep_artifact.get("findings")):
+        item = _read_object(finding)
+        path = _read_str(item.get("path"), "")
+        start = _read_object(item.get("start"))
+        line = _read_optional_positive_int(start.get("line"))
+        if not path or line is None:
+            continue
+        if line not in changed_lines_by_path.get(path, set()):
+            continue
+
+        candidates.append(
+            {
+                "findingId": _read_str(item.get("id"), _dedupe_hash(item)),
+                "path": path,
+                "line": line,
+                "severity": _read_str(item.get("severity"), "info"),
+                "body": _render_inline_semgrep_comment(item),
+                "_rank": _severity_rank(_read_str(item.get("severity"), "info")),
+            }
+        )
+
+    candidates.sort(key=lambda candidate: (-_read_int(candidate.get("_rank"), 0), _read_str(candidate.get("path"), ""), _read_int(candidate.get("line"), 0)))
+    return [{key: value for key, value in candidate.items() if key != "_rank"} for candidate in candidates[:max_comments]]
+
+
+def _render_inline_semgrep_comment(finding: Mapping[str, Any]) -> str:
+    severity = _read_str(finding.get("severity"), "info")
+    rule_id = _read_str(finding.get("ruleId"), "semgrep")
+    message = _read_str(finding.get("message"), "Semgrep finding")
+    lines = _read_str(finding.get("lines"), "")
+    metadata = _read_object(finding.get("metadata"))
+    remediation = _read_optional_str(metadata.get("remediation")) or _read_optional_str(finding.get("fix"))
+    alert = "CAUTION" if severity in {"critical", "high"} else "WARNING" if severity == "medium" else "NOTE"
+    language = _inline_comment_language(_read_str(finding.get("path"), ""))
+
+    body = [
+        f"### {message}",
+        "",
+        f"> [!{alert}]",
+        f"> **{severity.upper()}** Semgrep rule `{rule_id}` flagged this changed line.",
+    ]
+    if lines.strip():
+        body.extend(
+            [
+                "",
+                "**Flagged code:**",
+                "",
+                f"```{language}",
+                lines.strip()[:1200],
+                "```",
+            ]
+        )
+
+    body.extend(
+        [
+            "",
+            "**Why this matters:**",
+            message,
+            "",
+            "**Suggested fix:**",
+            remediation or "Review this changed line and update it to satisfy the Semgrep rule before merging.",
+        ]
+    )
+    return "\n".join(body)
+
+
+def _inline_comment_language(path: str) -> str:
+    extension = Path(path).suffix.lower()
+    return {
+        ".go": "go",
+        ".java": "java",
+        ".js": "javascript",
+        ".jsx": "jsx",
+        ".py": "python",
+        ".ts": "typescript",
+        ".tsx": "tsx",
+        ".yaml": "yaml",
+        ".yml": "yaml",
+    }.get(extension, "")
+
+
+def _severity_rank(severity: str) -> int:
+    return {"critical": 4, "high": 3, "medium": 2, "low": 1, "info": 0}.get(severity, 0)
+
+
+def _match_published_inline_comments(
+    review_id: int,
+    selected_comments: Sequence[Mapping[str, Any]],
+    review_comments: Sequence[Any],
+) -> list[PublishedInlineComment]:
+    remaining = [_read_object(comment) for comment in review_comments]
+    published: list[PublishedInlineComment] = []
+
+    for selected in selected_comments:
+        selected_body = _read_str(selected.get("body"), "")
+        selected_path = _read_str(selected.get("path"), "")
+        selected_line = _read_int(selected.get("line"), 1)
+        match_index = next(
+            (
+                index
+                for index, comment in enumerate(remaining)
+                if _read_str(comment.get("body"), "") == selected_body
+                and _read_str(comment.get("path"), "") == selected_path
+                and _read_int(comment.get("line"), 0) == selected_line
+                and isinstance(comment.get("id"), int)
+            ),
+            None,
+        )
+        if match_index is None:
+            raise ReviewPipelineError("github_response_invalid", "GitHub review comments response did not include every inline comment id.")
+        match = remaining.pop(match_index)
+        published.append(
+            PublishedInlineComment(
+                finding_id=_read_str(selected.get("findingId"), ""),
+                github_review_id=review_id,
+                github_comment_id=int(match["id"]),
+                file_path=selected_path,
+                line=selected_line,
+                body=selected_body,
+                dry_run=False,
+            )
+        )
+
+    return published
 
 
 def _semgrep_scanned_paths(semgrep_artifact: Mapping[str, Any]) -> list[str]:
