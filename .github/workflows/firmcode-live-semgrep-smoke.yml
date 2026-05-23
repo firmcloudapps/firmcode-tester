@@ -9,3 +9,4 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: echo "firmcode live semgrep smoke"
+      - run: echo "firmcode live semgrep smoke rerun"
