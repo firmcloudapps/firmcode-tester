@@ -5,6 +5,7 @@ import asyncio
 import importlib.util
 import json
 import os
+import shutil
 import socket
 import subprocess
 import sys
@@ -23,6 +24,7 @@ class WorkerRuntimeConfig:
     log_level: str
     semgrep_executable: str
     semgrep_startup_timeout_seconds: float
+    semgrep_startup_version_check: bool
 
 
 @dataclass(frozen=True)
@@ -48,6 +50,7 @@ def load_worker_config(env: Mapping[str, str] = os.environ) -> WorkerRuntimeConf
         log_level=env.get("LOG_LEVEL", "info"),
         semgrep_executable=env.get("SEMGREP_EXECUTABLE", "semgrep").strip() or "semgrep",
         semgrep_startup_timeout_seconds=_read_positive_float(env, "SEMGREP_STARTUP_TIMEOUT_SECONDS", 20.0),
+        semgrep_startup_version_check=_read_bool(env, "SEMGREP_STARTUP_VERSION_CHECK", False),
     )
 
 
@@ -124,6 +127,17 @@ def _read_positive_float(env: Mapping[str, str], name: str, default: float) -> f
     return value
 
 
+def _read_bool(env: Mapping[str, str], name: str, default: bool) -> bool:
+    raw_value = env.get(name, "").strip().lower()
+    if not raw_value:
+        return default
+    if raw_value in {"1", "true", "yes", "on"}:
+        return True
+    if raw_value in {"0", "false", "no", "off"}:
+        return False
+    raise ValueError(f"{name} must be a boolean")
+
+
 def _validate_url(value: str, schemes: tuple[str, ...], name: str) -> None:
     parsed = urlparse(value)
     if parsed.scheme not in schemes or not parsed.hostname:
@@ -146,13 +160,21 @@ def _check_tcp_url(name: str, raw_url: str, default_port: int) -> DependencyChec
 
 
 def _check_semgrep(config: WorkerRuntimeConfig) -> DependencyCheck:
+    executable_path = shutil.which(config.semgrep_executable)
+    if executable_path is None:
+        return DependencyCheck(name="semgrep", status="unavailable", error="executable_missing")
+
+    if not config.semgrep_startup_version_check:
+        return DependencyCheck(name="semgrep", status="ok")
+
     try:
         subprocess.run(
-            [config.semgrep_executable, "--version"],
+            [executable_path, "--version"],
             check=True,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             timeout=config.semgrep_startup_timeout_seconds,
+            env={**os.environ, "SEMGREP_SEND_METRICS": "off"},
         )
         return DependencyCheck(name="semgrep", status="ok")
     except (OSError, subprocess.SubprocessError) as error:

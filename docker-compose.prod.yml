@@ -42,6 +42,8 @@ services:
       DATABASE_SSL: ${DATABASE_SSL:-true}
       REDIS_URL: redis://redis:6379
       REVIEW_QUEUE_NAME: review-runs
+      SEMGREP_STARTUP_TIMEOUT_SECONDS: ${SEMGREP_STARTUP_TIMEOUT_SECONDS:-30}
+      SEMGREP_STARTUP_VERSION_CHECK: ${SEMGREP_STARTUP_VERSION_CHECK:-false}
     depends_on:
       redis:
         condition: service_healthy
