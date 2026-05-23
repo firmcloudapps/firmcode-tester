@@ -1133,7 +1133,7 @@ def render_summary_comment(
     semgrep_errors = _read_list(semgrep_artifact.get("errors"))
     risk_level = _risk_level(semgrep_findings, semgrep_errors)
     components = _changed_components(changed_files)
-    review_blocks = [_render_summary_semgrep_finding(finding) for finding in semgrep_findings[:8]]
+    review_blocks = [_render_summary_semgrep_finding(finding, changed_files) for finding in semgrep_findings[:8]]
     if not review_blocks:
         review_blocks = ["No actionable issues were found in the selected changed files."]
     suggestions = _test_suggestions(changed_files, semgrep_findings)
@@ -1430,18 +1430,19 @@ def _details_section(title: str, lines: Sequence[str]) -> list[str]:
     return ["<details>", f"<summary>{title}</summary>", "", *content, "", "</details>", ""]
 
 
-def _render_summary_semgrep_finding(value: Any) -> str:
+def _render_summary_semgrep_finding(value: Any, changed_files: Sequence[ChangedFile]) -> str:
     finding = _read_object(value)
     start = _read_object(finding.get("start"))
     path = _read_str(finding.get("path"), "unknown")
     line = _read_int(start.get("line"), 1)
     severity = _read_str(finding.get("severity"), "info")
     message = _public_message(_read_str(finding.get("message"), "Automated finding"))
+    display_lines = _changed_file_line_excerpt(changed_files, path, line) or _read_str(finding.get("lines"), "")
     return _render_finding_report(
         severity=severity,
         message=message,
         path=path,
-        lines=_read_str(finding.get("lines"), ""),
+        lines=display_lines,
         remediation=_public_message(_summary_remediation(finding)),
         fix=_read_optional_str(finding.get("fix")),
         location_label=f"`{path}:{line}`",
@@ -1475,13 +1476,14 @@ def _build_semgrep_inline_review_comments(
         if line not in changed_lines_by_path.get(path, set()):
             continue
 
+        display_lines = _changed_file_line_excerpt(changed_files, path, line) or _read_str(item.get("lines"), "")
         candidates.append(
             {
                 "findingId": _read_str(item.get("id"), _dedupe_hash(item)),
                 "path": path,
                 "line": line,
                 "severity": _read_str(item.get("severity"), "info"),
-                "body": _render_inline_semgrep_comment(item),
+                "body": _render_inline_semgrep_comment({**item, "displayLines": display_lines}),
                 "_rank": _severity_rank(_read_str(item.get("severity"), "info")),
             }
         )
@@ -1493,7 +1495,7 @@ def _build_semgrep_inline_review_comments(
 def _render_inline_semgrep_comment(finding: Mapping[str, Any]) -> str:
     severity = _read_str(finding.get("severity"), "info")
     message = _public_message(_read_str(finding.get("message"), "Automated finding"))
-    lines = _read_str(finding.get("lines"), "")
+    lines = _read_str(finding.get("displayLines"), "") or _read_str(finding.get("lines"), "")
     metadata = _read_object(finding.get("metadata"))
     fix = _read_optional_str(finding.get("fix"))
     return _render_finding_report(
@@ -1548,14 +1550,15 @@ def _render_finding_report(
             message,
         ]
     )
-    if lines.strip():
+    code_excerpt = _trim_code_excerpt(lines)
+    if code_excerpt:
         body.extend(
             [
                 "",
                 "**Flagged code:**",
                 "",
                 f"```{language}",
-                lines.strip()[:1200],
+                code_excerpt,
                 "```",
             ]
         )
@@ -1582,6 +1585,28 @@ def _render_finding_report(
 def _summary_remediation(finding: Mapping[str, Any]) -> str:
     metadata = _read_object(finding.get("metadata"))
     return _read_optional_str(metadata.get("remediation")) or _read_optional_str(finding.get("fix")) or "Review this changed code and update it before merging."
+
+
+def _trim_code_excerpt(value: str) -> str:
+    lines = value.splitlines()
+    while lines and not lines[0].strip():
+        lines.pop(0)
+    while lines and not lines[-1].strip():
+        lines.pop()
+    return "\n".join(lines)[:1200]
+
+
+def _changed_file_line_excerpt(changed_files: Sequence[ChangedFile], path: str, line: int) -> str | None:
+    if line <= 0:
+        return None
+    for file in changed_files:
+        if file.path != path or file.content is None:
+            continue
+        lines = file.content.splitlines()
+        if line <= len(lines):
+            return lines[line - 1]
+    return None
+
 
 def _inline_severity_label(severity: str) -> str:
     return {
