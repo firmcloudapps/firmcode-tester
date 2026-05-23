@@ -31,6 +31,8 @@
     "components/**/*.ts",
     "components/**/*.tsx",
     "config/**/*.ts",
+    "lib/**/*.ts",
+    "lib/**/*.tsx",
     "tests/**/*.ts",
     "tests/**/*.tsx"
   ],
