@@ -39,6 +39,12 @@ class LLMProviderError(LLMClientError):
         self.code = code
 
 
+class LLMInvalidJsonError(LLMClientError):
+    def __init__(self, message: str, *, raw_content: str) -> None:
+        super().__init__(message)
+        self.raw_content = raw_content
+
+
 @dataclass(frozen=True)
 class LLMRetryConfig:
     max_retries: int = DEFAULT_LLM_MAX_RETRIES
@@ -272,7 +278,15 @@ class RetryingLLMClient:
                     self._provider.complete_structured(messages=messages, schema=schema, options=options),
                     timeout=options.timeout_ms / 1000,
                 )
-                parsed = _parse_structured_content(provider_response.content)
+                try:
+                    parsed = _parse_structured_content(provider_response.content)
+                except json.JSONDecodeError as error:
+                    raise LLMInvalidJsonError(
+                        f"LLM response was not valid JSON: {error.msg}.",
+                        raw_content=provider_response.content,
+                    ) from error
+                except ValueError as error:
+                    raise LLMInvalidJsonError(str(error), raw_content=provider_response.content) from error
                 latency_ms = _elapsed_ms(started)
                 self._event_logger(
                     {
@@ -299,8 +313,6 @@ class RetryingLLMClient:
                 last_error = LLMTimeoutError(f"LLM request timed out after {options.timeout_ms} ms.")
             except LLMProviderError as error:
                 last_error = error
-            except json.JSONDecodeError as error:
-                raise LLMClientError(f"LLM response was not valid JSON: {error.msg}.") from error
             except ValueError as error:
                 raise LLMClientError(str(error)) from error
 

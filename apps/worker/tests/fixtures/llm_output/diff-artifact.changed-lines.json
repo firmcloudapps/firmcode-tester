@@ -1,0 +1,58 @@
+{
+  "schemaVersion": "diff-artifact/v1",
+  "reviewRunId": "run-llm-output",
+  "repositoryFullName": "acme/widgets",
+  "pullRequestNumber": 9,
+  "baseSha": "base123",
+  "headSha": "head456",
+  "files": [
+    {
+      "path": "src/server.ts",
+      "previousPath": null,
+      "status": "modified",
+      "additions": 2,
+      "deletions": 1,
+      "language": "typescript",
+      "patch": "@@ -40,3 +40,4 @@\n export function run(command: string) {\n+  exec(command);\n+  audit(command);\n }\n",
+      "headContentSha256": null,
+      "sizeBytes": 128,
+      "changedNewLines": [42, 43],
+      "hunks": [
+        {
+          "oldStart": 40,
+          "oldLineCount": 3,
+          "newStart": 40,
+          "newLineCount": 4,
+          "sectionHeader": "",
+          "lines": [
+            {
+              "type": "context",
+              "content": "export function run(command: string) {",
+              "oldLineNumber": 40,
+              "newLineNumber": 40
+            },
+            {
+              "type": "addition",
+              "content": "  exec(command);",
+              "oldLineNumber": null,
+              "newLineNumber": 42
+            },
+            {
+              "type": "addition",
+              "content": "  audit(command);",
+              "oldLineNumber": null,
+              "newLineNumber": 43
+            },
+            {
+              "type": "context",
+              "content": "}",
+              "oldLineNumber": 42,
+              "newLineNumber": 44
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "skippedFiles": []
+}

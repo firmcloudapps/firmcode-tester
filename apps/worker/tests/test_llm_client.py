@@ -11,6 +11,7 @@ import pytest
 from firmcode_worker.llm import (
     FakeLLMClient,
     LLMClientConfig,
+    LLMInvalidJsonError,
     LLMMessage,
     LLMProviderError,
     LLMProviderResponse,
@@ -133,6 +134,20 @@ def test_retrying_llm_client_times_out_provider_calls() -> None:
 
     with pytest.raises(LLMTimeoutError):
         asyncio.run(client.complete_structured("review", SCHEMA, options))
+
+
+def test_retrying_llm_client_preserves_raw_invalid_json_for_repair() -> None:
+    provider = ScriptedProvider([LLMProviderResponse(content='{"summary":')])
+    client = RetryingLLMClient(
+        provider=provider,
+        provider_name="example",
+        event_logger=lambda _event: None,
+    )
+
+    with pytest.raises(LLMInvalidJsonError) as error:
+        asyncio.run(client.complete_structured("review", SCHEMA, LLMRequestOptions(model="review-model")))
+
+    assert error.value.raw_content == '{"summary":'
 
 
 def test_retrying_llm_client_redacts_secrets_from_request_logs() -> None:

@@ -1,0 +1,69 @@
+{
+  "schemaVersion": "llm-review-output/v1",
+  "promptId": "review.findings",
+  "promptVersion": "1.0.0",
+  "model": "review-model",
+  "summary": "The PR adds shell execution and should be constrained.",
+  "riskLevel": "high",
+  "changedComponents": ["src/server.ts"],
+  "inlineFindings": [
+    {
+      "id": "llm-duplicate-shell",
+      "source": "llm",
+      "category": "security",
+      "severity": "high",
+      "confidence": 0.82,
+      "path": "src/server.ts",
+      "lineRange": {
+        "startLine": 42,
+        "endLine": 42
+      },
+      "title": "Avoid shell execution with untrusted input",
+      "body": "Validate the command before invoking the shell.",
+      "evidence": [
+        {
+          "source": "semgrep",
+          "artifactId": "semgrep:typescript.security.audit:src/server.ts:42",
+          "path": "src/server.ts",
+          "lineRange": {
+            "startLine": 42,
+            "endLine": 42
+          },
+          "excerpt": "exec(command)"
+        }
+      ],
+      "suggestedFix": null
+    },
+    {
+      "id": "llm-context-finding",
+      "source": "llm",
+      "category": "maintainability",
+      "severity": "low",
+      "confidence": 0.71,
+      "path": "src/server.ts",
+      "lineRange": {
+        "startLine": 43,
+        "endLine": 43
+      },
+      "title": "Keep audit calls close to validation",
+      "body": "Place auditing after command validation so rejected input is also tracked consistently.",
+      "evidence": [
+        {
+          "source": "llm",
+          "artifactId": null,
+          "path": "src/server.ts",
+          "lineRange": {
+            "startLine": 43,
+            "endLine": 43
+          },
+          "excerpt": "audit(command)"
+        }
+      ],
+      "suggestedFix": null
+    }
+  ],
+  "summaryFindings": [],
+  "testSuggestions": ["Add a test that rejects disallowed commands."],
+  "ciExplanation": null,
+  "confidence": 0.84
+}

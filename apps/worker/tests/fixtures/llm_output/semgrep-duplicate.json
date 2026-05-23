@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "semgrep-artifact/v1",
+  "reviewRunId": "run-llm-output",
+  "toolVersion": "1.99.0",
+  "exitCode": 1,
+  "durationMs": 85,
+  "findings": [
+    {
+      "id": "semgrep:typescript.security.audit:src/server.ts:42",
+      "ruleId": "typescript.security.audit",
+      "path": "src/server.ts",
+      "start": {
+        "line": 42,
+        "column": 3,
+        "offset": 1200
+      },
+      "end": {
+        "line": 42,
+        "column": 16,
+        "offset": 1213
+      },
+      "severity": "high",
+      "sourceSeverity": "ERROR",
+      "message": "Avoid shell execution with untrusted input",
+      "fingerprint": "semgrep-fingerprint-1",
+      "lines": "exec(command)",
+      "metadata": {
+        "category": "security"
+      },
+      "fix": null
+    }
+  ],
+  "errors": [],
+  "paths": {
+    "scanned": ["src/server.ts"],
+    "skipped": []
+  }
+}
