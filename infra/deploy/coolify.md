@@ -12,7 +12,7 @@ Firmcode uses Coolify for long-running Docker services: the NestJS API in `apps/
 | Redis | Compose internal Redis or external managed Redis | `redis:7-alpine` or provider-managed | internal only | Redis `PING` |
 | NeonDB | external managed PostgreSQL | provider-managed | provider-managed | connection smoke from API and worker |
 
-GitHub Actions builds and pushes the API and worker images to Docker Hub. Coolify should deploy the Compose stack by pulling those images, not by rebuilding the API or worker from source.
+GitHub Actions builds and pushes the API and worker images to Docker Hub. Coolify should deploy the Compose stack by pulling those images, not by rebuilding the API or worker from source. Production Compose sets `pull_policy: always` for API and worker so a redeploy pulls the current `latest` image instead of reusing a stale local image.
 
 Prefer deploying `docker-compose.prod.yml` in Coolify so API, worker, and Redis remain one production backend stack. The production Compose file intentionally excludes PostgreSQL and the Next.js web service.
 
@@ -100,13 +100,13 @@ Required worker environment variables:
 | `LLM_MAX_RETRIES` | Optional retry count. |
 | `SEMGREP_CONFIGS` | Default `auto,infra/semgrep`. |
 | `SEMGREP_TIMEOUT_MS` | Optional Semgrep timeout. |
-| `SEMGREP_STARTUP_VERSION_CHECK=false` | Production Compose pins this off so worker startup verifies the Semgrep executable without running `semgrep --version`. |
-| `SEMGREP_STARTUP_TIMEOUT_SECONDS=30` | Startup version-check timeout if the probe is intentionally re-enabled for debugging. |
+| `SEMGREP_STARTUP_VERSION_CHECK=false` | Deprecated compatibility setting. Worker startup does not run `semgrep --version`; it only verifies the executable exists. |
+| `SEMGREP_STARTUP_TIMEOUT_SECONDS=30` | Deprecated compatibility setting retained for older deployed env files. |
 | `SEMGREP_SEND_METRICS=off` | Disables Semgrep metrics reporting in worker containers. |
 | `TREESITTER_TIMEOUT_MS` | Optional parse timeout. |
 | `TREESITTER_MAX_FILE_BYTES` | Optional parse size limit. |
 
-The worker image installs Semgrep CLI and Tree-sitter runtime dependencies. Treat a missing Semgrep binary or failed worker health check as a release blocker. If worker logs show `{"name":"semgrep","status":"unavailable","error":"TimeoutExpired"}`, the deployed worker image is stale or the Compose app is still running with the Semgrep startup version probe enabled. Pull the latest `obehiaye/firmcode-worker:latest`, redeploy/recreate the worker container, and confirm `SEMGREP_STARTUP_VERSION_CHECK=false` in the running container.
+The worker image installs Semgrep CLI and Tree-sitter runtime dependencies. Treat a missing Semgrep binary or failed worker health check as a release blocker. Current worker startup logs include `semgrep_startup_probe="executable_only"`. If worker logs still show `{"name":"semgrep","status":"unavailable","error":"TimeoutExpired"}`, the deployed worker image is stale because current code has no startup path that executes Semgrep. Pull the latest `obehiaye/firmcode-worker:latest`, redeploy/recreate the worker container, and confirm new logs include `semgrep_startup_probe`.
 
 ## Redis Options
 
@@ -137,10 +137,10 @@ Use a production NeonDB branch for production and a separate branch or project f
 Run migrations from the API service after the API image deploys and before scaling workers:
 
 ```bash
-npm run db:migrate --workspace @firmcode/api
+npm run db:migrate:runtime --workspace @firmcode/api
 ```
 
-The command builds the API package and applies pending migrations against `DATABASE_URL`.
+The production API image already contains compiled JavaScript and omits TypeScript dev dependencies, so use the runtime migration command inside Coolify. From a source checkout during local development, `npm run db:migrate --workspace @firmcode/api` still builds the API package before applying migrations against `DATABASE_URL`.
 
 ## Deployment Order
 

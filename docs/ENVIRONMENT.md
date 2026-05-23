@@ -29,10 +29,16 @@ Local development uses NeonDB, not a local PostgreSQL container. NeonDB connecti
 Run database migrations from the repository root with:
 
 ```bash
-npm run db:migrate
+npm run db:migrate --workspace @firmcode/api
 ```
 
 The command builds the API package and applies pending migrations against `DATABASE_URL`.
+
+Inside the production API container, use the compiled runtime command instead:
+
+```bash
+npm run db:migrate:runtime --workspace @firmcode/api
+```
 
 Inside Docker Compose, API and worker receive the same external NeonDB URL from the host environment:
 
@@ -104,8 +110,8 @@ Clerk owns sign-in, sign-up, sessions, user profile, organizations where enabled
 | `SEMGREP_CONFIGS` | no | Comma-separated configs. Default includes `auto` and local infra rules. |
 | `SEMGREP_MAX_TARGET_BYTES` | no | Per-file scan size limit. |
 | `SEMGREP_SCAN_TEMP_DIR` | no | Base directory for isolated changed-file scan workspaces. Defaults to the system temp directory under `firmcode-semgrep`. |
-| `SEMGREP_STARTUP_TIMEOUT_SECONDS` | no | Worker startup timeout for `semgrep --version`. Defaults to `20`; Docker images set `30` to allow first-start CLI warmup. |
-| `SEMGREP_STARTUP_VERSION_CHECK` | no | Whether worker startup should execute `semgrep --version`. Defaults to `false`; startup normally verifies the executable exists and leaves full CLI execution to scan jobs. |
+| `SEMGREP_STARTUP_TIMEOUT_SECONDS` | no | Deprecated compatibility setting. Worker startup no longer executes `semgrep --version`; full Semgrep execution happens during scan jobs. |
+| `SEMGREP_STARTUP_VERSION_CHECK` | no | Deprecated compatibility setting. Startup always verifies only that the Semgrep executable is present. |
 | `SEMGREP_SEND_METRICS` | no | Set to `off` in Docker images and production Compose so Semgrep startup and scans do not attempt metrics reporting. |
 
 ## Tree-sitter

@@ -7,9 +7,9 @@ import json
 import os
 import shutil
 import socket
-import subprocess
 import sys
 from dataclasses import dataclass
+from importlib.metadata import PackageNotFoundError, version
 from typing import Mapping
 from urllib.parse import urlparse
 
@@ -79,6 +79,8 @@ def main(argv: list[str] | None = None) -> int:
     _log(
         "worker.startup.completed",
         status=status,
+        worker_version=_worker_version(),
+        semgrep_startup_probe="executable_only",
         dependencies=[_check_to_dict(check) for check in checks],
     )
 
@@ -164,25 +166,14 @@ def _check_semgrep(config: WorkerRuntimeConfig) -> DependencyCheck:
     if executable_path is None:
         return DependencyCheck(name="semgrep", status="unavailable", error="executable_missing")
 
-    if not config.semgrep_startup_version_check:
-        return DependencyCheck(name="semgrep", status="ok")
+    return DependencyCheck(name="semgrep", status="ok")
 
+
+def _worker_version() -> str:
     try:
-        subprocess.run(
-            [executable_path, "--version"],
-            check=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            timeout=config.semgrep_startup_timeout_seconds,
-            env={**os.environ, "SEMGREP_SEND_METRICS": "off"},
-        )
-        return DependencyCheck(name="semgrep", status="ok")
-    except subprocess.TimeoutExpired:
-        return DependencyCheck(name="semgrep", status="ok", error="version_check_timeout")
-    except subprocess.CalledProcessError as error:
-        return DependencyCheck(name="semgrep", status="ok", error=error.__class__.__name__)
-    except OSError as error:
-        return DependencyCheck(name="semgrep", status="unavailable", error=error.__class__.__name__)
+        return version("firmcode-worker")
+    except PackageNotFoundError:
+        return "editable"
 
 
 def _check_tree_sitter() -> DependencyCheck:
