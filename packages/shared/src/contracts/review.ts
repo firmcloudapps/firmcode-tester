@@ -235,6 +235,60 @@ export interface ReviewRunDetail extends ReviewRunSummary {
   publishedComments: ReviewRunPublishedComment[];
 }
 
+export type OverviewMetricId = "review_activity" | "security_findings" | "ci_failures" | "repositories_monitored";
+export type OverviewTone = "neutral" | "info" | "success" | "warning" | "critical";
+
+export interface OverviewMetric {
+  id: OverviewMetricId;
+  label: string;
+  value: number;
+  helper: string;
+  changeLabel: string;
+  trend: number[];
+  tone: OverviewTone;
+}
+
+export type OverviewAttentionKind =
+  | "failed_job"
+  | "high_severity_finding"
+  | "ci_failure"
+  | "incomplete_repository_configuration";
+
+export interface OverviewAttentionItem {
+  id: string;
+  kind: OverviewAttentionKind;
+  title: string;
+  detail: string;
+  href: string;
+  severity: ReviewFindingSeverity | "none";
+  updatedAt: string;
+}
+
+export interface OverviewQualityMetric {
+  label: string;
+  value: string;
+  helper: string;
+  tone: OverviewTone;
+}
+
+export interface OverviewSupplementData {
+  securityFindingsCount: number;
+  ciFailuresExplainedCount: number;
+  highSeverityFindings: OverviewAttentionItem[];
+  ciFailures: OverviewAttentionItem[];
+  incompleteRepositoryConfigurationRepositoryIds: string[];
+  qualityMetrics: OverviewQualityMetric[];
+}
+
+export interface OverviewDashboardData {
+  metrics: OverviewMetric[];
+  recentReviewRuns: ReviewRunListItem[];
+  needsAttention: OverviewAttentionItem[];
+  qualityMetrics: OverviewQualityMetric[];
+  generatedAt: string;
+  dataSource: "dashboard_api" | "dashboard_api_with_local_supplement";
+}
+
 export const DEFAULT_REVIEW_LIMITS = {
   maxInlineComments: 10,
   artifactRetentionDays: 30

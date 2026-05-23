@@ -1,10 +1,12 @@
 import type {
   DashboardRepositoryListFilters,
+  OverviewDashboardData,
   RepositoryListResponse,
   ReviewRunDetail,
   ReviewRunListFilters,
   ReviewRunListResponse
 } from "@firmcode/shared";
+import { buildOverviewDashboardData } from "./overview-data";
 import type { ViewState } from "./view-state";
 
 type SearchParams = Record<string, string | string[] | undefined>;
@@ -25,6 +27,25 @@ export async function loadRepositoriesState(searchParams: SearchParams): Promise
     const data = await requestJson<RepositoryListResponse>("/api/repositories", filters);
 
     return data.repositories.length === 0 ? { status: "empty", data } : { status: "populated", data };
+  } catch (error) {
+    return { status: "error", message: toErrorMessage(error) };
+  }
+}
+
+export async function loadOverviewState(): Promise<ViewState<OverviewDashboardData>> {
+  try {
+    const [repositories, reviewRuns] = await Promise.all([
+      requestJson<RepositoryListResponse>("/api/repositories", {}),
+      requestJson<ReviewRunListResponse>("/api/review-runs", {})
+    ]);
+    const data = buildOverviewDashboardData({
+      repositories: repositories.repositories,
+      reviewRuns: reviewRuns.reviewRuns
+    });
+
+    return data.recentReviewRuns.length === 0 && data.needsAttention.length === 0
+      ? { status: "empty", data }
+      : { status: "populated", data };
   } catch (error) {
     return { status: "error", message: toErrorMessage(error) };
   }
