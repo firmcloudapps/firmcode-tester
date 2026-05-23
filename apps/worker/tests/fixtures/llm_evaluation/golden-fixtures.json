@@ -1,0 +1,844 @@
+{
+  "schemaVersion": "llm-evaluation-fixtures/v1",
+  "cases": [
+    {
+      "name": "small-bug-pr",
+      "description": "A small application bug with one changed-line inline finding.",
+      "expectations": {
+        "promptId": "firmcode.review.code",
+        "promptVersion": "1.0.0",
+        "schemaVersion": "llm-review-output/v1",
+        "maxInlineComments": 2,
+        "maxSeverity": "medium",
+        "requiredSemgrepFindingIds": []
+      },
+      "diffArtifact": {
+        "schemaVersion": "diff-artifact/v1",
+        "reviewRunId": "eval-small-bug",
+        "repositoryFullName": "firmcode/eval-fixtures",
+        "pullRequestNumber": 101,
+        "baseSha": "base-small-bug",
+        "headSha": "head-small-bug",
+        "files": [
+          {
+            "path": "src/pricing.py",
+            "previousPath": null,
+            "status": "modified",
+            "additions": 1,
+            "deletions": 1,
+            "language": "python",
+            "patch": "@@ -9,4 +9,4 @@\n def average_discount(total_discount, item_count):\n-    return total_discount\n+    return total_discount / item_count\n",
+            "headContentSha256": null,
+            "sizeBytes": 180,
+            "changedNewLines": [12],
+            "hunks": [
+              {
+                "oldStart": 9,
+                "oldLineCount": 4,
+                "newStart": 9,
+                "newLineCount": 4,
+                "sectionHeader": "def average_discount",
+                "lines": [
+                  {
+                    "type": "context",
+                    "content": "def average_discount(total_discount, item_count):",
+                    "oldLineNumber": 9,
+                    "newLineNumber": 9
+                  },
+                  {
+                    "type": "addition",
+                    "content": "    return total_discount / item_count",
+                    "oldLineNumber": null,
+                    "newLineNumber": 12
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "skippedFiles": []
+      },
+      "semgrepArtifact": null,
+      "frozenResponse": {
+        "schemaVersion": "llm-review-output/v1",
+        "promptId": "firmcode.review.code",
+        "promptVersion": "1.0.0",
+        "model": "frozen-review-model",
+        "summary": "The pricing helper now divides by item count and needs an empty-cart guard.",
+        "riskLevel": "medium",
+        "changedComponents": ["src/pricing.py"],
+        "inlineFindings": [
+          {
+            "id": "small-bug-zero-division",
+            "source": "llm",
+            "category": "bug",
+            "severity": "medium",
+            "confidence": 0.83,
+            "path": "src/pricing.py",
+            "lineRange": {
+              "startLine": 12,
+              "endLine": 12
+            },
+            "title": "Guard empty item counts before dividing",
+            "body": "When item_count is 0, this new division raises at runtime instead of returning a safe discount value.",
+            "evidence": [
+              {
+                "source": "llm",
+                "artifactId": null,
+                "path": "src/pricing.py",
+                "lineRange": {
+                  "startLine": 12,
+                  "endLine": 12
+                },
+                "excerpt": "return total_discount / item_count"
+              }
+            ],
+            "suggestedFix": "Return 0 or raise a domain error when item_count is 0 before dividing."
+          }
+        ],
+        "summaryFindings": [],
+        "testSuggestions": ["Add a unit test for average_discount with item_count set to 0."],
+        "ciExplanation": null,
+        "confidence": 0.83
+      }
+    },
+    {
+      "name": "security-finding-pr",
+      "description": "A Semgrep-backed security finding where deterministic evidence must win dedupe.",
+      "expectations": {
+        "promptId": "firmcode.review.code",
+        "promptVersion": "1.0.0",
+        "schemaVersion": "llm-review-output/v1",
+        "maxInlineComments": 1,
+        "maxSeverity": "high",
+        "requiredSemgrepFindingIds": ["semgrep:typescript.security.audit:src/server.ts:42"]
+      },
+      "diffArtifact": {
+        "schemaVersion": "diff-artifact/v1",
+        "reviewRunId": "eval-security",
+        "repositoryFullName": "firmcode/eval-fixtures",
+        "pullRequestNumber": 102,
+        "baseSha": "base-security",
+        "headSha": "head-security",
+        "files": [
+          {
+            "path": "src/server.ts",
+            "previousPath": null,
+            "status": "modified",
+            "additions": 1,
+            "deletions": 0,
+            "language": "typescript",
+            "patch": "@@ -40,3 +40,4 @@\n export function run(command: string) {\n+  exec(command);\n }\n",
+            "headContentSha256": null,
+            "sizeBytes": 256,
+            "changedNewLines": [42],
+            "hunks": [
+              {
+                "oldStart": 40,
+                "oldLineCount": 3,
+                "newStart": 40,
+                "newLineCount": 4,
+                "sectionHeader": "run",
+                "lines": [
+                  {
+                    "type": "context",
+                    "content": "export function run(command: string) {",
+                    "oldLineNumber": 40,
+                    "newLineNumber": 40
+                  },
+                  {
+                    "type": "addition",
+                    "content": "  exec(command);",
+                    "oldLineNumber": null,
+                    "newLineNumber": 42
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "skippedFiles": []
+      },
+      "semgrepArtifact": {
+        "schemaVersion": "semgrep-artifact/v1",
+        "reviewRunId": "eval-security",
+        "toolVersion": "1.99.0",
+        "exitCode": 1,
+        "durationMs": 80,
+        "findings": [
+          {
+            "id": "semgrep:typescript.security.audit:src/server.ts:42",
+            "ruleId": "typescript.security.audit",
+            "path": "src/server.ts",
+            "start": {
+              "line": 42,
+              "column": 3,
+              "offset": 1200
+            },
+            "end": {
+              "line": 42,
+              "column": 16,
+              "offset": 1213
+            },
+            "severity": "high",
+            "sourceSeverity": "ERROR",
+            "message": "Avoid shell execution with untrusted input",
+            "fingerprint": "security-fingerprint",
+            "lines": "exec(command)",
+            "metadata": {
+              "category": "security"
+            },
+            "fix": null
+          }
+        ],
+        "errors": [],
+        "paths": {
+          "scanned": ["src/server.ts"],
+          "skipped": []
+        }
+      },
+      "frozenResponse": {
+        "schemaVersion": "llm-review-output/v1",
+        "promptId": "firmcode.review.code",
+        "promptVersion": "1.0.0",
+        "model": "frozen-review-model",
+        "summary": "The PR introduces shell execution of caller-controlled input.",
+        "riskLevel": "high",
+        "changedComponents": ["src/server.ts"],
+        "inlineFindings": [
+          {
+            "id": "llm-duplicate-shell-exec",
+            "source": "llm",
+            "category": "security",
+            "severity": "high",
+            "confidence": 0.86,
+            "path": "src/server.ts",
+            "lineRange": {
+              "startLine": 42,
+              "endLine": 42
+            },
+            "title": "Avoid shell execution with untrusted input",
+            "body": "Validate or avoid the shell before executing caller-controlled command text.",
+            "evidence": [
+              {
+                "source": "semgrep",
+                "artifactId": "semgrep:typescript.security.audit:src/server.ts:42",
+                "path": "src/server.ts",
+                "lineRange": {
+                  "startLine": 42,
+                  "endLine": 42
+                },
+                "excerpt": "exec(command)"
+              }
+            ],
+            "suggestedFix": null
+          }
+        ],
+        "summaryFindings": [],
+        "testSuggestions": ["Add a security test that rejects shell metacharacters in command input."],
+        "ciExplanation": null,
+        "confidence": 0.88
+      }
+    },
+    {
+      "name": "infrastructure-pr",
+      "description": "A Kubernetes deployment change with one restrained infrastructure finding.",
+      "expectations": {
+        "promptId": "firmcode.review.infrastructure",
+        "promptVersion": "1.0.0",
+        "schemaVersion": "llm-review-output/v1",
+        "maxInlineComments": 2,
+        "maxSeverity": "medium",
+        "requiredSemgrepFindingIds": []
+      },
+      "diffArtifact": {
+        "schemaVersion": "diff-artifact/v1",
+        "reviewRunId": "eval-infra",
+        "repositoryFullName": "firmcode/eval-fixtures",
+        "pullRequestNumber": 103,
+        "baseSha": "base-infra",
+        "headSha": "head-infra",
+        "files": [
+          {
+            "path": "infra/k8s/deployment.yaml",
+            "previousPath": null,
+            "status": "modified",
+            "additions": 1,
+            "deletions": 0,
+            "language": "yaml",
+            "patch": "@@ -15,4 +15,5 @@\n         securityContext:\n+          privileged: true\n           readOnlyRootFilesystem: true\n",
+            "headContentSha256": null,
+            "sizeBytes": 640,
+            "changedNewLines": [18],
+            "hunks": [
+              {
+                "oldStart": 15,
+                "oldLineCount": 4,
+                "newStart": 15,
+                "newLineCount": 5,
+                "sectionHeader": "securityContext",
+                "lines": [
+                  {
+                    "type": "context",
+                    "content": "        securityContext:",
+                    "oldLineNumber": 15,
+                    "newLineNumber": 15
+                  },
+                  {
+                    "type": "addition",
+                    "content": "          privileged: true",
+                    "oldLineNumber": null,
+                    "newLineNumber": 18
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "skippedFiles": []
+      },
+      "semgrepArtifact": null,
+      "frozenResponse": {
+        "schemaVersion": "llm-review-output/v1",
+        "promptId": "firmcode.review.infrastructure",
+        "promptVersion": "1.0.0",
+        "model": "frozen-review-model",
+        "summary": "The deployment change expands container privileges and should be justified or removed.",
+        "riskLevel": "medium",
+        "changedComponents": ["infra/k8s/deployment.yaml"],
+        "inlineFindings": [
+          {
+            "id": "infra-privileged-container",
+            "source": "llm",
+            "category": "infrastructure",
+            "severity": "medium",
+            "confidence": 0.8,
+            "path": "infra/k8s/deployment.yaml",
+            "lineRange": {
+              "startLine": 18,
+              "endLine": 18
+            },
+            "title": "Avoid privileged containers by default",
+            "body": "Running the application container as privileged grants host-level capabilities that are not needed by the existing read-only filesystem setting.",
+            "evidence": [
+              {
+                "source": "llm",
+                "artifactId": null,
+                "path": "infra/k8s/deployment.yaml",
+                "lineRange": {
+                  "startLine": 18,
+                  "endLine": 18
+                },
+                "excerpt": "privileged: true"
+              }
+            ],
+            "suggestedFix": "Remove privileged: true and grant only the specific capability if one is required."
+          }
+        ],
+        "summaryFindings": [],
+        "testSuggestions": ["Add a policy test that rejects privileged Kubernetes containers."],
+        "ciExplanation": null,
+        "confidence": 0.8
+      }
+    },
+    {
+      "name": "ci-failure-pr",
+      "description": "A CI log backed failure explanation tied to a changed test script line.",
+      "expectations": {
+        "promptId": "firmcode.review.ci_explanation",
+        "promptVersion": "1.0.0",
+        "schemaVersion": "llm-review-output/v1",
+        "maxInlineComments": 1,
+        "maxSeverity": "medium",
+        "requiredSemgrepFindingIds": []
+      },
+      "diffArtifact": {
+        "schemaVersion": "diff-artifact/v1",
+        "reviewRunId": "eval-ci",
+        "repositoryFullName": "firmcode/eval-fixtures",
+        "pullRequestNumber": 104,
+        "baseSha": "base-ci",
+        "headSha": "head-ci",
+        "files": [
+          {
+            "path": "package.json",
+            "previousPath": null,
+            "status": "modified",
+            "additions": 1,
+            "deletions": 1,
+            "language": "json",
+            "patch": "@@ -6,4 +6,4 @@\n   \"scripts\": {\n-    \"test\": \"vitest run\"\n+    \"test\": \"vitest run --config missing.config.ts\"\n   }\n",
+            "headContentSha256": null,
+            "sizeBytes": 420,
+            "changedNewLines": [8],
+            "hunks": [
+              {
+                "oldStart": 6,
+                "oldLineCount": 4,
+                "newStart": 6,
+                "newLineCount": 4,
+                "sectionHeader": "scripts",
+                "lines": [
+                  {
+                    "type": "context",
+                    "content": "  \"scripts\": {",
+                    "oldLineNumber": 6,
+                    "newLineNumber": 6
+                  },
+                  {
+                    "type": "addition",
+                    "content": "    \"test\": \"vitest run --config missing.config.ts\"",
+                    "oldLineNumber": null,
+                    "newLineNumber": 8
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "skippedFiles": []
+      },
+      "semgrepArtifact": null,
+      "frozenResponse": {
+        "schemaVersion": "llm-review-output/v1",
+        "promptId": "firmcode.review.ci_explanation",
+        "promptVersion": "1.0.0",
+        "model": "frozen-review-model",
+        "summary": "CI is failing because the test script points Vitest at a config file that is not present.",
+        "riskLevel": "medium",
+        "changedComponents": ["package.json"],
+        "inlineFindings": [
+          {
+            "id": "ci-missing-vitest-config",
+            "source": "ci",
+            "category": "ci",
+            "severity": "medium",
+            "confidence": 0.88,
+            "path": "package.json",
+            "lineRange": {
+              "startLine": 8,
+              "endLine": 8
+            },
+            "title": "Point the test script at an existing config",
+            "body": "The changed script references missing.config.ts, matching the CI error that Vitest cannot load that file.",
+            "evidence": [
+              {
+                "source": "ci",
+                "artifactId": "ci-log:unit-tests",
+                "path": null,
+                "lineRange": null,
+                "excerpt": "Error: Cannot find config file missing.config.ts"
+              },
+              {
+                "source": "llm",
+                "artifactId": null,
+                "path": "package.json",
+                "lineRange": {
+                  "startLine": 8,
+                  "endLine": 8
+                },
+                "excerpt": "vitest run --config missing.config.ts"
+              }
+            ],
+            "suggestedFix": "Use the existing Vitest config path or remove the --config override."
+          }
+        ],
+        "summaryFindings": [],
+        "testSuggestions": ["Run npm test locally after changing package scripts."],
+        "ciExplanation": "The unit-test job fails while loading Vitest configuration because package.json now references missing.config.ts.",
+        "confidence": 0.88
+      }
+    },
+    {
+      "name": "large-pr",
+      "description": "A prioritized large PR with a preserved Semgrep finding and capped inline output.",
+      "expectations": {
+        "promptId": "firmcode.review.summary",
+        "promptVersion": "1.0.0",
+        "schemaVersion": "llm-review-output/v1",
+        "maxInlineComments": 2,
+        "maxSeverity": "high",
+        "requiredSemgrepFindingIds": ["semgrep:python.security.jwt:src/auth/tokens.py:88"]
+      },
+      "diffArtifact": {
+        "schemaVersion": "diff-artifact/v1",
+        "reviewRunId": "eval-large-pr",
+        "repositoryFullName": "firmcode/eval-fixtures",
+        "pullRequestNumber": 105,
+        "baseSha": "base-large",
+        "headSha": "head-large",
+        "files": [
+          {
+            "path": "src/auth/tokens.py",
+            "previousPath": null,
+            "status": "modified",
+            "additions": 1,
+            "deletions": 1,
+            "language": "python",
+            "patch": "@@ -85,4 +85,4 @@\n def verify(token):\n-    return jwt.decode(token, key, algorithms=[\"RS256\"])\n+    return jwt.decode(token, key, options={\"verify_signature\": False})\n",
+            "headContentSha256": null,
+            "sizeBytes": 1800,
+            "changedNewLines": [88],
+            "hunks": [
+              {
+                "oldStart": 85,
+                "oldLineCount": 4,
+                "newStart": 85,
+                "newLineCount": 4,
+                "sectionHeader": "verify",
+                "lines": [
+                  {
+                    "type": "context",
+                    "content": "def verify(token):",
+                    "oldLineNumber": 85,
+                    "newLineNumber": 85
+                  },
+                  {
+                    "type": "addition",
+                    "content": "    return jwt.decode(token, key, options={\"verify_signature\": False})",
+                    "oldLineNumber": null,
+                    "newLineNumber": 88
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "path": "src/payments/retry.py",
+            "previousPath": null,
+            "status": "modified",
+            "additions": 1,
+            "deletions": 0,
+            "language": "python",
+            "patch": "@@ -20,3 +20,4 @@\n def charge(client, payload):\n+    return client.post(payload, timeout=None)\n",
+            "headContentSha256": null,
+            "sizeBytes": 900,
+            "changedNewLines": [22],
+            "hunks": [
+              {
+                "oldStart": 20,
+                "oldLineCount": 3,
+                "newStart": 20,
+                "newLineCount": 4,
+                "sectionHeader": "charge",
+                "lines": [
+                  {
+                    "type": "context",
+                    "content": "def charge(client, payload):",
+                    "oldLineNumber": 20,
+                    "newLineNumber": 20
+                  },
+                  {
+                    "type": "addition",
+                    "content": "    return client.post(payload, timeout=None)",
+                    "oldLineNumber": null,
+                    "newLineNumber": 22
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "skippedFiles": [
+          {
+            "path": "docs/large-changelog.md",
+            "previousPath": null,
+            "status": "modified",
+            "reason": "large_file",
+            "detail": "Excluded from LLM context after prioritized budget selection.",
+            "excludedFromSemgrep": true,
+            "excludedFromTreeSitter": true,
+            "excludedFromLlmContext": true
+          }
+        ]
+      },
+      "semgrepArtifact": {
+        "schemaVersion": "semgrep-artifact/v1",
+        "reviewRunId": "eval-large-pr",
+        "toolVersion": "1.99.0",
+        "exitCode": 1,
+        "durationMs": 120,
+        "findings": [
+          {
+            "id": "semgrep:python.security.jwt:src/auth/tokens.py:88",
+            "ruleId": "python.jwt.security.audit",
+            "path": "src/auth/tokens.py",
+            "start": {
+              "line": 88,
+              "column": 12,
+              "offset": 880
+            },
+            "end": {
+              "line": 88,
+              "column": 72,
+              "offset": 940
+            },
+            "severity": "high",
+            "sourceSeverity": "ERROR",
+            "message": "Do not disable JWT signature verification",
+            "fingerprint": "jwt-fingerprint",
+            "lines": "jwt.decode(token, key, options={\"verify_signature\": False})",
+            "metadata": {
+              "category": "security"
+            },
+            "fix": null
+          }
+        ],
+        "errors": [],
+        "paths": {
+          "scanned": ["src/auth/tokens.py", "src/payments/retry.py"],
+          "skipped": [
+            {
+              "path": "docs/large-changelog.md",
+              "reason": "size_limit",
+              "detail": "Skipped by large PR budget."
+            }
+          ]
+        }
+      },
+      "frozenResponse": {
+        "schemaVersion": "llm-review-output/v1",
+        "promptId": "firmcode.review.summary",
+        "promptVersion": "1.0.0",
+        "model": "frozen-review-model",
+        "summary": "Large PR mode reviewed high-risk auth and payment changes first; generated and low-risk context was skipped.",
+        "riskLevel": "high",
+        "changedComponents": ["src/auth/tokens.py", "src/payments/retry.py"],
+        "inlineFindings": [
+          {
+            "id": "large-pr-timeout-disabled",
+            "source": "llm",
+            "category": "performance",
+            "severity": "medium",
+            "confidence": 0.76,
+            "path": "src/payments/retry.py",
+            "lineRange": {
+              "startLine": 22,
+              "endLine": 22
+            },
+            "title": "Keep an outbound request timeout",
+            "body": "Removing the payment client timeout can leave worker capacity tied up indefinitely when the upstream hangs.",
+            "evidence": [
+              {
+                "source": "llm",
+                "artifactId": null,
+                "path": "src/payments/retry.py",
+                "lineRange": {
+                  "startLine": 22,
+                  "endLine": 22
+                },
+                "excerpt": "client.post(payload, timeout=None)"
+              }
+            ],
+            "suggestedFix": "Use a bounded timeout and retry policy for the payment client."
+          }
+        ],
+        "summaryFindings": [
+          {
+            "id": "large-pr-skipped-context",
+            "source": "policy",
+            "category": "maintainability",
+            "severity": "low",
+            "confidence": 0.7,
+            "path": null,
+            "lineRange": null,
+            "title": "Some low-risk files were excluded by large PR handling",
+            "body": "The review used prioritized mode and skipped the large changelog file, so reviewers should skim it manually if release notes matter.",
+            "evidence": [
+              {
+                "source": "policy",
+                "artifactId": "skipped-files:eval-large-pr",
+                "path": "docs/large-changelog.md",
+                "lineRange": null,
+                "excerpt": "Excluded from LLM context after prioritized budget selection."
+              }
+            ],
+            "suggestedFix": null
+          }
+        ],
+        "testSuggestions": ["Add an integration test covering JWT verification and payment timeout behavior."],
+        "ciExplanation": null,
+        "confidence": 0.8
+      }
+    },
+    {
+      "name": "generated-file-heavy-pr",
+      "description": "Generated-file-heavy PR that should avoid noisy inline comments.",
+      "expectations": {
+        "promptId": "firmcode.review.summary",
+        "promptVersion": "1.0.0",
+        "schemaVersion": "llm-review-output/v1",
+        "maxInlineComments": 0,
+        "maxSeverity": "low",
+        "requiredSemgrepFindingIds": []
+      },
+      "diffArtifact": {
+        "schemaVersion": "diff-artifact/v1",
+        "reviewRunId": "eval-generated",
+        "repositoryFullName": "firmcode/eval-fixtures",
+        "pullRequestNumber": 106,
+        "baseSha": "base-generated",
+        "headSha": "head-generated",
+        "files": [
+          {
+            "path": "src/api/client.ts",
+            "previousPath": null,
+            "status": "modified",
+            "additions": 1,
+            "deletions": 1,
+            "language": "typescript",
+            "patch": "@@ -3,3 +3,3 @@\n-export const API_VERSION = \"2026-04-01\";\n+export const API_VERSION = \"2026-05-01\";\n",
+            "headContentSha256": null,
+            "sizeBytes": 240,
+            "changedNewLines": [4],
+            "hunks": [
+              {
+                "oldStart": 3,
+                "oldLineCount": 3,
+                "newStart": 3,
+                "newLineCount": 3,
+                "sectionHeader": "API_VERSION",
+                "lines": [
+                  {
+                    "type": "addition",
+                    "content": "export const API_VERSION = \"2026-05-01\";",
+                    "oldLineNumber": null,
+                    "newLineNumber": 4
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "skippedFiles": [
+          {
+            "path": "src/generated/openapi-client.ts",
+            "previousPath": null,
+            "status": "modified",
+            "reason": "generated",
+            "detail": "Generated API client excluded from LLM context; source version file was reviewed instead.",
+            "excludedFromSemgrep": false,
+            "excludedFromTreeSitter": true,
+            "excludedFromLlmContext": true
+          }
+        ]
+      },
+      "semgrepArtifact": {
+        "schemaVersion": "semgrep-artifact/v1",
+        "reviewRunId": "eval-generated",
+        "toolVersion": "1.99.0",
+        "exitCode": 0,
+        "durationMs": 60,
+        "findings": [],
+        "errors": [],
+        "paths": {
+          "scanned": ["src/api/client.ts", "src/generated/openapi-client.ts"],
+          "skipped": []
+        }
+      },
+      "frozenResponse": {
+        "schemaVersion": "llm-review-output/v1",
+        "promptId": "firmcode.review.summary",
+        "promptVersion": "1.0.0",
+        "model": "frozen-review-model",
+        "summary": "The PR mostly updates generated API client output; no line-grounded issue is warranted.",
+        "riskLevel": "low",
+        "changedComponents": ["src/api/client.ts", "src/generated/openapi-client.ts"],
+        "inlineFindings": [],
+        "summaryFindings": [
+          {
+            "id": "generated-heavy-manual-contract-check",
+            "source": "policy",
+            "category": "testing",
+            "severity": "low",
+            "confidence": 0.68,
+            "path": null,
+            "lineRange": null,
+            "title": "Confirm the generated client matches the API version bump",
+            "body": "Generated client output was excluded from LLM context, so the useful check is whether the committed output came from the declared API version.",
+            "evidence": [
+              {
+                "source": "policy",
+                "artifactId": "skipped-files:eval-generated",
+                "path": "src/generated/openapi-client.ts",
+                "lineRange": null,
+                "excerpt": "Generated API client excluded from LLM context; source version file was reviewed instead."
+              }
+            ],
+            "suggestedFix": null
+          }
+        ],
+        "testSuggestions": ["Regenerate the client in CI and fail when generated files are stale."],
+        "ciExplanation": null,
+        "confidence": 0.72
+      }
+    },
+    {
+      "name": "no-issue-pr",
+      "description": "A clean small PR with no inline or summary findings.",
+      "expectations": {
+        "promptId": "firmcode.review.code",
+        "promptVersion": "1.0.0",
+        "schemaVersion": "llm-review-output/v1",
+        "maxInlineComments": 0,
+        "maxSeverity": "info",
+        "requiredSemgrepFindingIds": []
+      },
+      "diffArtifact": {
+        "schemaVersion": "diff-artifact/v1",
+        "reviewRunId": "eval-no-issue",
+        "repositoryFullName": "firmcode/eval-fixtures",
+        "pullRequestNumber": 107,
+        "baseSha": "base-no-issue",
+        "headSha": "head-no-issue",
+        "files": [
+          {
+            "path": "src/readme-links.ts",
+            "previousPath": null,
+            "status": "modified",
+            "additions": 1,
+            "deletions": 1,
+            "language": "typescript",
+            "patch": "@@ -6,4 +6,4 @@\n-export const docsUrl = \"/docs/old\";\n+export const docsUrl = \"/docs/review-runs\";\n",
+            "headContentSha256": null,
+            "sizeBytes": 120,
+            "changedNewLines": [8],
+            "hunks": [
+              {
+                "oldStart": 6,
+                "oldLineCount": 4,
+                "newStart": 6,
+                "newLineCount": 4,
+                "sectionHeader": "docsUrl",
+                "lines": [
+                  {
+                    "type": "addition",
+                    "content": "export const docsUrl = \"/docs/review-runs\";",
+                    "oldLineNumber": null,
+                    "newLineNumber": 8
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "skippedFiles": []
+      },
+      "semgrepArtifact": null,
+      "frozenResponse": {
+        "schemaVersion": "llm-review-output/v1",
+        "promptId": "firmcode.review.code",
+        "promptVersion": "1.0.0",
+        "model": "frozen-review-model",
+        "summary": "The PR updates a documentation link and does not introduce a review finding.",
+        "riskLevel": "low",
+        "changedComponents": ["src/readme-links.ts"],
+        "inlineFindings": [],
+        "summaryFindings": [],
+        "testSuggestions": ["No additional tests are needed for this link-only change."],
+        "ciExplanation": null,
+        "confidence": 0.9
+      }
+    }
+  ]
+}
