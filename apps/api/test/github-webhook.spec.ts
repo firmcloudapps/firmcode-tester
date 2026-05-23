@@ -8,12 +8,6 @@ import { createApiApplication } from "../src/main";
 import { GitHubWebhookController } from "../src/modules/webhooks/github/github-webhook.controller";
 import { GitHubWebhookService } from "../src/modules/webhooks/github/github-webhook.service";
 import type {
-  GitHubPullRequestActivityPublisher,
-  PublishPullRequestActivityResult,
-  PublishPullRequestScanningActivityInput,
-  PublishPullRequestSummaryActivityInput
-} from "../src/infrastructure/github/github-pr-activity-publisher";
-import type {
   GitHubAssociatedPullRequest,
   GitHubPushPullRequestResolver,
   ResolvePushPullRequestsInput
@@ -59,21 +53,18 @@ function signPayload(payload: Buffer, secret = WEBHOOK_SECRET): string {
 describe("GitHubWebhookService", () => {
   let store: InMemoryGitHubWebhookStore;
   let queue: InMemoryReviewQueueProducer;
-  let activityPublisher: RecordingPullRequestActivityPublisher;
   let pushPullRequestResolver: RecordingPushPullRequestResolver;
   let service: GitHubWebhookService;
 
   beforeEach(() => {
     store = new InMemoryGitHubWebhookStore();
     queue = new InMemoryReviewQueueProducer();
-    activityPublisher = new RecordingPullRequestActivityPublisher();
     pushPullRequestResolver = new RecordingPushPullRequestResolver();
     service = new GitHubWebhookService(
       WEBHOOK_SECRET,
       store,
       queue,
       createApiRuntimeConfig(API_ENV),
-      activityPublisher,
       pushPullRequestResolver
     );
   });
@@ -195,42 +186,6 @@ describe("GitHubWebhookService", () => {
       headSha,
       status: "processed"
     });
-    expect(activityPublisher.scanningActivities[0]).toMatchObject({
-      installationId: 101,
-      repositoryFullName: "openclaw/firmcode-fixture",
-      pullRequestNumber: 7,
-      reviewRunId: receipt.reviewRunId,
-      headSha,
-      triggerEvent: `pull_request.${action}`,
-      status: "queued"
-    });
-  });
-
-  it("does not fail webhook ingestion when FirmcodeAI GitHub activity publishing fails", async () => {
-    const rawBody = await readFixture("pull_request.opened.json");
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
-    activityPublisher.failWith = new Error("GitHub unavailable");
-
-    await expect(
-      service.acceptDelivery({
-        rawBody,
-        signature: signPayload(rawBody),
-        eventName: "pull_request",
-        deliveryId: "delivery-activity-failure"
-      })
-    ).resolves.toMatchObject({
-      duplicate: false,
-      ignored: false,
-      jobId: "delivery-activity-failure"
-    });
-    expect(store.reviewRuns).toHaveLength(1);
-    expect(queue.jobs.size).toBe(1);
-    expect(store.deliveries.get("delivery-activity-failure")).toMatchObject({
-      status: "processed"
-    });
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining("github.activity.publish_failed"));
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining("GitHub unavailable"));
-    warn.mockRestore();
   });
 
   it("does not create duplicate review runs or jobs for a repeated delivery ID", async () => {
@@ -372,12 +327,6 @@ describe("GitHubWebhookService", () => {
       status: "queued"
     });
     expect(queue.jobs.get("delivery-push-new-head")).toMatchObject({
-      pullRequestNumber: 7,
-      headSha: "fed456cba123",
-      triggerEvent: "push"
-    });
-    expect(activityPublisher.scanningActivities[activityPublisher.scanningActivities.length - 1]).toMatchObject({
-      repositoryFullName: "openclaw/firmcode-fixture",
       pullRequestNumber: 7,
       headSha: "fed456cba123",
       triggerEvent: "push"
@@ -540,34 +489,6 @@ describe("GitHubWebhookService", () => {
     expect(draftQueue.jobs.size).toBe(1);
   });
 });
-
-class RecordingPullRequestActivityPublisher implements GitHubPullRequestActivityPublisher {
-  readonly scanningActivities: PublishPullRequestScanningActivityInput[] = [];
-  readonly summaryActivities: PublishPullRequestSummaryActivityInput[] = [];
-  failWith: Error | null = null;
-
-  async publishScanningActivity(input: PublishPullRequestScanningActivityInput): Promise<void> {
-    this.scanningActivities.push(input);
-
-    if (this.failWith !== null) {
-      throw this.failWith;
-    }
-  }
-
-  async publishSummaryActivity(input: PublishPullRequestSummaryActivityInput): Promise<PublishPullRequestActivityResult> {
-    this.summaryActivities.push(input);
-
-    if (this.failWith !== null) {
-      throw this.failWith;
-    }
-
-    return {
-      action: "created",
-      githubCommentId: 0,
-      body: input.summaryBody
-    };
-  }
-}
 
 class RecordingPushPullRequestResolver implements GitHubPushPullRequestResolver {
   readonly calls: ResolvePushPullRequestsInput[] = [];

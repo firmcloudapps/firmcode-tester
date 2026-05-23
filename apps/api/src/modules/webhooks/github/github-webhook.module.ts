@@ -8,11 +8,6 @@ import {
   NoopGitHubPushPullRequestResolver
 } from "../../../infrastructure/github/github-push-pr-resolver";
 import {
-  GITHUB_PR_ACTIVITY_PUBLISHER,
-  GitHubAppPullRequestActivityPublisher,
-  NoopGitHubPullRequestActivityPublisher
-} from "../../../infrastructure/github/github-pr-activity-publisher";
-import {
   GITHUB_PR_REVIEW_PUBLISHER,
   GitHubAppPullRequestReviewPublisher,
   NoopGitHubPullRequestReviewPublisher,
@@ -53,22 +48,6 @@ import { PostgresGitHubWebhookStore } from "./postgres-github-webhook.store";
             ssl: config.database.ssl ? { rejectUnauthorized: false } : false
           })
         );
-      },
-      inject: [API_RUNTIME_CONFIG]
-    },
-    {
-      provide: GITHUB_PR_ACTIVITY_PUBLISHER,
-      useFactory: (config: ApiRuntimeConfig) => {
-        if (config.nodeEnv === "test") {
-          return new NoopGitHubPullRequestActivityPublisher();
-        }
-
-        const pool = new Pool({
-          connectionString: config.database.url,
-          ssl: config.database.ssl ? { rejectUnauthorized: false } : false
-        });
-
-        return GitHubAppPullRequestActivityPublisher.fromConfig(config, new PostgresPublishedCommentStore(pool));
       },
       inject: [API_RUNTIME_CONFIG]
     },
