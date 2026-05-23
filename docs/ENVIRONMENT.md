@@ -106,6 +106,7 @@ Clerk owns sign-in, sign-up, sessions, user profile, organizations where enabled
 | `SEMGREP_SCAN_TEMP_DIR` | no | Base directory for isolated changed-file scan workspaces. Defaults to the system temp directory under `firmcode-semgrep`. |
 | `SEMGREP_STARTUP_TIMEOUT_SECONDS` | no | Worker startup timeout for `semgrep --version`. Defaults to `20`; Docker images set `30` to allow first-start CLI warmup. |
 | `SEMGREP_STARTUP_VERSION_CHECK` | no | Whether worker startup should execute `semgrep --version`. Defaults to `false`; startup normally verifies the executable exists and leaves full CLI execution to scan jobs. |
+| `SEMGREP_SEND_METRICS` | no | Set to `off` in Docker images and production Compose so Semgrep startup and scans do not attempt metrics reporting. |
 
 ## Tree-sitter
 
