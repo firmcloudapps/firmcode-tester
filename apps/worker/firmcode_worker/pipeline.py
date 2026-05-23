@@ -1131,8 +1131,6 @@ def render_summary_comment(
 ) -> str:
     semgrep_findings = _read_list(semgrep_artifact.get("findings"))
     semgrep_errors = _read_list(semgrep_artifact.get("errors"))
-    semgrep_scanned_paths = _semgrep_scanned_paths(semgrep_artifact)
-    semgrep_skipped_paths = _semgrep_skipped_paths(semgrep_artifact)
     tree_files = _read_list(tree_sitter_artifact.get("files"))
     parsed_count = _tree_sitter_parsed_count(tree_sitter_artifact)
     partial_count = sum(1 for file in tree_files if _read_str(_read_object(file).get("parseStatus"), "") == "partial")
@@ -1143,16 +1141,6 @@ def render_summary_comment(
         finding_lines = ["No actionable issues were found in the selected changed files."]
     suggestions = _test_suggestions(changed_files, semgrep_findings)
     review_lines = [f"- {line}" for line in finding_lines]
-    coverage_lines = [
-        f"- Files scanned by automated checks: {len(semgrep_scanned_paths)}",
-        f"- Files skipped by automated checks: {len(semgrep_skipped_paths)}",
-        f"- Check errors: {len(semgrep_errors)}",
-        f"- Inline code comments posted: {inline_comment_count}",
-        f"- Files parsed for code context: {parsed_count}",
-        *(_render_scan_path_block("Scanned paths", semgrep_scanned_paths) if semgrep_scanned_paths else []),
-        *(_render_scan_path_block("Skipped paths", _format_semgrep_skipped_paths(semgrep_skipped_paths)) if semgrep_skipped_paths else []),
-        *(_render_semgrep_error_block(semgrep_errors) if semgrep_errors else []),
-    ]
 
     return "\n".join(
         [
@@ -1161,9 +1149,7 @@ def render_summary_comment(
             "## FirmcodeAI Summary",
             "",
             (
-                f"FirmcodeAI reviewed {len(changed_files)} changed file(s), skipped "
-                f"{len(skipped_files)} file(s), and posted {inline_comment_count} inline code comment(s). "
-                f"Automated checks reported {len(semgrep_findings)} actionable finding(s)."
+                f"FirmcodeAI reviewed this PR and found {len(semgrep_findings)} actionable issue(s)."
             ),
             "",
             "### Code Review",
@@ -1172,21 +1158,7 @@ def render_summary_comment(
             "",
             *_details_section("Risk", [f"- Level: {risk_level}"]),
             *_details_section("Changed Components", [f"- {component}" for component in (components or ["No supported changed files were selected."])]),
-            *_details_section("Analysis Coverage", coverage_lines),
             *_details_section("Suggested Tests", [f"- {suggestion}" for suggestion in suggestions]),
-            *_details_section(
-                "Review Activity",
-                [
-                    f"- Repository: `{context.repository_full_name}`",
-                    f"- Pull request: #{context.pull_request_number}",
-                    f"- Trigger: `{payload.trigger_event}`",
-                    f"- Head SHA: `{context.head_sha[:12]}`",
-                    f"- Review run: `{payload.review_run_id}`",
-                    f"- Files selected: {len(changed_files)}",
-                    f"- Files skipped: {len(skipped_files)}",
-                    f"- Check errors: {len(semgrep_errors)}",
-                ],
-            ),
             "<sub>FirmcodeAI grounds this summary in changed files and automated review evidence.</sub>",
         ]
     )
@@ -1212,31 +1184,9 @@ def render_scanning_progress_comment(
         "completed": "FirmcodeAI finished analysis for this PR.",
         "failed": "FirmcodeAI could not finish analysis for this PR.",
     }.get(status, "FirmcodeAI is processing this PR.")
-    activity_lines = [
-        "- Webhook accepted",
-        "- Review job picked up by worker",
-        f"- Current phase: {phase}",
-    ]
-    if selected_file_count is not None:
-        activity_lines.append(f"- Files selected for processing: {selected_file_count}")
-    else:
-        activity_lines.append("- Files selected for processing: pending")
-    if skipped_file_count is not None:
-        activity_lines.append(f"- Skipped files: {skipped_file_count}")
-    else:
-        activity_lines.append("- Skipped files: pending")
-    if semgrep_finding_count is not None:
-        activity_lines.append(f"- Findings so far: {semgrep_finding_count}")
-    if semgrep_scanned_count is not None:
-        activity_lines.append(f"- Files checked: {semgrep_scanned_count}")
-    if semgrep_error_count is not None:
-        activity_lines.append(f"- Check errors: {semgrep_error_count}")
-    if tree_sitter_parsed_count is not None:
-        activity_lines.append(f"- Files parsed for code context: {tree_sitter_parsed_count}")
-    if inline_comment_count is not None:
-        activity_lines.append(f"- Inline code comments posted: {inline_comment_count}")
-    if error_message:
-        activity_lines.append(f"- Failure: {_public_message(_single_line(error_message))[:300]}")
+    progress_lines = [f"- Status: `{status}`"]
+    if status == "failed" and error_message:
+        progress_lines.append("- Result: Analysis could not finish. Please retry after checking the service logs.")
 
     return "\n".join(
         [
@@ -1249,26 +1199,7 @@ def render_scanning_progress_comment(
             "",
             "### Progress",
             "",
-            f"- Status: `{status}`",
-            f"- Phase: `{phase}`",
-            "",
-            "<details>",
-            "<summary>Run configuration</summary>",
-            "",
-            f"- Repository: `{context.repository_full_name}`",
-            f"- Pull request: #{context.pull_request_number}",
-            f"- Trigger: `{payload.trigger_event}`",
-            f"- Head SHA: `{context.head_sha[:12]}`",
-            f"- Review run: `{payload.review_run_id}`",
-            "",
-            "</details>",
-            "",
-            "<details>",
-            "<summary>Processing details</summary>",
-            "",
-            *activity_lines,
-            "",
-            "</details>",
+            *progress_lines,
             "",
             "<sub>This comment is updated by the worker as analysis progresses.</sub>",
         ]
