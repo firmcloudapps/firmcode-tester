@@ -1,6 +1,7 @@
 import React from "react";
 import type { RepositoryListResponse } from "@firmcode/shared";
 import type { ViewState } from "../../lib/view-state";
+import { RepositoryAutomationToggle } from "./repository-automation-toggle";
 import { BooleanBadge, StatusBadge } from "./status-badge";
 import { formatDateTime, shortSha } from "./format";
 
@@ -132,7 +133,10 @@ function RepositoryTable({ data }: { data: RepositoryListResponse }) {
                 <td className="px-4 py-3 font-mono text-xs text-primary">{repository.defaultBranch}</td>
                 <td className="px-4 py-3 text-primary">{repository.private ? "Private" : "Public"}</td>
                 <td className="px-4 py-3">
-                  <BooleanBadge enabled={repository.enabled} />
+                  <div className="space-y-2">
+                    <BooleanBadge enabled={repository.enabled} />
+                    <RepositoryAutomationToggle repositoryId={repository.id} initialEnabled={repository.enabled} />
+                  </div>
                 </td>
                 <td className="px-4 py-3">
                   {repository.lastReview === null ? (
@@ -154,9 +158,6 @@ function RepositoryTable({ data }: { data: RepositoryListResponse }) {
                 <td className="px-4 py-3 font-mono text-sm text-primary">{repository.openFindingsCount}</td>
                 <td className="px-4 py-3">
                   <div className="flex flex-wrap gap-2">
-                    <button className="rounded-md border border-border px-2 py-1 text-xs font-medium text-primary" type="button">
-                      {repository.enabled ? "Disable" : "Enable"}
-                    </button>
                     <a className="rounded-md border border-border px-2 py-1 text-xs font-medium text-primary" href={`/repositories/${repository.id}`}>
                       Configure
                     </a>

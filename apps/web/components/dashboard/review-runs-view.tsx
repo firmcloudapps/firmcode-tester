@@ -2,6 +2,7 @@ import React from "react";
 import type { ReviewRunListResponse } from "@firmcode/shared";
 import type { ViewState } from "../../lib/view-state";
 import { formatDateTime, formatDuration, shortSha } from "./format";
+import { RetryReviewRunButton } from "./retry-review-run-button";
 import { StatusBadge } from "./status-badge";
 
 interface ReviewRunsViewProps {
@@ -133,6 +134,7 @@ function ReviewRunTable({ data }: { data: ReviewRunListResponse }) {
               <th className="px-4 py-3">Findings</th>
               <th className="px-4 py-3">Comments</th>
               <th className="px-4 py-3">Started</th>
+              <th className="px-4 py-3">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -159,6 +161,9 @@ function ReviewRunTable({ data }: { data: ReviewRunListResponse }) {
                 <td className="px-4 py-3 font-mono text-sm text-primary">{run.findingsCount}</td>
                 <td className="px-4 py-3 font-mono text-sm text-primary">{run.commentsPostedCount}</td>
                 <td className="px-4 py-3 text-secondary">{formatDateTime(run.startedAt ?? run.createdAt)}</td>
+                <td className="px-4 py-3">
+                  <RetryReviewRunButton compact reviewRunId={run.id} status={run.status} />
+                </td>
               </tr>
             ))}
           </tbody>
