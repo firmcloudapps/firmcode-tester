@@ -18,13 +18,14 @@ import {
   NoopGitHubPullRequestReviewPublisher,
   PostgresPublishedCommentStore
 } from "../../../infrastructure/github/github-pr-review-publisher";
-import { BullMqReviewQueueProducer, InMemoryReviewQueueProducer, REVIEW_QUEUE } from "../../queues/review-queue";
+import { ReviewQueueModule } from "../../queues/review-queue.module";
 import { GitHubWebhookController } from "./github-webhook.controller";
 import { GITHUB_WEBHOOK_SECRET, GitHubWebhookService } from "./github-webhook.service";
 import { GITHUB_WEBHOOK_STORE, InMemoryGitHubWebhookStore } from "./github-webhook.store";
 import { PostgresGitHubWebhookStore } from "./postgres-github-webhook.store";
 
 @Module({
+  imports: [ReviewQueueModule],
   controllers: [GitHubWebhookController],
   providers: [
     apiRuntimeConfigProvider,
@@ -52,17 +53,6 @@ import { PostgresGitHubWebhookStore } from "./postgres-github-webhook.store";
             ssl: config.database.ssl ? { rejectUnauthorized: false } : false
           })
         );
-      },
-      inject: [API_RUNTIME_CONFIG]
-    },
-    {
-      provide: REVIEW_QUEUE,
-      useFactory: (config: ApiRuntimeConfig) => {
-        if (config.nodeEnv === "test") {
-          return new InMemoryReviewQueueProducer();
-        }
-
-        return new BullMqReviewQueueProducer(config.queue.redisUrl);
       },
       inject: [API_RUNTIME_CONFIG]
     },

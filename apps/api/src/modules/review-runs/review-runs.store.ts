@@ -13,19 +13,58 @@ import type {
   ReviewRunListFilters,
   ReviewRunListItem,
   ReviewRunListResponse,
+  ReviewRunRetryReason,
   ReviewRunLogExcerpt,
   ReviewRunPublishedComment,
   ReviewRunRiskLevel,
   ReviewRunStatus
 } from "@firmcode/shared";
 import type { DatabaseExecutor } from "../../infrastructure/database/migrations";
+import { randomUUID } from "crypto";
 
 export const REVIEW_RUNS_STORE = Symbol("REVIEW_RUNS_STORE");
 
 export interface ReviewRunsStore {
   listReviewRuns(filters: ReviewRunListFilters): Promise<ReviewRunListResponse>;
   getReviewRunDetail(reviewRunId: string): Promise<ReviewRunDetail | null>;
+  createRetryReviewRun(input: CreateRetryReviewRunInput): Promise<ReviewRunRetryCreateResult>;
+  markRetryJobQueued(input: MarkRetryJobQueuedInput): Promise<void>;
 }
+
+export interface CreateRetryReviewRunInput {
+  readonly reviewRunId: string;
+  readonly workspaceId: string;
+  readonly clerkUserId: string;
+}
+
+export interface MarkRetryJobQueuedInput {
+  readonly originalReviewRunId: string;
+  readonly retryJobId: string;
+}
+
+export interface ReviewRunRetryCreation {
+  readonly created: boolean;
+  readonly retryRunId: string;
+  readonly retryDeliveryId: string;
+  readonly retryJobId: string | null;
+  readonly repositoryId: string;
+  readonly pullRequestId: string;
+  readonly pullRequestNumber: number;
+  readonly headSha: string;
+  readonly triggerEvent: string;
+  readonly status: ReviewRunStatus;
+}
+
+export type ReviewRunRetryCreateResult =
+  | { readonly kind: "created"; readonly created: true } & ReviewRunRetryCreation
+  | { readonly kind: "existing"; readonly created: false } & ReviewRunRetryCreation
+  | {
+      readonly kind: "not_retryable";
+      readonly status: ReviewRunStatus;
+      readonly reason: Exclude<ReviewRunRetryReason, "retry_queued" | "duplicate_retry">;
+      readonly message: string;
+    }
+  | { readonly kind: "not_found" };
 
 interface ReviewRunRow {
   readonly id: string;
@@ -49,6 +88,27 @@ interface ReviewRunRow {
 
 interface ReviewRunIdRow {
   readonly review_run_id: string;
+}
+
+interface RetryableReviewRunRow {
+  readonly id: string;
+  readonly repository_id: string;
+  readonly pull_request_id: string;
+  readonly delivery_id: string;
+  readonly trigger_event: string;
+  readonly head_sha: string;
+  readonly status: ReviewRunStatus;
+  readonly error_code: string | null;
+  readonly github_repository_id: string | number;
+  readonly installation_id: string | number;
+  readonly pull_request_number: number;
+}
+
+interface ReviewRunRetryRow {
+  readonly retry_review_run_id: string;
+  readonly retry_delivery_id: string;
+  readonly retry_job_id: string | null;
+  readonly retry_status: ReviewRunStatus;
 }
 
 interface ChangedFileRow {
@@ -112,10 +172,21 @@ export class EmptyReviewRunsStore implements ReviewRunsStore {
   async getReviewRunDetail(_reviewRunId: string): Promise<ReviewRunDetail | null> {
     return null;
   }
+
+  async createRetryReviewRun(_input: CreateRetryReviewRunInput): Promise<ReviewRunRetryCreateResult> {
+    return { kind: "not_found" };
+  }
+
+  async markRetryJobQueued(_input: MarkRetryJobQueuedInput): Promise<void> {
+    return undefined;
+  }
 }
 
 export class PostgresReviewRunsStore implements ReviewRunsStore {
-  constructor(private readonly database: DatabaseExecutor) {}
+  constructor(
+    private readonly database: DatabaseExecutor,
+    private readonly createId: () => string = randomUUID
+  ) {}
 
   async listReviewRuns(filters: ReviewRunListFilters): Promise<ReviewRunListResponse> {
     const { whereSql, values } = buildReviewRunListWhereClause(filters);
@@ -329,6 +400,183 @@ ORDER BY created_at ASC,
     };
   }
 
+  async createRetryReviewRun(input: CreateRetryReviewRunInput): Promise<ReviewRunRetryCreateResult> {
+    await this.database.query("BEGIN");
+
+    try {
+      const existingRetry = await this.loadExistingRetry(input.reviewRunId);
+
+      if (existingRetry !== null) {
+        const original = await this.loadRetryableReviewRun(input.reviewRunId, input.workspaceId);
+
+        await this.database.query("COMMIT");
+
+        if (original === null) {
+          return { kind: "not_found" };
+        }
+
+        return {
+          kind: "existing",
+          created: false,
+          retryRunId: existingRetry.retry_review_run_id,
+          retryDeliveryId: existingRetry.retry_delivery_id,
+          retryJobId: existingRetry.retry_job_id,
+          repositoryId: original.repository_id,
+          pullRequestId: original.pull_request_id,
+          pullRequestNumber: original.pull_request_number,
+          headSha: original.head_sha,
+          triggerEvent: "dashboard.retry",
+          status: existingRetry.retry_status
+        };
+      }
+
+      const original = await this.loadRetryableReviewRun(input.reviewRunId, input.workspaceId);
+
+      if (original === null) {
+        await this.database.query("COMMIT");
+        return { kind: "not_found" };
+      }
+
+      const retryability = getRetryability(original);
+
+      if (!retryability.retryable) {
+        await this.database.query("COMMIT");
+        return retryability.result;
+      }
+
+      const retryDeliveryId = `retry:${original.id}`;
+      const retryRunId = this.createId();
+      const retryStateId = this.createId();
+
+      await this.database.query(
+        `
+INSERT INTO github_deliveries (
+  delivery_id,
+  event_name,
+  action,
+  installation_id,
+  repository_id,
+  pull_request_number,
+  head_sha,
+  processed_at,
+  status
+) VALUES ($1, 'dashboard', 'retry', $2, $3, $4, $5, now(), 'processed')
+`,
+        [
+          retryDeliveryId,
+          Number(original.installation_id),
+          Number(original.github_repository_id),
+          original.pull_request_number,
+          original.head_sha
+        ]
+      );
+
+      await this.database.query(
+        `
+INSERT INTO review_runs (
+  id,
+  repository_id,
+  pull_request_id,
+  delivery_id,
+  trigger_event,
+  head_sha,
+  status
+) VALUES ($1, $2, $3, $4, 'dashboard.retry', $5, 'queued')
+`,
+        [retryRunId, original.repository_id, original.pull_request_id, retryDeliveryId, original.head_sha]
+      );
+
+      await this.database.query(
+        `
+INSERT INTO review_run_retries (
+  id,
+  original_review_run_id,
+  retry_review_run_id,
+  retry_delivery_id,
+  created_by_clerk_user_id
+) VALUES ($1, $2, $3, $4, $5)
+`,
+        [retryStateId, original.id, retryRunId, retryDeliveryId, input.clerkUserId]
+      );
+
+      await this.database.query("COMMIT");
+
+      return {
+        kind: "created",
+        created: true,
+        retryRunId,
+        retryDeliveryId,
+        retryJobId: null,
+        repositoryId: original.repository_id,
+        pullRequestId: original.pull_request_id,
+        pullRequestNumber: original.pull_request_number,
+        headSha: original.head_sha,
+        triggerEvent: "dashboard.retry",
+        status: "queued"
+      };
+    } catch (error) {
+      await this.database.query("ROLLBACK");
+      throw error;
+    }
+  }
+
+  async markRetryJobQueued(input: MarkRetryJobQueuedInput): Promise<void> {
+    await this.database.query(
+      `
+UPDATE review_run_retries
+SET retry_job_id = $2
+WHERE original_review_run_id = $1
+`,
+      [input.originalReviewRunId, input.retryJobId]
+    );
+  }
+
+  private async loadRetryableReviewRun(reviewRunId: string, workspaceId: string): Promise<RetryableReviewRunRow | null> {
+    const result = await this.database.query<RetryableReviewRunRow>(
+      `
+SELECT
+  rr.id,
+  rr.repository_id,
+  rr.pull_request_id,
+  rr.delivery_id,
+  rr.trigger_event,
+  rr.head_sha,
+  rr.status,
+  rr.error_code,
+  r.github_repository_id,
+  gi.installation_id,
+  pr.number AS pull_request_number
+FROM review_runs rr
+JOIN repositories r ON r.id = rr.repository_id
+JOIN github_installations gi ON gi.id = r.installation_id
+JOIN pull_requests pr ON pr.id = rr.pull_request_id
+WHERE rr.id = $1
+  AND gi.workspace_id = $2
+`,
+      [reviewRunId, workspaceId]
+    );
+
+    return result.rows[0] ?? null;
+  }
+
+  private async loadExistingRetry(reviewRunId: string): Promise<ReviewRunRetryRow | null> {
+    const result = await this.database.query<ReviewRunRetryRow>(
+      `
+SELECT
+  rrr.retry_review_run_id,
+  rrr.retry_delivery_id,
+  rrr.retry_job_id,
+  rr.status AS retry_status
+FROM review_run_retries rrr
+JOIN review_runs rr ON rr.id = rrr.retry_review_run_id
+WHERE rrr.original_review_run_id = $1
+`,
+      [reviewRunId]
+    );
+
+    return result.rows[0] ?? null;
+  }
+
   private async loadReviewRunCounts(): Promise<Map<string, ReviewRunCounts>> {
     const [findings, comments, changedFiles] = await Promise.all([
       this.database.query<ReviewRunIdRow>("SELECT review_run_id FROM findings"),
@@ -351,6 +599,49 @@ ORDER BY created_at ASC,
 
     return counts;
   }
+}
+
+const DETERMINISTIC_VALIDATION_ERROR_CODES = new Set([
+  "invalid_job_payload",
+  "unsupported_job_name",
+  "github_response_invalid",
+  "review_context_not_found",
+  "missing_worker_env"
+]);
+
+function getRetryability(
+  row: RetryableReviewRunRow
+):
+  | { retryable: true }
+  | {
+      retryable: false;
+      result: Extract<ReviewRunRetryCreateResult, { kind: "not_retryable" }>;
+    } {
+  if (row.status !== "failed") {
+    return {
+      retryable: false,
+      result: {
+        kind: "not_retryable",
+        status: row.status,
+        reason: "run_not_failed",
+        message: `Only failed review runs can be retried. Current status is ${row.status}.`
+      }
+    };
+  }
+
+  if (row.error_code !== null && DETERMINISTIC_VALIDATION_ERROR_CODES.has(row.error_code)) {
+    return {
+      retryable: false,
+      result: {
+        kind: "not_retryable",
+        status: row.status,
+        reason: "deterministic_validation_failure",
+        message: `Review run failed with ${row.error_code}; fix the validation or configuration issue before retrying.`
+      }
+    };
+  }
+
+  return { retryable: true };
 }
 
 function buildReviewRunListWhereClause(filters: ReviewRunListFilters): { whereSql: string; values: unknown[] } {

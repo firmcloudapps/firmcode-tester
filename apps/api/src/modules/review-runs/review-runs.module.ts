@@ -2,10 +2,18 @@ import { Module } from "@nestjs/common";
 import { Pool } from "pg";
 import type { ApiRuntimeConfig } from "@firmcode/shared";
 import { API_RUNTIME_CONFIG, apiRuntimeConfigProvider } from "../../config/api-config.provider";
+import { ReviewQueueModule } from "../queues/review-queue.module";
+import {
+  DASHBOARD_AUTH_STORE,
+  EmptyDashboardAuthStore,
+  PostgresDashboardAuthStore
+} from "./dashboard-auth.store";
+import { ReviewRunRetryService } from "./review-run-retry.service";
 import { ReviewRunsController } from "./review-runs.controller";
 import { EmptyReviewRunsStore, PostgresReviewRunsStore, REVIEW_RUNS_STORE } from "./review-runs.store";
 
 @Module({
+  imports: [ReviewQueueModule],
   controllers: [ReviewRunsController],
   providers: [
     apiRuntimeConfigProvider,
@@ -24,7 +32,24 @@ import { EmptyReviewRunsStore, PostgresReviewRunsStore, REVIEW_RUNS_STORE } from
         );
       },
       inject: [API_RUNTIME_CONFIG]
-    }
+    },
+    {
+      provide: DASHBOARD_AUTH_STORE,
+      useFactory: (config: ApiRuntimeConfig) => {
+        if (config.nodeEnv === "test") {
+          return new EmptyDashboardAuthStore();
+        }
+
+        return new PostgresDashboardAuthStore(
+          new Pool({
+            connectionString: config.database.url,
+            ssl: config.database.ssl ? { rejectUnauthorized: false } : false
+          })
+        );
+      },
+      inject: [API_RUNTIME_CONFIG]
+    },
+    ReviewRunRetryService
   ]
 })
 export class ReviewRunsModule {}

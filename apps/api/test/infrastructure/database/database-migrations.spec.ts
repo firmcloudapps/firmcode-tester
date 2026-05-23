@@ -16,8 +16,11 @@ const EXPECTED_TABLES = [
   "published_comments",
   "pull_requests",
   "repositories",
+  "review_run_retries",
   "review_runs",
-  "schema_migrations"
+  "schema_migrations",
+  "workspace_memberships",
+  "workspaces"
 ];
 
 function createTestPool(): PgPoolLike {
@@ -152,10 +155,18 @@ ORDER BY table_name
     );
     const applied = await pool.query<{ id: string }>("SELECT id FROM schema_migrations ORDER BY id");
 
-    expect(appliedMigrationIds).toEqual(["001_initial_review_schema", "002_dry_run_published_comments"]);
+    expect(appliedMigrationIds).toEqual([
+      "001_initial_review_schema",
+      "002_dry_run_published_comments",
+      "003_dashboard_auth_retry_state"
+    ]);
     expect(secondRunMigrationIds).toEqual([]);
     expect(tables.rows.map((row) => row.table_name)).toEqual(EXPECTED_TABLES);
-    expect(applied.rows).toEqual([{ id: "001_initial_review_schema" }, { id: "002_dry_run_published_comments" }]);
+    expect(applied.rows).toEqual([
+      { id: "001_initial_review_schema" },
+      { id: "002_dry_run_published_comments" },
+      { id: "003_dashboard_auth_retry_state" }
+    ]);
   });
 
   it("stores dry-run comment bodies for dashboard inspection", async () => {

@@ -80,6 +80,21 @@ export interface ReviewRunListResponse {
   filters: ReviewRunListFilters;
 }
 
+export type ReviewRunRetryReason =
+  | "retry_queued"
+  | "duplicate_retry"
+  | "run_not_failed"
+  | "deterministic_validation_failure";
+
+export interface ReviewRunRetryResponse {
+  originalRunId: string;
+  retryRunId: string | null;
+  retryJobId: string | null;
+  status: ReviewRunStatus;
+  reason: ReviewRunRetryReason;
+  message: string;
+}
+
 export interface ReviewRunPublishedComment {
   id: string;
   commentType: "summary" | "inline" | "review";
