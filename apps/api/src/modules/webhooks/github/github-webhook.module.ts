@@ -12,6 +12,12 @@ import {
   GitHubAppPullRequestActivityPublisher,
   NoopGitHubPullRequestActivityPublisher
 } from "../../../infrastructure/github/github-pr-activity-publisher";
+import {
+  GITHUB_PR_REVIEW_PUBLISHER,
+  GitHubAppPullRequestReviewPublisher,
+  NoopGitHubPullRequestReviewPublisher,
+  PostgresPublishedCommentStore
+} from "../../../infrastructure/github/github-pr-review-publisher";
 import { BullMqReviewQueueProducer, InMemoryReviewQueueProducer, REVIEW_QUEUE } from "../../queues/review-queue";
 import { GitHubWebhookController } from "./github-webhook.controller";
 import { GITHUB_WEBHOOK_SECRET, GitHubWebhookService } from "./github-webhook.service";
@@ -68,6 +74,22 @@ import { PostgresGitHubWebhookStore } from "./postgres-github-webhook.store";
         }
 
         return GitHubAppPullRequestActivityPublisher.fromConfig(config);
+      },
+      inject: [API_RUNTIME_CONFIG]
+    },
+    {
+      provide: GITHUB_PR_REVIEW_PUBLISHER,
+      useFactory: (config: ApiRuntimeConfig) => {
+        if (config.nodeEnv === "test") {
+          return new NoopGitHubPullRequestReviewPublisher();
+        }
+
+        const pool = new Pool({
+          connectionString: config.database.url,
+          ssl: config.database.ssl ? { rejectUnauthorized: false } : false
+        });
+
+        return GitHubAppPullRequestReviewPublisher.fromConfig(config, new PostgresPublishedCommentStore(pool));
       },
       inject: [API_RUNTIME_CONFIG]
     },
