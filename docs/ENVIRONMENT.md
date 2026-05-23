@@ -104,6 +104,7 @@ Clerk owns sign-in, sign-up, sessions, user profile, organizations where enabled
 | `SEMGREP_CONFIGS` | no | Comma-separated configs. Default includes `auto` and local infra rules. |
 | `SEMGREP_MAX_TARGET_BYTES` | no | Per-file scan size limit. |
 | `SEMGREP_SCAN_TEMP_DIR` | no | Base directory for isolated changed-file scan workspaces. Defaults to the system temp directory under `firmcode-semgrep`. |
+| `SEMGREP_STARTUP_TIMEOUT_SECONDS` | no | Worker startup timeout for `semgrep --version`. Defaults to `20`; Docker images set `30` to allow first-start CLI warmup. |
 
 ## Tree-sitter
 

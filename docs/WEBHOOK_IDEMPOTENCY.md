@@ -34,6 +34,12 @@ When a new `pull_request.synchronize` event arrives:
 - Cancel or mark superseded queued/running review runs for older SHAs when safe.
 - Never publish comments from a superseded run unless it completed before supersession and still targets the same head SHA.
 
+## Push Fallback Behavior
+
+When a `push` event arrives for a branch, Firmcode resolves open pull requests associated with the pushed `after` SHA through GitHub's commit-to-pull-requests API. If an open PR is found, the API creates the same review run, queue job, supersession, and activity comment flow as a `pull_request.synchronize` event. Deleted refs, tag pushes, and branch pushes without an associated open PR are accepted and marked ignored.
+
+The current review-run schema has one review run per GitHub delivery ID, so a push delivery processes the first open associated PR whose head SHA matches the pushed SHA.
+
 ## Event Ordering
 
 Use `head_sha` as the review identity. Before publishing:
@@ -45,6 +51,7 @@ Use `head_sha` as the review identity. Before publishing:
 
 Initial supported events:
 
+- `push`
 - `pull_request.opened`
 - `pull_request.synchronize`
 - `pull_request.reopened`
@@ -69,4 +76,3 @@ Tests should cover:
 - unsupported event
 - invalid signature
 - missing installation
-

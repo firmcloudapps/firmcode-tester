@@ -21,6 +21,8 @@ class WorkerRuntimeConfig:
     redis_url: str
     queue_name: str
     log_level: str
+    semgrep_executable: str
+    semgrep_startup_timeout_seconds: float
 
 
 @dataclass(frozen=True)
@@ -44,6 +46,8 @@ def load_worker_config(env: Mapping[str, str] = os.environ) -> WorkerRuntimeConf
         redis_url=redis_url,
         queue_name=env.get("REVIEW_QUEUE_NAME", REVIEW_QUEUE_NAME),
         log_level=env.get("LOG_LEVEL", "info"),
+        semgrep_executable=env.get("SEMGREP_EXECUTABLE", "semgrep").strip() or "semgrep",
+        semgrep_startup_timeout_seconds=_read_positive_float(env, "SEMGREP_STARTUP_TIMEOUT_SECONDS", 20.0),
     )
 
 
@@ -51,7 +55,7 @@ def run_startup_checks(config: WorkerRuntimeConfig) -> list[DependencyCheck]:
     return [
         _check_tcp_url("database", config.database_url, 5432),
         _check_tcp_url("redis", config.redis_url, 6379),
-        _check_semgrep(),
+        _check_semgrep(config),
         _check_tree_sitter(),
     ]
 
@@ -104,6 +108,22 @@ def _read_required(env: Mapping[str, str], name: str) -> str:
     return value
 
 
+def _read_positive_float(env: Mapping[str, str], name: str, default: float) -> float:
+    raw_value = env.get(name, "").strip()
+    if not raw_value:
+        return default
+
+    try:
+        value = float(raw_value)
+    except ValueError as error:
+        raise ValueError(f"{name} must be a positive number") from error
+
+    if value <= 0:
+        raise ValueError(f"{name} must be a positive number")
+
+    return value
+
+
 def _validate_url(value: str, schemes: tuple[str, ...], name: str) -> None:
     parsed = urlparse(value)
     if parsed.scheme not in schemes or not parsed.hostname:
@@ -125,14 +145,14 @@ def _check_tcp_url(name: str, raw_url: str, default_port: int) -> DependencyChec
         return DependencyCheck(name=name, status="unavailable", host=host, port=port, error=error.__class__.__name__)
 
 
-def _check_semgrep() -> DependencyCheck:
+def _check_semgrep(config: WorkerRuntimeConfig) -> DependencyCheck:
     try:
         subprocess.run(
-            ["semgrep", "--version"],
+            [config.semgrep_executable, "--version"],
             check=True,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
-            timeout=5,
+            timeout=config.semgrep_startup_timeout_seconds,
         )
         return DependencyCheck(name="semgrep", status="ok")
     except (OSError, subprocess.SubprocessError) as error:

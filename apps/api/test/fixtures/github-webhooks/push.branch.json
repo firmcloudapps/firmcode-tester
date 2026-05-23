@@ -1,0 +1,31 @@
+{
+  "ref": "refs/heads/feature/webhooks",
+  "before": "abc123def456",
+  "after": "fed456cba123",
+  "deleted": false,
+  "installation": {
+    "id": 101,
+    "account": {
+      "login": "openclaw",
+      "type": "Organization"
+    },
+    "permissions": {
+      "contents": "read",
+      "pull_requests": "write"
+    }
+  },
+  "repository": {
+    "id": 202,
+    "name": "firmcode-fixture",
+    "full_name": "openclaw/firmcode-fixture",
+    "private": true,
+    "default_branch": "main",
+    "owner": {
+      "login": "openclaw",
+      "type": "Organization"
+    }
+  },
+  "sender": {
+    "login": "octocat"
+  }
+}
