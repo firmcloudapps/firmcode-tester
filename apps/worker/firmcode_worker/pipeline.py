@@ -1131,16 +1131,12 @@ def render_summary_comment(
 ) -> str:
     semgrep_findings = _read_list(semgrep_artifact.get("findings"))
     semgrep_errors = _read_list(semgrep_artifact.get("errors"))
-    tree_files = _read_list(tree_sitter_artifact.get("files"))
-    parsed_count = _tree_sitter_parsed_count(tree_sitter_artifact)
-    partial_count = sum(1 for file in tree_files if _read_str(_read_object(file).get("parseStatus"), "") == "partial")
     risk_level = _risk_level(semgrep_findings, semgrep_errors)
     components = _changed_components(changed_files)
-    finding_lines = [_render_semgrep_finding(finding) for finding in semgrep_findings[:8]]
-    if not finding_lines:
-        finding_lines = ["No actionable issues were found in the selected changed files."]
+    review_blocks = [_render_summary_semgrep_finding(finding) for finding in semgrep_findings[:8]]
+    if not review_blocks:
+        review_blocks = ["No actionable issues were found in the selected changed files."]
     suggestions = _test_suggestions(changed_files, semgrep_findings)
-    review_lines = [f"- {line}" for line in finding_lines]
 
     return "\n".join(
         [
@@ -1154,7 +1150,7 @@ def render_summary_comment(
             "",
             "### Code Review",
             "",
-            *review_lines,
+            *review_blocks,
             "",
             *_details_section("Risk", [f"- Level: {risk_level}"]),
             *_details_section("Changed Components", [f"- {component}" for component in (components or ["No supported changed files were selected."])]),
@@ -1434,14 +1430,27 @@ def _details_section(title: str, lines: Sequence[str]) -> list[str]:
     return ["<details>", f"<summary>{title}</summary>", "", *content, "", "</details>", ""]
 
 
-def _render_semgrep_finding(value: Any) -> str:
+def _render_summary_semgrep_finding(value: Any) -> str:
     finding = _read_object(value)
     start = _read_object(finding.get("start"))
     path = _read_str(finding.get("path"), "unknown")
     line = _read_int(start.get("line"), 1)
-    severity = _read_str(finding.get("severity"), "info").capitalize()
+    severity = _read_str(finding.get("severity"), "info")
     message = _public_message(_read_str(finding.get("message"), "Automated finding"))
-    return f"{severity}: {message} (`{path}:{line}`)"
+    return _render_finding_report(
+        severity=severity,
+        message=message,
+        path=path,
+        lines=_read_str(finding.get("lines"), ""),
+        remediation=_public_message(_summary_remediation(finding)),
+        fix=_read_optional_str(finding.get("fix")),
+        location_label=f"`{path}:{line}`",
+        analysis_lines=[
+            "- An automated review rule matched this changed code.",
+            f"- Severity: `{severity}`.",
+            "- The finding is included because it maps to code changed in this PR.",
+        ],
+    )
 
 
 def _build_semgrep_inline_review_comments(
@@ -1486,29 +1495,59 @@ def _render_inline_semgrep_comment(finding: Mapping[str, Any]) -> str:
     message = _public_message(_read_str(finding.get("message"), "Automated finding"))
     lines = _read_str(finding.get("lines"), "")
     metadata = _read_object(finding.get("metadata"))
-    remediation = _public_message(_read_optional_str(metadata.get("remediation")) or _read_optional_str(finding.get("fix")) or "")
+    fix = _read_optional_str(finding.get("fix"))
+    return _render_finding_report(
+        severity=severity,
+        message=message,
+        path=_read_str(finding.get("path"), ""),
+        lines=lines,
+        remediation=_public_message(_read_optional_str(metadata.get("remediation")) or fix or "Review this changed line and update it before merging."),
+        fix=fix,
+        location_label=None,
+        analysis_lines=[
+            "- An automated review rule matched this changed line.",
+            f"- Severity: `{severity}`.",
+            "- This comment is anchored because the finding maps to a line added or modified in this PR.",
+        ],
+    )
+
+
+def _render_finding_report(
+    *,
+    severity: str,
+    message: str,
+    path: str,
+    lines: str,
+    remediation: str,
+    fix: str | None,
+    location_label: str | None,
+    analysis_lines: Sequence[str],
+) -> str:
     alert = "CAUTION" if severity in {"critical", "high"} else "WARNING" if severity == "medium" else "NOTE"
     severity_label = _inline_severity_label(severity)
-    language = _inline_comment_language(_read_str(finding.get("path"), ""))
-    fix = _read_optional_str(finding.get("fix"))
+    language = _inline_comment_language(path)
 
     body = [
         f"⚠️ Potential issue | {severity_label} | ⚡ Quick win",
         "",
         f"> [!{alert}]",
         f"> **{message}**",
-        "",
-        "<details>",
-        "<summary>Review rationale</summary>",
-        "",
-        "- An automated check matched this changed line.",
-        f"- Severity: `{severity}`.",
-        "- This comment is anchored because the finding maps to a line added or modified in this PR.",
-        "",
-        "</details>",
-        "",
-        message,
     ]
+    if location_label:
+        body.extend(["", location_label])
+    body.extend(
+        [
+            "",
+            "<details>",
+            "<summary>Analysis chain</summary>",
+            "",
+            *analysis_lines,
+            "",
+            "</details>",
+            "",
+            message,
+        ]
+    )
     if lines.strip():
         body.extend(
             [
@@ -1530,13 +1569,19 @@ def _render_inline_semgrep_comment(finding: Mapping[str, Any]) -> str:
                 "<details>",
                 "<summary>🛠 Suggested resolution</summary>",
                 "",
+                "```text",
                 remediation or "Review this changed line and update it before merging.",
+                "```",
                 "",
                 "</details>",
             ]
         )
     return "\n".join(body)
 
+
+def _summary_remediation(finding: Mapping[str, Any]) -> str:
+    metadata = _read_object(finding.get("metadata"))
+    return _read_optional_str(metadata.get("remediation")) or _read_optional_str(finding.get("fix")) or "Review this changed code and update it before merging."
 
 def _inline_severity_label(severity: str) -> str:
     return {
