@@ -8,6 +8,7 @@ import pytest
 
 from firmcode_worker.schemas.contracts import (
     ContractValidationError,
+    CiLogArtifact,
     DiffArtifact,
     LlmReviewOutput,
     PublishPayload,
@@ -31,6 +32,7 @@ def read_fixture(name: str) -> Mapping[str, Any]:
         (DiffArtifact, "diff-artifact.v1.json"),
         (SemgrepArtifact, "semgrep-artifact.v1.json"),
         (TreeSitterArtifact, "tree-sitter-artifact.v1.json"),
+        (CiLogArtifact, "ci-log-artifact.v1.json"),
         (LlmReviewOutput, "llm-review-output.v1.json"),
         (PublishPayload, "publish-payload.v1.json"),
     ],

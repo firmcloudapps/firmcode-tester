@@ -9,6 +9,7 @@ REVIEW_JOB_INPUT_SCHEMA_VERSION = "review-job-input/v1"
 DIFF_ARTIFACT_SCHEMA_VERSION = "diff-artifact/v1"
 SEMGREP_ARTIFACT_SCHEMA_VERSION = "semgrep-artifact/v1"
 TREE_SITTER_ARTIFACT_SCHEMA_VERSION = "tree-sitter-artifact/v1"
+CI_LOG_ARTIFACT_SCHEMA_VERSION = "ci-log-artifact/v1"
 LLM_REVIEW_OUTPUT_SCHEMA_VERSION = "llm-review-output/v1"
 PUBLISH_PAYLOAD_SCHEMA_VERSION = "publish-payload/v1"
 
@@ -24,6 +25,17 @@ FINDING_CATEGORIES = {
     "ci",
     "infrastructure",
     "documentation",
+}
+CI_LOG_UNAVAILABLE_REASONS = {
+    "checks_unavailable",
+    "github_request_failed",
+    "log_expired",
+    "log_not_found",
+    "missing_actions_permission",
+    "missing_checks_permission",
+    "not_github_actions",
+    "workflow_job_unavailable",
+    "workflow_run_unavailable",
 }
 
 
@@ -288,6 +300,82 @@ class TreeSitterArtifact:
             files=[
                 _read_tree_sitter_file(file_value, f"files[{index}]", errors)
                 for index, file_value in enumerate(_read_list(value, "files", errors))
+            ],
+        )
+        _raise_if_errors(errors)
+        return artifact
+
+
+@dataclass(frozen=True)
+class CiCheckRun:
+    id: int
+    name: str
+    status: str
+    conclusion: str
+    app_slug: str | None
+    details_url: str | None
+    html_url: str | None
+    workflow_run_id: int | None
+    workflow_job_id: int | None
+    started_at: str | None
+    completed_at: str | None
+
+
+@dataclass(frozen=True)
+class CiLogEntry:
+    check_run_id: int
+    name: str
+    source: str
+    workflow_run_id: int | None
+    workflow_job_id: int
+    content: str
+    original_bytes: int
+    redacted_bytes: int
+    stored_bytes: int
+    truncated: bool
+    redacted: bool
+
+
+@dataclass(frozen=True)
+class UnavailableCiLog:
+    check_run_id: int | None
+    name: str | None
+    reason: str
+    detail: str
+
+
+@dataclass(frozen=True)
+class CiLogArtifact:
+    schema_version: str
+    review_run_id: str
+    repository_full_name: str
+    pull_request_number: int
+    head_sha: str
+    check_runs: list[CiCheckRun]
+    logs: list[CiLogEntry]
+    unavailable_logs: list[UnavailableCiLog]
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> "CiLogArtifact":
+        errors: list[str] = []
+        _read_literal(value, "schemaVersion", CI_LOG_ARTIFACT_SCHEMA_VERSION, errors)
+        artifact = cls(
+            schema_version=CI_LOG_ARTIFACT_SCHEMA_VERSION,
+            review_run_id=_read_non_empty_str(value, "reviewRunId", errors),
+            repository_full_name=_read_non_empty_str(value, "repositoryFullName", errors),
+            pull_request_number=_read_positive_int(value, "pullRequestNumber", errors),
+            head_sha=_read_non_empty_str(value, "headSha", errors),
+            check_runs=[
+                _read_ci_check_run(check_run, f"checkRuns[{index}]", errors)
+                for index, check_run in enumerate(_read_list(value, "checkRuns", errors))
+            ],
+            logs=[
+                _read_ci_log_entry(log, f"logs[{index}]", errors)
+                for index, log in enumerate(_read_list(value, "logs", errors))
+            ],
+            unavailable_logs=[
+                _read_unavailable_ci_log(log, f"unavailableLogs[{index}]", errors)
+                for index, log in enumerate(_read_list(value, "unavailableLogs", errors))
             ],
         )
         _raise_if_errors(errors)
@@ -572,6 +660,50 @@ def _read_tree_sitter_hunk_scope(value: Any, path: str, errors: list[str]) -> Tr
         hunk_new_start=_read_positive_int(item, "hunkNewStart", errors, path),
         hunk_new_end=_read_positive_int(item, "hunkNewEnd", errors, path),
         enclosing_symbol=_read_nullable_str(item, "enclosingSymbol", errors, path),
+    )
+
+
+def _read_ci_check_run(value: Any, path: str, errors: list[str]) -> CiCheckRun:
+    item = _as_object(value, path, errors)
+    return CiCheckRun(
+        id=_read_positive_int(item, "id", errors, path),
+        name=_read_non_empty_str(item, "name", errors, path),
+        status=_read_non_empty_str(item, "status", errors, path),
+        conclusion=_read_non_empty_str(item, "conclusion", errors, path),
+        app_slug=_read_nullable_str(item, "appSlug", errors, path),
+        details_url=_read_nullable_str(item, "detailsUrl", errors, path),
+        html_url=_read_nullable_str(item, "htmlUrl", errors, path),
+        workflow_run_id=_read_nullable_positive_int(item, "workflowRunId", errors, path),
+        workflow_job_id=_read_nullable_positive_int(item, "workflowJobId", errors, path),
+        started_at=_read_nullable_str(item, "startedAt", errors, path),
+        completed_at=_read_nullable_str(item, "completedAt", errors, path),
+    )
+
+
+def _read_ci_log_entry(value: Any, path: str, errors: list[str]) -> CiLogEntry:
+    item = _as_object(value, path, errors)
+    return CiLogEntry(
+        check_run_id=_read_positive_int(item, "checkRunId", errors, path),
+        name=_read_non_empty_str(item, "name", errors, path),
+        source=_read_literal_from_set(item, "source", {"github_actions_job"}, errors, path),
+        workflow_run_id=_read_nullable_positive_int(item, "workflowRunId", errors, path),
+        workflow_job_id=_read_positive_int(item, "workflowJobId", errors, path),
+        content=_read_str(item, "content", errors, path),
+        original_bytes=_read_non_negative_int(item, "originalBytes", errors, path),
+        redacted_bytes=_read_non_negative_int(item, "redactedBytes", errors, path),
+        stored_bytes=_read_non_negative_int(item, "storedBytes", errors, path),
+        truncated=_read_bool(item, "truncated", errors, path),
+        redacted=_read_bool(item, "redacted", errors, path),
+    )
+
+
+def _read_unavailable_ci_log(value: Any, path: str, errors: list[str]) -> UnavailableCiLog:
+    item = _as_object(value, path, errors)
+    return UnavailableCiLog(
+        check_run_id=_read_nullable_positive_int(item, "checkRunId", errors, path),
+        name=_read_nullable_str(item, "name", errors, path),
+        reason=_read_literal_from_set(item, "reason", CI_LOG_UNAVAILABLE_REASONS, errors, path),
+        detail=_read_non_empty_str(item, "detail", errors, path),
     )
 
 

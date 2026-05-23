@@ -32,6 +32,7 @@ describe("API runtime config", () => {
     expect(config.github?.privateKey).toBe(RAW_PRIVATE_KEY);
     expect(config.port).toBe(3001);
     expect(config.review.dryRun).toBe(true);
+    expect(config.review.ciLogMaxBytes).toBe(20_000);
     expect(config.review.largePullRequest.maxChangedFiles).toBe(100);
   });
 
@@ -117,9 +118,11 @@ describe("API runtime config", () => {
       REVIEW_SUMMARY_ONLY_DIFF_BYTES: "200000",
       REVIEW_SUMMARY_ONLY_CHANGED_LINES: "4000",
       REVIEW_SUMMARY_ONLY_ESTIMATED_TOKENS: "25000",
-      REVIEW_LARGE_PR_MAX_FULL_CONTEXT_FILES: "12"
+      REVIEW_LARGE_PR_MAX_FULL_CONTEXT_FILES: "12",
+      REVIEW_CI_LOG_MAX_BYTES: "12000"
     });
 
+    expect(config.review.ciLogMaxBytes).toBe(12000);
     expect(config.review.largePullRequest).toEqual({
       maxChangedFiles: 25,
       maxDiffBytes: 90000,
@@ -150,6 +153,15 @@ describe("API runtime config", () => {
         REVIEW_LARGE_PR_MAX_CHANGED_FILES: "0"
       })
     ).toThrow(/REVIEW_LARGE_PR_MAX_CHANGED_FILES must be a positive integer/);
+  });
+
+  it("rejects invalid CI log truncation limits", () => {
+    expect(() =>
+      createApiRuntimeConfig({
+        ...VALID_ENV,
+        REVIEW_CI_LOG_MAX_BYTES: "0"
+      })
+    ).toThrow(/REVIEW_CI_LOG_MAX_BYTES must be a positive integer/);
   });
 });
 
