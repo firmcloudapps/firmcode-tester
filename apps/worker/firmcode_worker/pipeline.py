@@ -943,7 +943,7 @@ def render_scanning_progress_comment(
         [
             FIRMCODEAI_SCANNING_COMMENT_MARKER,
             FIRMCODEAI_BANNER,
-            "## FirmcodeAI Scanning",
+            "## FirmcodeAI Analysis Progress",
             "",
             f"> [!{'CAUTION' if status == 'failed' else 'NOTE'}]",
             f"> {status_message}",
@@ -984,17 +984,31 @@ def create_github_app_jwt(*, app_id: str, private_key: str, now_seconds: int | N
 
 
 def normalize_private_key(value: str) -> str:
-    candidate = _normalize_private_key_text(_strip_matching_quotes(value.strip()))
+    raw = _strip_matching_quotes(value.strip())
+    candidate = _normalize_private_key_text(raw)
     if _is_private_key_pem(candidate):
         return candidate
 
-    try:
-        decoded = base64.b64decode(_strip_matching_quotes(value.strip()), validate=True).decode("utf-8")
-    except Exception:
+    decoded = _decode_base64_private_key_candidate(raw)
+    if decoded is None:
         return candidate
 
     decoded_candidate = _normalize_private_key_text(_strip_matching_quotes(decoded.strip()))
     return decoded_candidate if _is_private_key_pem(decoded_candidate) else candidate
+
+
+def _decode_base64_private_key_candidate(value: str) -> str | None:
+    compact = re.sub(r"\s+", "", value)
+    if not compact:
+        return None
+
+    padded = compact + ("=" * ((4 - len(compact) % 4) % 4))
+    for decoder in (base64.b64decode, base64.urlsafe_b64decode):
+        try:
+            return decoder(padded).decode("utf-8")
+        except Exception:
+            continue
+    return None
 
 
 def _strip_matching_quotes(value: str) -> str:
