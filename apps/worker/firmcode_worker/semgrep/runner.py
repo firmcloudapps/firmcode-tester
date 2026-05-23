@@ -18,7 +18,7 @@ from firmcode_worker.semgrep.normalizer import (
 DEFAULT_SEMGREP_TIMEOUT_MS = 30_000
 FIRMCODE_REPO_ROOT = Path(__file__).resolve().parents[4]
 LOCAL_INFRA_SEMGREP_CONFIG = "infra/semgrep/config.yml"
-DEFAULT_SEMGREP_CONFIGS = ("auto", LOCAL_INFRA_SEMGREP_CONFIG)
+DEFAULT_SEMGREP_CONFIGS = (LOCAL_INFRA_SEMGREP_CONFIG,)
 SEMGREP_RAW_ARTIFACT_SCHEMA_VERSION = "semgrep-raw-output/v1"
 
 
@@ -34,11 +34,7 @@ class SemgrepScanConfig:
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] = os.environ) -> "SemgrepScanConfig":
-        configs = tuple(
-            config.strip()
-            for config in env.get("SEMGREP_CONFIGS", ",".join(DEFAULT_SEMGREP_CONFIGS)).split(",")
-            if config.strip()
-        )
+        configs = _read_semgrep_configs(env.get("SEMGREP_CONFIGS"))
         timeout_ms = _read_positive_int(env.get("SEMGREP_TIMEOUT_MS"), DEFAULT_SEMGREP_TIMEOUT_MS)
         executable = env.get("SEMGREP_EXECUTABLE", "semgrep").strip() or "semgrep"
         return cls(configs=configs or DEFAULT_SEMGREP_CONFIGS, timeout_ms=timeout_ms, executable=executable)
@@ -103,11 +99,33 @@ def _resolve_config_reference(config: str) -> str:
     if config_path.is_absolute():
         return config
 
-    repo_config_path = FIRMCODE_REPO_ROOT / config_path
-    if repo_config_path.exists():
-        return str(repo_config_path)
+    for root in _config_roots():
+        repo_config_path = root / config_path
+        if repo_config_path.exists():
+            return str(repo_config_path)
 
     return config
+
+
+def _read_semgrep_configs(value: str | None) -> tuple[str, ...]:
+    if value is None:
+        return DEFAULT_SEMGREP_CONFIGS
+
+    configs = tuple(config.strip() for config in value.split(",") if config.strip())
+    if configs == ("auto",):
+        return DEFAULT_SEMGREP_CONFIGS
+    return tuple(LOCAL_INFRA_SEMGREP_CONFIG if config == "auto" else config for config in configs)
+
+
+def _config_roots() -> tuple[Path, ...]:
+    roots = [FIRMCODE_REPO_ROOT, Path.cwd(), Path("/app")]
+    unique_roots: list[Path] = []
+    seen: set[Path] = set()
+    for root in roots:
+        if root not in seen:
+            seen.add(root)
+            unique_roots.append(root)
+    return tuple(unique_roots)
 
 
 def _run_command(*, command: tuple[str, ...], timeout_ms: int, cwd: str | Path | None) -> RawSemgrepOutput:
