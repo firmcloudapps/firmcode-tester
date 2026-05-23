@@ -9,7 +9,9 @@ import { GitHubWebhookController } from "../src/modules/webhooks/github/github-w
 import { GitHubWebhookService } from "../src/modules/webhooks/github/github-webhook.service";
 import type {
   GitHubPullRequestActivityPublisher,
-  PublishPullRequestScanningActivityInput
+  PublishPullRequestActivityResult,
+  PublishPullRequestScanningActivityInput,
+  PublishPullRequestSummaryActivityInput
 } from "../src/infrastructure/github/github-pr-activity-publisher";
 import type {
   GitHubAssociatedPullRequest,
@@ -541,6 +543,7 @@ describe("GitHubWebhookService", () => {
 
 class RecordingPullRequestActivityPublisher implements GitHubPullRequestActivityPublisher {
   readonly scanningActivities: PublishPullRequestScanningActivityInput[] = [];
+  readonly summaryActivities: PublishPullRequestSummaryActivityInput[] = [];
   failWith: Error | null = null;
 
   async publishScanningActivity(input: PublishPullRequestScanningActivityInput): Promise<void> {
@@ -549,6 +552,20 @@ class RecordingPullRequestActivityPublisher implements GitHubPullRequestActivity
     if (this.failWith !== null) {
       throw this.failWith;
     }
+  }
+
+  async publishSummaryActivity(input: PublishPullRequestSummaryActivityInput): Promise<PublishPullRequestActivityResult> {
+    this.summaryActivities.push(input);
+
+    if (this.failWith !== null) {
+      throw this.failWith;
+    }
+
+    return {
+      action: "created",
+      githubCommentId: 0,
+      body: input.summaryBody
+    };
   }
 }
 

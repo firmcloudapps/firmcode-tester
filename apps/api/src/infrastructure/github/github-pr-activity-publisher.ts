@@ -2,8 +2,10 @@ import { createSign } from "crypto";
 import {
   firmcodeAiActivityMarker,
   renderFirmcodeAiScanningActivity,
+  renderFirmcodeAiSummaryActivity,
   type ApiRuntimeConfig,
   type FirmcodeAiScanningActivityInput,
+  type FirmcodeAiSummaryActivityInput,
   type GitHubAppConfig
 } from "@firmcode/shared";
 
@@ -13,13 +15,32 @@ export interface PublishPullRequestScanningActivityInput extends FirmcodeAiScann
   readonly installationId: number;
 }
 
+export interface PublishPullRequestSummaryActivityInput extends FirmcodeAiSummaryActivityInput {
+  readonly installationId: number;
+}
+
+export interface PublishPullRequestActivityResult {
+  readonly action: "created" | "updated";
+  readonly githubCommentId: number;
+  readonly body: string;
+}
+
 export interface GitHubPullRequestActivityPublisher {
   publishScanningActivity(input: PublishPullRequestScanningActivityInput): Promise<void>;
+  publishSummaryActivity(input: PublishPullRequestSummaryActivityInput): Promise<PublishPullRequestActivityResult>;
 }
 
 export class NoopGitHubPullRequestActivityPublisher implements GitHubPullRequestActivityPublisher {
   async publishScanningActivity(_input: PublishPullRequestScanningActivityInput): Promise<void> {
     return undefined;
+  }
+
+  async publishSummaryActivity(input: PublishPullRequestSummaryActivityInput): Promise<PublishPullRequestActivityResult> {
+    return {
+      action: "created",
+      githubCommentId: 0,
+      body: renderFirmcodeAiSummaryActivity(input)
+    };
   }
 }
 
@@ -55,16 +76,41 @@ export class GitHubAppPullRequestActivityPublisher implements GitHubPullRequestA
   }
 
   async publishScanningActivity(input: PublishPullRequestScanningActivityInput): Promise<void> {
+    await this.publishIssueCommentActivity({
+      installationId: input.installationId,
+      repositoryFullName: input.repositoryFullName,
+      pullRequestNumber: input.pullRequestNumber,
+      marker: firmcodeAiActivityMarker("scanning"),
+      body: renderFirmcodeAiScanningActivity(input)
+    });
+  }
+
+  async publishSummaryActivity(input: PublishPullRequestSummaryActivityInput): Promise<PublishPullRequestActivityResult> {
+    return this.publishIssueCommentActivity({
+      installationId: input.installationId,
+      repositoryFullName: input.repositoryFullName,
+      pullRequestNumber: input.pullRequestNumber,
+      marker: firmcodeAiActivityMarker("summary"),
+      body: renderFirmcodeAiSummaryActivity(input)
+    });
+  }
+
+  private async publishIssueCommentActivity(input: {
+    readonly installationId: number;
+    readonly repositoryFullName: string;
+    readonly pullRequestNumber: number;
+    readonly marker: string;
+    readonly body: string;
+  }): Promise<PublishPullRequestActivityResult> {
     const [owner, repo] = splitRepositoryFullName(input.repositoryFullName);
     const token = await this.createInstallationAccessToken(input.installationId);
-    const body = renderFirmcodeAiScanningActivity(input);
     const comments = await this.request<GitHubIssueComment[]>({
       method: "GET",
       token,
       path: `/repos/${owner}/${repo}/issues/${input.pullRequestNumber}/comments?per_page=100`
     });
     const existing = comments.find((comment) => {
-      return typeof comment.body === "string" && comment.body.includes(firmcodeAiActivityMarker("scanning"));
+      return typeof comment.body === "string" && comment.body.includes(input.marker);
     });
 
     if (existing?.id !== undefined && typeof existing.id === "number") {
@@ -72,17 +118,31 @@ export class GitHubAppPullRequestActivityPublisher implements GitHubPullRequestA
         method: "PATCH",
         token,
         path: `/repos/${owner}/${repo}/issues/comments/${existing.id}`,
-        body: { body }
+        body: { body: input.body }
       });
-      return;
+      return {
+        action: "updated",
+        githubCommentId: existing.id,
+        body: input.body
+      };
     }
 
-    await this.request({
+    const created = await this.request<GitHubIssueComment>({
       method: "POST",
       token,
       path: `/repos/${owner}/${repo}/issues/${input.pullRequestNumber}/comments`,
-      body: { body }
+      body: { body: input.body }
     });
+
+    if (typeof created.id !== "number") {
+      throw new GitHubActivityPublishError("GitHub create comment response did not include a comment id.");
+    }
+
+    return {
+      action: "created",
+      githubCommentId: created.id,
+      body: input.body
+    };
   }
 
   private async createInstallationAccessToken(installationId: number): Promise<string> {
