@@ -3,7 +3,7 @@ import type { DatabaseExecutor } from "../../infrastructure/database/migrations"
 export const DASHBOARD_AUTH_STORE = Symbol("DASHBOARD_AUTH_STORE");
 
 export type DashboardRole = "owner" | "admin" | "developer" | "viewer";
-export type DashboardCapability = "retry_review_run";
+export type DashboardCapability = "retry_review_run" | "manage_repository_configuration";
 
 export interface DashboardMembership {
   workspaceId: string;
@@ -16,8 +16,8 @@ export interface DashboardAuthStore {
 }
 
 const ROLE_CAPABILITIES: Readonly<Record<DashboardRole, readonly DashboardCapability[]>> = {
-  owner: ["retry_review_run"],
-  admin: ["retry_review_run"],
+  owner: ["retry_review_run", "manage_repository_configuration"],
+  admin: ["retry_review_run", "manage_repository_configuration"],
   developer: ["retry_review_run"],
   viewer: []
 };

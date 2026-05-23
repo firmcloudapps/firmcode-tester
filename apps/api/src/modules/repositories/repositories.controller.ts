@@ -1,14 +1,58 @@
-import { BadRequestException, Controller, Get, Inject, Query } from "@nestjs/common";
-import type { DashboardRepositoryListFilters, RepositoryListResponse } from "@firmcode/shared";
+import { BadRequestException, Body, Controller, Get, Headers, Inject, NotFoundException, Param, Patch, Query } from "@nestjs/common";
+import type {
+  DashboardRepositoryListFilters,
+  RepositoryListResponse,
+  RepositoryReviewConfiguration
+} from "@firmcode/shared";
+import { RepositoryConfigurationService } from "./repository-configuration.service";
 import { REPOSITORIES_STORE, type RepositoriesStore } from "./repositories.store";
 
 @Controller("api/repositories")
 export class RepositoriesController {
-  constructor(@Inject(REPOSITORIES_STORE) private readonly repositoriesStore: RepositoriesStore) {}
+  constructor(
+    @Inject(REPOSITORIES_STORE) private readonly repositoriesStore: RepositoriesStore,
+    private readonly configurationService?: RepositoryConfigurationService
+  ) {}
 
   @Get()
   async listRepositories(@Query() query: Record<string, string | string[] | undefined>): Promise<RepositoryListResponse> {
     return this.repositoriesStore.listRepositories(parseRepositoryListFilters(query));
+  }
+
+  @Get(":id/configuration")
+  async getRepositoryConfiguration(
+    @Param("id") id: string,
+    @Headers("x-firmcode-workspace-id") workspaceIdHeader: string | string[] | undefined,
+    @Headers("x-firmcode-user-id") userIdHeader: string | string[] | undefined
+  ): Promise<RepositoryReviewConfiguration> {
+    if (this.configurationService === undefined) {
+      throw new NotFoundException("Repository not found");
+    }
+
+    return this.configurationService.getRepositoryConfiguration({
+      repositoryId: id,
+      workspaceId: readSingleValue(workspaceIdHeader) ?? null,
+      clerkUserId: readSingleValue(userIdHeader) ?? null
+    });
+  }
+
+  @Patch(":id/configuration")
+  async updateRepositoryConfiguration(
+    @Param("id") id: string,
+    @Body() body: unknown,
+    @Headers("x-firmcode-workspace-id") workspaceIdHeader: string | string[] | undefined,
+    @Headers("x-firmcode-user-id") userIdHeader: string | string[] | undefined
+  ): Promise<RepositoryReviewConfiguration> {
+    if (this.configurationService === undefined) {
+      throw new NotFoundException("Repository not found");
+    }
+
+    return this.configurationService.updateRepositoryConfiguration({
+      repositoryId: id,
+      workspaceId: readSingleValue(workspaceIdHeader) ?? null,
+      clerkUserId: readSingleValue(userIdHeader) ?? null,
+      body
+    });
   }
 }
 

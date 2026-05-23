@@ -1,8 +1,10 @@
 import type {
   DashboardRepositoryListFilters,
+  RepositoryReviewConfiguration,
   RepositoryLastReview,
   RepositoryListItem,
   RepositoryListResponse,
+  UpdateRepositoryReviewConfigurationRequest,
   ReviewRunStatus
 } from "@firmcode/shared";
 import type { DatabaseExecutor } from "../../infrastructure/database/migrations";
@@ -11,6 +13,18 @@ export const REPOSITORIES_STORE = Symbol("REPOSITORIES_STORE");
 
 export interface RepositoriesStore {
   listRepositories(filters: DashboardRepositoryListFilters): Promise<RepositoryListResponse>;
+  getRepositoryConfiguration(input: RepositoryConfigurationLookup): Promise<RepositoryReviewConfiguration | null>;
+  updateRepositoryConfiguration(input: RepositoryConfigurationUpdate): Promise<RepositoryReviewConfiguration | null>;
+}
+
+export interface RepositoryConfigurationLookup {
+  readonly repositoryId: string;
+  readonly workspaceId: string;
+}
+
+export interface RepositoryConfigurationUpdate extends RepositoryConfigurationLookup {
+  readonly updates: UpdateRepositoryReviewConfigurationRequest;
+  readonly updatedByClerkUserId: string;
 }
 
 interface RepositoryListRow {
@@ -45,9 +59,33 @@ interface RepositoryFindingRow {
   readonly finding_id: string;
 }
 
+interface RepositoryConfigurationRow {
+  readonly repository_id: string;
+  readonly automation_enabled: boolean;
+  readonly draft_pr_reviews_enabled: boolean;
+  readonly max_inline_comments: number;
+  readonly severity_threshold: RepositoryReviewConfiguration["severityThreshold"];
+  readonly semgrep_enabled: boolean;
+  readonly tree_sitter_enabled: boolean;
+  readonly ci_explanation_enabled: boolean;
+  readonly infrastructure_review_enabled: boolean;
+  readonly dry_run_enabled: boolean;
+  readonly updated_by_clerk_user_id: string | null;
+  readonly created_at: Date | string | null;
+  readonly updated_at: Date | string | null;
+}
+
 export class EmptyRepositoriesStore implements RepositoriesStore {
   async listRepositories(filters: DashboardRepositoryListFilters): Promise<RepositoryListResponse> {
     return { repositories: [], filters };
+  }
+
+  async getRepositoryConfiguration(_input: RepositoryConfigurationLookup): Promise<RepositoryReviewConfiguration | null> {
+    return null;
+  }
+
+  async updateRepositoryConfiguration(_input: RepositoryConfigurationUpdate): Promise<RepositoryReviewConfiguration | null> {
+    return null;
   }
 }
 
@@ -121,6 +159,102 @@ JOIN review_runs rr ON rr.id = f.review_run_id
       repositories,
       filters
     };
+  }
+
+  async getRepositoryConfiguration(input: RepositoryConfigurationLookup): Promise<RepositoryReviewConfiguration | null> {
+    const owned = await this.repositoryBelongsToWorkspace(input);
+
+    if (!owned) {
+      return null;
+    }
+
+    const row = await this.ensureRepositoryConfiguration(input.repositoryId);
+    return toRepositoryReviewConfiguration(row);
+  }
+
+  async updateRepositoryConfiguration(input: RepositoryConfigurationUpdate): Promise<RepositoryReviewConfiguration | null> {
+    const owned = await this.repositoryBelongsToWorkspace(input);
+
+    if (!owned) {
+      return null;
+    }
+
+    await this.ensureRepositoryConfiguration(input.repositoryId);
+
+    const assignments = buildConfigurationAssignments(input.updates);
+    const values: unknown[] = [input.repositoryId, input.updatedByClerkUserId, ...assignments.values];
+    const result = await this.database.query<RepositoryConfigurationRow>(
+      `
+UPDATE repository_review_configurations
+SET updated_by_clerk_user_id = $2,
+    updated_at = now()
+    ${assignments.sql}
+WHERE repository_id = $1
+RETURNING *
+`,
+      values
+    );
+    const row = result.rows[0];
+
+    if (row === undefined) {
+      return null;
+    }
+
+    if (input.updates.automationEnabled !== undefined) {
+      await this.database.query(
+        `
+UPDATE repositories
+SET enabled = $2,
+    updated_at = now()
+WHERE id = $1
+`,
+        [input.repositoryId, input.updates.automationEnabled]
+      );
+    }
+
+    return toRepositoryReviewConfiguration(row);
+  }
+
+  private async repositoryBelongsToWorkspace(input: RepositoryConfigurationLookup): Promise<boolean> {
+    const result = await this.database.query<{ id: string }>(
+      `
+SELECT r.id
+FROM repositories r
+JOIN github_installations gi ON gi.id = r.installation_id
+WHERE r.id = $1
+  AND gi.workspace_id = $2
+`,
+      [input.repositoryId, input.workspaceId]
+    );
+
+    return result.rows[0] !== undefined;
+  }
+
+  private async ensureRepositoryConfiguration(repositoryId: string): Promise<RepositoryConfigurationRow> {
+    const result = await this.database.query<RepositoryConfigurationRow>(
+      `
+INSERT INTO repository_review_configurations (
+  repository_id,
+  automation_enabled
+)
+SELECT
+  id,
+  enabled
+FROM repositories
+WHERE id = $1
+ON CONFLICT (repository_id) DO UPDATE
+SET automation_enabled = repository_review_configurations.automation_enabled
+RETURNING *
+`,
+      [repositoryId]
+    );
+    const row = result.rows[0];
+
+    if (row === undefined) {
+      throw new Error("Repository configuration could not be created");
+    }
+
+    return row;
   }
 }
 
@@ -216,6 +350,74 @@ function toRepositoryListItem(row: RepositoryListRow, aggregate: RepositoryAggre
     primaryLanguage: aggregate?.primaryLanguage ?? null,
     openFindingsCount: aggregate?.openFindingsCount ?? 0,
     lastReview: aggregate?.lastReview ?? null,
+    updatedAt: toRequiredIsoString(row.updated_at)
+  };
+}
+
+function buildConfigurationAssignments(updates: UpdateRepositoryReviewConfigurationRequest): { sql: string; values: unknown[] } {
+  const assignments: string[] = [];
+  const values: unknown[] = [];
+  const append = (column: string, value: unknown) => {
+    values.push(value);
+    assignments.push(`${column} = $${values.length + 2}`);
+  };
+
+  if (updates.automationEnabled !== undefined) {
+    append("automation_enabled", updates.automationEnabled);
+  }
+
+  if (updates.draftPullRequestReviewsEnabled !== undefined) {
+    append("draft_pr_reviews_enabled", updates.draftPullRequestReviewsEnabled);
+  }
+
+  if (updates.maxInlineComments !== undefined) {
+    append("max_inline_comments", updates.maxInlineComments);
+  }
+
+  if (updates.severityThreshold !== undefined) {
+    append("severity_threshold", updates.severityThreshold);
+  }
+
+  if (updates.semgrepEnabled !== undefined) {
+    append("semgrep_enabled", updates.semgrepEnabled);
+  }
+
+  if (updates.treeSitterEnabled !== undefined) {
+    append("tree_sitter_enabled", updates.treeSitterEnabled);
+  }
+
+  if (updates.ciExplanationEnabled !== undefined) {
+    append("ci_explanation_enabled", updates.ciExplanationEnabled);
+  }
+
+  if (updates.infrastructureReviewEnabled !== undefined) {
+    append("infrastructure_review_enabled", updates.infrastructureReviewEnabled);
+  }
+
+  if (updates.dryRunEnabled !== undefined) {
+    append("dry_run_enabled", updates.dryRunEnabled);
+  }
+
+  return {
+    sql: assignments.length === 0 ? "" : `,\n    ${assignments.join(",\n    ")}`,
+    values
+  };
+}
+
+function toRepositoryReviewConfiguration(row: RepositoryConfigurationRow): RepositoryReviewConfiguration {
+  return {
+    repositoryId: row.repository_id,
+    automationEnabled: row.automation_enabled,
+    draftPullRequestReviewsEnabled: row.draft_pr_reviews_enabled,
+    maxInlineComments: Number(row.max_inline_comments),
+    severityThreshold: row.severity_threshold,
+    semgrepEnabled: row.semgrep_enabled,
+    treeSitterEnabled: row.tree_sitter_enabled,
+    ciExplanationEnabled: row.ci_explanation_enabled,
+    infrastructureReviewEnabled: row.infrastructure_review_enabled,
+    dryRunEnabled: row.dry_run_enabled,
+    updatedByClerkUserId: row.updated_by_clerk_user_id,
+    createdAt: toRequiredIsoString(row.created_at),
     updatedAt: toRequiredIsoString(row.updated_at)
   };
 }

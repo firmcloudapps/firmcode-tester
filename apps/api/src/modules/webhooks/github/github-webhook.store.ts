@@ -44,6 +44,7 @@ export interface RepositoryUpsert {
   private: boolean;
   defaultBranch: string;
   enabled: boolean;
+  preserveExistingEnabled?: boolean;
 }
 
 export interface RepositoryRecord extends RepositoryUpsert {
@@ -204,6 +205,7 @@ export class InMemoryGitHubWebhookStore implements GitHubWebhookStore {
     const repository: RepositoryRecord = {
       id: existing?.id ?? randomUUID(),
       ...input,
+      enabled: input.preserveExistingEnabled === true ? existing?.enabled ?? input.enabled : input.enabled,
       createdAt: existing?.createdAt ?? now,
       updatedAt: now
     };

@@ -16,6 +16,7 @@ const EXPECTED_TABLES = [
   "published_comments",
   "pull_requests",
   "repositories",
+  "repository_review_configurations",
   "review_run_retries",
   "review_runs",
   "schema_migrations",
@@ -158,14 +159,16 @@ ORDER BY table_name
     expect(appliedMigrationIds).toEqual([
       "001_initial_review_schema",
       "002_dry_run_published_comments",
-      "003_dashboard_auth_retry_state"
+      "003_dashboard_auth_retry_state",
+      "004_repository_review_configuration"
     ]);
     expect(secondRunMigrationIds).toEqual([]);
     expect(tables.rows.map((row) => row.table_name)).toEqual(EXPECTED_TABLES);
     expect(applied.rows).toEqual([
       { id: "001_initial_review_schema" },
       { id: "002_dry_run_published_comments" },
-      { id: "003_dashboard_auth_retry_state" }
+      { id: "003_dashboard_auth_retry_state" },
+      { id: "004_repository_review_configuration" }
     ]);
   });
 
