@@ -11,6 +11,7 @@ from firmcode_worker.pipeline import (
     GitHubFile,
     ReviewContext,
     _partition_existing_inline_comments,
+    _render_resolution_bullets,
     normalize_private_key,
     parse_patch_hunks,
 )
@@ -213,6 +214,17 @@ def test_partition_existing_inline_comments_prevents_duplicate_review_posts() ->
     assert missing == [selected[1]]
 
 
+def test_render_resolution_bullets_splits_major_points() -> None:
+    lines = _render_resolution_bullets(
+        "Replace the tag or branch after @ with the action commit SHA, and update it through a dependency update workflow."
+    )
+
+    assert lines == [
+        "- Replace the tag or branch after @ with the action commit SHA.",
+        "- Update it through a dependency update workflow.",
+    ]
+
+
 def test_deterministic_pipeline_publishes_actual_analysis_summary() -> None:
     store = RecordingStore()
     github = FakeGitHub()
@@ -237,7 +249,8 @@ def test_deterministic_pipeline_publishes_actual_analysis_summary() -> None:
     assert "```typescript" in inline_body
     assert "  const value = eval(input);" in inline_body
     assert "<summary>🛠 Suggested resolution</summary>" in inline_body
-    assert "```text" in inline_body
+    assert "```text" not in inline_body
+    assert "- Validate and parse trusted input instead of evaluating it." in inline_body
     assert "Validate and parse trusted input instead of evaluating it." in inline_body
     assert "<details open>" not in inline_body
     assert "Semgrep" not in inline_body
@@ -250,7 +263,8 @@ def test_deterministic_pipeline_publishes_actual_analysis_summary() -> None:
     assert "```typescript" in store.summary_body
     assert "  const value = eval(input);" in store.summary_body
     assert "<summary>🛠 Suggested resolution</summary>" in store.summary_body
-    assert "```text" in store.summary_body
+    assert "```text\nValidate and parse trusted input instead of evaluating it." not in store.summary_body
+    assert "- Validate and parse trusted input instead of evaluating it." in store.summary_body
     assert "<summary>Risk</summary>" in store.summary_body
     assert "<summary>Changed Components</summary>" in store.summary_body
     assert "<summary>Suggested Tests</summary>" in store.summary_body
