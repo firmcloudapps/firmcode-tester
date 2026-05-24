@@ -53,6 +53,48 @@ export interface RepositoryListResponse {
   filters: DashboardRepositoryListFilters;
 }
 
+export interface GitHubOAuthUserSummary {
+  githubUserId: number;
+  login: string;
+  name: string | null;
+  avatarUrl: string | null;
+  connectedAt: string;
+  updatedAt: string;
+}
+
+export interface GitHubOAuthStatusResponse {
+  connected: boolean;
+  user: GitHubOAuthUserSummary | null;
+}
+
+export interface GitHubOAuthStartResponse {
+  authorizationUrl: string;
+  expiresAt: string;
+}
+
+export interface GitHubInstallationListItem {
+  id: string;
+  installationId: number;
+  accountLogin: string | null;
+  accountType: string | null;
+  repositoryCount: number;
+  enabledRepositoryCount: number;
+  updatedAt: string;
+}
+
+export interface GitHubInstallationListResponse {
+  installations: GitHubInstallationListItem[];
+}
+
+export interface GitHubInstallationSyncResponse {
+  installations: GitHubInstallationListItem[];
+  syncedRepositoryCount: number;
+}
+
+export interface GitHubRepositorySyncResponse {
+  repository: RepositoryListItem;
+}
+
 export const DASHBOARD_WORKSPACE_ROLES = ["owner", "admin", "developer", "viewer"] as const;
 
 export type DashboardWorkspaceRole = (typeof DASHBOARD_WORKSPACE_ROLES)[number];

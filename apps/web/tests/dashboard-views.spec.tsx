@@ -16,13 +16,46 @@ describe("RepositoriesView", () => {
   });
 
   it("renders populated repository rows with enabled status and last review", () => {
-    const html = renderToString(<RepositoriesView state={{ status: "populated", data: repositoryList }} />);
+    const html = renderToString(
+      <RepositoriesView
+        state={{ status: "populated", data: repositoryList }}
+        controlsState={{
+          status: "ready",
+          data: {
+            oauth: connectedOAuth,
+            settings: ownerSettings
+          }
+        }}
+      />
+    );
 
     expect(html).toContain("openclaw/firmcode");
     expect(html).toContain("Enabled");
     expect(html).toContain("PR #");
     expect(html).toContain(">7</a>");
     expect(html).toContain("View runs");
+    expect(html).toContain("Sync GitHub");
+    expect(html).toContain(">Manage GitHub App</a>");
+    expect(html).not.toContain("not wired");
+  });
+
+  it("renders read-only repository controls for unauthorized roles and missing OAuth", () => {
+    const html = renderToString(
+      <RepositoriesView
+        state={{ status: "populated", data: repositoryList }}
+        controlsState={{
+          status: "ready",
+          data: {
+            oauth: { connected: false, user: null },
+            settings: viewerSettings
+          }
+        }}
+      />
+    );
+
+    expect(html).toContain('href="/auth/github"');
+    expect(html).toContain("Connect GitHub OAuth before syncing repositories.");
+    expect(html).toContain("Connect GitHub first.");
   });
 });
 
@@ -175,6 +208,76 @@ const repositoryList: RepositoryListResponse = {
       }
     }
   ]
+};
+
+const connectedOAuth = {
+  connected: true,
+  user: {
+    githubUserId: 42,
+    login: "kelly",
+    name: "Kelly",
+    avatarUrl: null,
+    connectedAt: "2026-05-22T09:00:00.000Z",
+    updatedAt: "2026-05-22T09:00:00.000Z"
+  }
+};
+
+const ownerSettings = {
+  workspace: {
+    id: "workspace-1",
+    name: "Firmcode",
+    clerkOrgId: "org_firmcode",
+    role: "owner" as const,
+    canManageSensitiveSettings: true
+  },
+  clerk: {
+    userProfileUrl: "/user-profile",
+    organizationProfileUrl: "/organization-profile",
+    memberManagementUrl: "/organization-profile/members"
+  },
+  githubApp: {
+    installUrl: "/github/installations",
+    repositoryConfigurationUrl: "/repositories",
+    installations: [
+      {
+        id: "install-1",
+        installationId: 301,
+        accountLogin: "openclaw",
+        accountType: "Organization",
+        repositoryCount: 2,
+        enabledRepositoryCount: 1,
+        updatedAt: "2026-05-22T10:00:00.000Z"
+      }
+    ]
+  },
+  retention: {
+    artifactRetentionDays: 30,
+    changedFilePatchDays: 30,
+    fullSnapshotDays: 14,
+    ciLogDays: 14,
+    llmArtifactDays: 14,
+    semgrepArtifactDays: 30,
+    treeSitterArtifactDays: 30,
+    findingMetadataDays: 180,
+    aggregatedMetricDays: 365
+  },
+  apiKeys: {
+    enabled: false,
+    message: "Workspace API key creation is not enabled in the MVP."
+  },
+  notifications: {
+    enabled: false,
+    message: "Email and Slack notification routing is planned after review delivery stabilizes."
+  }
+};
+
+const viewerSettings = {
+  ...ownerSettings,
+  workspace: {
+    ...ownerSettings.workspace,
+    role: "viewer" as const,
+    canManageSensitiveSettings: false
+  }
 };
 
 const reviewRunList: ReviewRunListResponse = {

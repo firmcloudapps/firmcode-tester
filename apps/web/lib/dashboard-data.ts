@@ -2,6 +2,7 @@ import type {
   DashboardRepositoryListFilters,
   FindingsListFilters,
   FindingsListResponse,
+  GitHubOAuthStatusResponse,
   OverviewDashboardData,
   RepositoryListResponse,
   ReviewRunDetail,
@@ -19,9 +20,20 @@ type SearchParams = Record<string, string | string[] | undefined>;
 export type GitHubInstallationsState =
   | { status: "loading" }
   | { status: "signed-out" }
-  | { status: "empty"; data: WorkspaceSettingsResponse }
+  | { status: "empty"; data: GitHubSyncDashboardData }
   | { status: "error"; message: string }
-  | { status: "populated"; data: WorkspaceSettingsResponse };
+  | { status: "populated"; data: GitHubSyncDashboardData };
+
+export interface GitHubSyncDashboardData {
+  settings: WorkspaceSettingsResponse;
+  oauth: GitHubOAuthStatusResponse;
+  repositories: RepositoryListResponse;
+}
+
+export type GitHubRepositoryControlsState =
+  | { status: "ready"; data: Pick<GitHubSyncDashboardData, "settings" | "oauth"> }
+  | { status: "signed-out" }
+  | { status: "error"; message: string };
 
 class DashboardApiError extends Error {
   constructor(
@@ -97,9 +109,31 @@ export async function loadSettingsState(): Promise<ViewState<WorkspaceSettingsRe
 
 export async function loadGitHubInstallationsState(): Promise<GitHubInstallationsState> {
   try {
-    const data = await requestAuthenticatedJson<WorkspaceSettingsResponse>("/api/settings");
+    const [settings, oauth, repositories] = await Promise.all([
+      requestAuthenticatedJson<WorkspaceSettingsResponse>("/api/settings"),
+      requestAuthenticatedJson<GitHubOAuthStatusResponse>("/api/github/oauth/status"),
+      requestJson<RepositoryListResponse>("/api/repositories", {})
+    ]);
+    const data = { settings, oauth, repositories };
 
-    return data.githubApp.installations.length === 0 ? { status: "empty", data } : { status: "populated", data };
+    return settings.githubApp.installations.length === 0 ? { status: "empty", data } : { status: "populated", data };
+  } catch (error) {
+    if (error instanceof DashboardApiError && error.status === 401) {
+      return { status: "signed-out" };
+    }
+
+    return { status: "error", message: toErrorMessage(error) };
+  }
+}
+
+export async function loadGitHubRepositoryControlsState(): Promise<GitHubRepositoryControlsState> {
+  try {
+    const [settings, oauth] = await Promise.all([
+      requestAuthenticatedJson<WorkspaceSettingsResponse>("/api/settings"),
+      requestAuthenticatedJson<GitHubOAuthStatusResponse>("/api/github/oauth/status")
+    ]);
+
+    return { status: "ready", data: { settings, oauth } };
   } catch (error) {
     if (error instanceof DashboardApiError && error.status === 401) {
       return { status: "signed-out" };

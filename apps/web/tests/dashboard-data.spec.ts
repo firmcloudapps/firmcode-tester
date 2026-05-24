@@ -3,6 +3,7 @@ import {
   loadBillingState,
   loadFindingsState,
   loadGitHubInstallationsState,
+  loadGitHubRepositoryControlsState,
   loadReviewRunDetailState,
   loadSettingsState
 } from "../lib/dashboard-data";
@@ -104,11 +105,29 @@ describe("dashboard findings data loader", () => {
     process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
     process.env.FIRMCODE_DASHBOARD_WORKSPACE_ID = "workspace-1";
     process.env.FIRMCODE_DASHBOARD_CLERK_USER_ID = "user-1";
-    const fetcher = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => jsonResponse(settingsResponse));
+    const fetcher = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
+      const pathname = new URL(String(input)).pathname;
+
+      if (pathname === "/api/github/oauth/status") {
+        return jsonResponse(oauthResponse);
+      }
+
+      if (pathname === "/api/repositories") {
+        return jsonResponse(repositoryResponse);
+      }
+
+      return jsonResponse(settingsResponse);
+    });
 
     vi.stubGlobal("fetch", fetcher);
 
-    await expect(loadGitHubInstallationsState()).resolves.toMatchObject({ status: "populated" });
+    await expect(loadGitHubInstallationsState()).resolves.toMatchObject({
+      status: "populated",
+      data: {
+        oauth: { connected: true },
+        repositories: { repositories: [{ fullName: "openclaw/firmcode" }] }
+      }
+    });
 
     const url = new URL(String(fetcher.mock.calls[0]?.[0]));
     const init = fetcher.mock.calls[0]?.[1] as RequestInit;
@@ -117,6 +136,25 @@ describe("dashboard findings data loader", () => {
     expect(url.pathname).toBe("/api/settings");
     expect(headers.get("x-firmcode-workspace-id")).toBe("workspace-1");
     expect(headers.get("x-firmcode-user-id")).toBe("user-1");
+  });
+
+  it("loads repository GitHub control status without routing controls to missing pages", async () => {
+    process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
+    process.env.FIRMCODE_DASHBOARD_WORKSPACE_ID = "workspace-1";
+    process.env.FIRMCODE_DASHBOARD_CLERK_USER_ID = "user-1";
+    const fetcher = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
+      const pathname = new URL(String(input)).pathname;
+      return jsonResponse(pathname === "/api/github/oauth/status" ? oauthResponse : settingsResponse);
+    });
+
+    vi.stubGlobal("fetch", fetcher);
+
+    await expect(loadGitHubRepositoryControlsState()).resolves.toMatchObject({
+      status: "ready",
+      data: { oauth: { connected: true } }
+    });
+
+    expect(fetcher).toHaveBeenCalledTimes(2);
   });
 
   it("fetches review run detail with dashboard auth headers for artifact role gating", async () => {
@@ -240,6 +278,37 @@ const settingsResponse = {
     enabled: false,
     message: "Email and Slack notification routing is planned after review delivery stabilizes."
   }
+};
+
+const oauthResponse = {
+  connected: true,
+  user: {
+    githubUserId: 42,
+    login: "kelly",
+    name: "Kelly",
+    avatarUrl: null,
+    connectedAt: "2026-05-22T09:00:00.000Z",
+    updatedAt: "2026-05-22T09:00:00.000Z"
+  }
+};
+
+const repositoryResponse = {
+  filters: {},
+  repositories: [
+    {
+      id: "repo-1",
+      owner: "openclaw",
+      name: "firmcode",
+      fullName: "openclaw/firmcode",
+      private: false,
+      defaultBranch: "main",
+      enabled: true,
+      primaryLanguage: "TypeScript",
+      openFindingsCount: 0,
+      lastReview: null,
+      updatedAt: "2026-05-22T10:00:00.000Z"
+    }
+  ]
 };
 
 const reviewRunDetailResponse = {
