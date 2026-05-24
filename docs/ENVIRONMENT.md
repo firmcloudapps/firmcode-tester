@@ -110,6 +110,8 @@ Clerk owns SaaS sign-in, sign-up, sessions, user profile, organizations/workspac
 
 Repository-level dashboard configuration is persisted in PostgreSQL separately from environment defaults. Owners/Admins can fetch and update repository automation and review policy fields through the dashboard API; updates are workspace-scoped, preserve unspecified fields, and record update timestamps plus the Clerk user ID that made the change.
 
+Workspace and repository Rules / Policies settings are also persisted in PostgreSQL through `GET /api/rules` and `PATCH /api/rules`. These policies cover review preferences, comment limits and severity thresholds, category enablement, prompt instructions, ignored paths, generated-file patterns, Semgrep settings, Tree-sitter/LLM/CI toggles, and infrastructure/security toggles. Policy mutations require Owner/Admin membership; prompt instructions that look like secrets or tokens are rejected rather than stored.
+
 ## Semgrep
 
 | Variable | Required | Description |
