@@ -5,14 +5,16 @@ Read AGENTS.md first and follow it strictly.
 Relevant planning docs: docs/TASKS.md Task 9.5, docs/TASK_PROMPTS.md Task 9.5, docs/DASHBOARD_DESIGN.md, docs/DASHBOARD_PROMPTS.md, docs/AUTHORIZATION.md.
 Code context requirement: Before implementing, inspect the repository list, settings GitHub App tab, dashboard API client/fetch patterns, toast or status components, authorization-aware UI patterns, and existing component tests.
 
-Wire Connect GitHub, PR Review, installation status, Sync GitHub, and repository row sync controls to the implemented GitHub installation and repository sync APIs. Controls must show loading, success, error, empty, unauthorized, and disabled states, and must prevent duplicate clicks during in-flight sync.
+Wire Connect GitHub, PR Review, required GitHub OAuth account status, installation status, Sync GitHub, and repository row sync controls to the implemented GitHub OAuth, installation, and repository sync APIs. Controls must show loading, success, error, empty, unauthorized, and disabled states, and must prevent duplicate clicks during in-flight sync.
 
-Use the PR Review workspace pattern from docs/DASHBOARD_DESIGN.md: provider tabs with GitHub active and future providers disabled, separate cards for GitHub account/OAuth and GitHub App installation status, and compact repository automation rows with readiness, enabled state, last review/run, configure, and run/retry actions.
+Use the PR Review workspace pattern from docs/DASHBOARD_DESIGN.md: provider tabs with GitHub active and future providers disabled, separate cards for required GitHub account/OAuth and GitHub App installation status, and compact repository automation rows with readiness, enabled state, last review/run, configure, and run/retry actions.
+
+Every user must connect GitHub OAuth before GitHub-backed workflows become available. Owners/Admins can continue from OAuth connection into GitHub App installation and sync controls; Developers/Viewers see installation status but disabled install/manage controls.
 
 Developers may sync only where docs/AUTHORIZATION.md allows it. Viewers must not receive active mutating controls. Planned or unavailable actions must be disabled rather than linked to missing routes.
 
 Testing requirements:
-- Add component tests for no installation, connected installation, provider tabs, repository automation rows, sync loading, sync success, sync error, unauthorized role, and disabled planned states.
+- Add component tests for missing OAuth, OAuth connected, no installation, connected installation, provider tabs, repository automation rows, sync loading, sync success, sync error, unauthorized role, and disabled planned states.
 - Add interaction tests proving duplicate sync clicks are blocked.
 - Add route/navigation tests for Connect GitHub and Sync GitHub actions.
 

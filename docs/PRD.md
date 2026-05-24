@@ -2,13 +2,27 @@
 
 ## 1. Overview
 
-Firmcode is an AI-powered pull request review and testing platform for GitHub repositories. The personal MVP should deliver high-signal PR reviews by combining deterministic static analysis, semantic parsing, CI log analysis, and LLM reasoning.
+Firmcode is an AI-powered pull request review and testing SaaS platform for GitHub repositories. The MVP should deliver high-signal PR reviews by combining deterministic static analysis, semantic parsing, CI log analysis, and LLM reasoning while supporting real customer workspaces, account management, billing, and tenant isolation from the start.
 
-The product is inspired by CodeRabbit, PR-Agent, Semgrep, and Tree-sitter, but the first release should stay intentionally small: Docker-first local development with Docker Compose, Vercel deployment for the Next.js dashboard, Coolify Docker deployment for the NestJS API and Python worker, NeonDB/PostgreSQL, and Redis/BullMQ.
+The product model is closest to CodeRabbit: teams sign up, connect GitHub identities, install a GitHub App on repositories, manage review automation from a dashboard, and receive PR reviews in GitHub. PR-Agent, Semgrep, and Tree-sitter are implementation references, but the first release should stay intentionally small: Docker-first local development with Docker Compose, Vercel deployment for the Next.js dashboard, Coolify Docker deployment for the NestJS API and Python worker, NeonDB/PostgreSQL, and Redis/BullMQ.
 
 The included `pr-agent/`, `semgrep/`, and `tree-sitter/` repositories are reference implementations only. Firmcode must not directly integrate their source code. Implementation agents should study their logic and patterns, then build Firmcode-owned modules and tests. See `docs/REFERENCE_ANALYSIS.md`.
 
 The dashboard should be a clean, modern light-mode developer SaaS interface built with TypeScript and Tailwind CSS. Clerk owns authentication and billing. NeonDB is the managed PostgreSQL database. See `docs/DASHBOARD_DESIGN.md`.
+
+## 1a. SaaS Product Model
+
+Firmcode must be designed as a multi-tenant SaaS product, not a single-user local tool. Core SaaS requirements:
+
+- Clerk owns sign-up, sign-in, sessions, user profile, organization/workspace switching, member invitations where enabled, and Billing.
+- Every user must authenticate to Firmcode through Clerk and connect GitHub OAuth before using GitHub-backed workflows.
+- Workspaces are the tenant boundary. Every repository, installation, review run, finding, artifact, policy, usage counter, and audit event must be scoped to one workspace.
+- Owners/Admins manage workspace settings, GitHub App installation, repository automation, review policies, members where Clerk permits, and billing.
+- Developers can view operational review data and retry failed runs where policy allows; Viewers are read-only.
+- Billing and plan enforcement are SaaS concerns. Clerk Billing owns checkout/subscription management; Firmcode stores only the plan/usage/capability metadata needed for authorization, quotas, and display.
+- Account management surfaces must include profile access, workspace switcher, member management entry point, billing portal, GitHub OAuth connection status, GitHub App installation status, data retention, notifications, and API keys or an explicit disabled state.
+- Auditability is required for sensitive actions: OAuth connect/disconnect, GitHub App install/disconnect/rescope, repository enablement changes, policy changes, billing capability changes, raw artifact access, and retry actions.
+- Secrets, OAuth access tokens, installation tokens, private keys, webhook secrets, client secrets, raw payloads, private diffs, and raw CI logs must never appear in dashboard responses unless a role-gated redacted artifact flow explicitly allows safe access.
 
 Supporting production-planning docs:
 
@@ -26,7 +40,7 @@ Supporting production-planning docs:
 
 ## 2. Goals
 
-- Connect to GitHub repositories through a GitHub App.
+- Connect every Firmcode user to a GitHub account through OAuth, and connect repositories through a GitHub App installation.
 - Listen to pull request and CI-related webhook events.
 - Fetch PR metadata, changed files, unified diffs, file contents, and check run logs.
 - Parse changed files with Tree-sitter for semantic context.
@@ -78,7 +92,7 @@ Supporting production-planning docs:
 
 ### Included
 
-- GitHub App installation and webhook ingestion.
+- Required GitHub OAuth account connection for every user, plus GitHub App installation and webhook ingestion for repository access.
 - Pull request opened, synchronized, reopened, ready_for_review events.
 - Check suite/check run completed events for CI analysis.
 - Diff extraction with file, hunk, old/new line mapping.
@@ -112,7 +126,7 @@ The MVP dashboard navigation must not expose dead links as active controls. Each
 Required implemented pages and flows:
 
 - Overview: review activity, recent runs, needs-attention items, and links only to implemented destination pages.
-- PR Review: primary workflow for GitHub connection status, GitHub App installation status, repository automation readiness, enabled/disabled review state, and manual run/retry actions.
+- PR Review: primary workflow for required GitHub OAuth account status, GitHub App installation status, repository automation readiness, enabled/disabled review state, and manual run/retry actions.
 - Repositories: repository list, filters, automation status, last review, findings count, and safe row actions.
 - Repository detail/configuration: Overview, Pull Requests, Findings, Configuration, and Activity tabs for one repository.
 - Pull Requests: PR queue and PR detail/history views backed by stored pull request and review run data.
@@ -371,7 +385,9 @@ docs/
 
 ### GitHub App API
 
-- `GET /auth/github/callback`: OAuth callback for user login if enabled.
+- `GET /auth/github`: start required GitHub OAuth account connection for the signed-in Firmcode user.
+- `GET /auth/github/callback`: OAuth callback for required user GitHub account connection.
+- `GET /api/github/oauth/status`: return the caller's GitHub OAuth connection status without exposing OAuth access tokens.
 - `GET /github/installations`: web entry point for GitHub App installation/status.
 - `GET /github/installations/callback`: GitHub App installation callback.
 - `GET /api/github/installations`: list GitHub App installations for the workspace.
@@ -545,6 +561,10 @@ Infrastructure-specific rules should cover:
 
 ## 16. GitHub App Setup
 
+Every Firmcode user must connect GitHub OAuth before using GitHub-backed dashboard workflows. OAuth is used for user identity, GitHub login display, audit trails, and membership checks. GitHub App installation remains the repository access mechanism for webhook ingestion, repository sync, diff/check/log reads, and PR comment publishing.
+
+Owners/Admins install or manage the GitHub App for a workspace after OAuth is connected. Developers/Viewers connect OAuth but do not install or manage the GitHub App unless promoted.
+
 Required permissions:
 
 - Repository contents: read.
@@ -644,7 +664,7 @@ Evidence: changed auth middleware branch bypasses expiry validation.
 - Sandbox Semgrep execution in worker container.
 - Treat CI logs as untrusted and potentially secret-bearing.
 - Validate LLM output and never execute model-generated code.
-- Add organization/repository allowlists for personal MVP.
+- Add organization/repository allowlists for temporary controlled SaaS rollout.
 
 ## 21. Scaling Recommendations
 

@@ -18,6 +18,7 @@ NeonDB
 
 Clerk
 ├── Authentication
+├── Organizations / members
 └── Billing
 ```
 
@@ -26,7 +27,7 @@ Clerk
 - Vercel is the best deployment target for the Next.js dashboard, preview deployments, edge caching, Clerk frontend integration, and fast UI iteration.
 - Coolify Docker is the right target for API and worker services that need long-running processes, queues, Semgrep, Tree-sitter dependencies, GitHub webhooks, and predictable container runtime behavior.
 - NeonDB keeps PostgreSQL managed.
-- Clerk keeps auth and billing managed.
+- Clerk keeps SaaS auth, account/profile management, organizations/members where enabled, and billing managed.
 
 ## Request Flow
 
@@ -87,6 +88,7 @@ GitHub Webhook
 ### Clerk
 
 - Configure production and preview callback URLs for the Vercel dashboard.
+- Configure sign-in/sign-up, user profile, organization/workspace, member-management, and GitHub OAuth redirect URLs.
 - Enable Clerk Billing and expose its subscription portal entry point through `CLERK_BILLING_PORTAL_URL`.
 - Provide `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` to the web app and `CLERK_SECRET_KEY` to server runtimes that validate sessions or call Clerk server APIs.
 

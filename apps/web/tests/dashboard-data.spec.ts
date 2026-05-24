@@ -1,5 +1,11 @@
 import type { FindingsListResponse } from "@firmcode/shared";
-import { loadBillingState, loadFindingsState, loadReviewRunDetailState, loadSettingsState } from "../lib/dashboard-data";
+import {
+  loadBillingState,
+  loadFindingsState,
+  loadGitHubInstallationsState,
+  loadReviewRunDetailState,
+  loadSettingsState
+} from "../lib/dashboard-data";
 
 describe("dashboard findings data loader", () => {
   const originalApiUrl = process.env.NEXT_PUBLIC_API_URL;
@@ -83,6 +89,34 @@ describe("dashboard findings data loader", () => {
     vi.stubGlobal("fetch", fetcher);
 
     await expect(loadSettingsState()).resolves.toMatchObject({ status: "empty" });
+  });
+
+  it("maps GitHub installation entrypoint 401 responses to signed-out state", async () => {
+    process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
+    const fetcher = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => jsonResponse({ message: "Unauthorized" }, 401));
+
+    vi.stubGlobal("fetch", fetcher);
+
+    await expect(loadGitHubInstallationsState()).resolves.toEqual({ status: "signed-out" });
+  });
+
+  it("loads GitHub installation entrypoint status from workspace settings", async () => {
+    process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
+    process.env.FIRMCODE_DASHBOARD_WORKSPACE_ID = "workspace-1";
+    process.env.FIRMCODE_DASHBOARD_CLERK_USER_ID = "user-1";
+    const fetcher = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => jsonResponse(settingsResponse));
+
+    vi.stubGlobal("fetch", fetcher);
+
+    await expect(loadGitHubInstallationsState()).resolves.toMatchObject({ status: "populated" });
+
+    const url = new URL(String(fetcher.mock.calls[0]?.[0]));
+    const init = fetcher.mock.calls[0]?.[1] as RequestInit;
+    const headers = new Headers(init.headers);
+
+    expect(url.pathname).toBe("/api/settings");
+    expect(headers.get("x-firmcode-workspace-id")).toBe("workspace-1");
+    expect(headers.get("x-firmcode-user-id")).toBe("user-1");
   });
 
   it("fetches review run detail with dashboard auth headers for artifact role gating", async () => {

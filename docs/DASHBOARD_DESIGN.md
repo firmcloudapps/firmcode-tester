@@ -2,6 +2,8 @@
 
 Firmcode's dashboard should feel like a clean, modern, light-mode code review SaaS product: calm, precise, fast to scan, and built for repeated engineering workflows. It should feel closer to a polished developer operations console than a marketing site.
 
+Firmcode is a CodeRabbit-style SaaS product. The dashboard must serve real multi-user workspaces: account setup, required GitHub OAuth, GitHub App installation, member management, billing, role-aware settings, and tenant-safe operational views are part of the product, not optional admin extras.
+
 Copy-ready prompts for implementing and QAing the dashboard live in `docs/DASHBOARD_PROMPTS.md`.
 
 ## Technology Direction
@@ -135,7 +137,9 @@ Repository Automation Rows
 Behavior notes:
 
 - GitHub is the only active provider in the MVP. Other providers should appear only as disabled planned states if shown at all.
-- Connection cards should separate user/account connection from GitHub App installation status.
+- Connection cards should separate required user/account OAuth connection from GitHub App installation status.
+- Every signed-in Firmcode user must connect GitHub OAuth before using GitHub-backed workflows. Owners/Admins can then install or manage the GitHub App for repository access; Developers/Viewers see installation status and Owner/Admin-required management states.
+- PR reviews, repository sync, and PR publishing must use GitHub App installation tokens, not individual users' OAuth tokens.
 - Repository rows should make automation state obvious: Ready, Needs setup, Enabled, Disabled, Last reviewed, Failed, or Running.
 - Run/retry controls must respect role capabilities and duplicate-click protection.
 - A short tip can clarify that repositories are matched by exact `owner/repo` name.
@@ -159,9 +163,12 @@ Firmcode should store Clerk-linked metadata:
 - `clerk_user_id`
 - `clerk_org_id`
 - Internal workspace ID.
+- Workspace role and capability metadata needed for app authorization.
+- Required GitHub OAuth identity metadata, such as GitHub user ID, login, avatar URL, scopes, and connection timestamp. Do not expose OAuth access tokens.
 - GitHub installation mapping.
 - Repository review configuration.
 - Usage counters or cached billing-related usage metrics where needed.
+- Audit events for sensitive account, integration, billing, policy, and artifact actions.
 
 ## NeonDB Responsibilities
 

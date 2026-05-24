@@ -1,6 +1,6 @@
 # Authentication And Authorization
 
-Clerk handles identity, sessions, organizations, and billing. Firmcode owns application authorization and GitHub installation access rules.
+Firmcode is a multi-tenant SaaS product. Clerk handles identity, sessions, organizations, member lifecycle where enabled, and billing. Firmcode owns application authorization, workspace resource ownership, GitHub OAuth connection state, and GitHub installation access rules.
 
 ## Identity Model
 
@@ -14,6 +14,22 @@ Firmcode should map Clerk identities to internal workspace records:
 - `updated_at`
 
 If Clerk Organizations are enabled, a Clerk organization maps to one Firmcode workspace. If not enabled for MVP, a user can own a personal workspace.
+
+The workspace is the tenant boundary. Every application row that contains customer data or customer configuration should either belong directly to a workspace or be reachable only through a workspace-owned parent.
+
+## Account Management Requirements
+
+Every SaaS workspace must provide or link to:
+
+- Clerk sign-up and sign-in.
+- Clerk user profile management.
+- Workspace or organization switching.
+- Member invitation/removal/role management through Clerk where available.
+- Billing checkout, subscription management, and customer portal through Clerk Billing.
+- Required GitHub OAuth connection for each user.
+- GitHub App installation management for Owners/Admins.
+- Workspace settings for notifications, retention, API keys or disabled API-key state, and review policy configuration.
+- Clear disabled states when a feature is unavailable in the MVP.
 
 ## Roles
 
@@ -33,6 +49,13 @@ If Clerk Organizations are enabled, a Clerk organization maps to one Firmcode wo
 - Viewers cannot view raw artifacts unless explicitly permitted.
 - Billing requires Owner or Clerk-managed billing role.
 - Billing UI routes users to the Clerk-managed subscription portal. Firmcode should only cache billing status or usage counters needed for authorization and display; Clerk remains the source of truth for plans, seats, checkout, and subscription management.
+
+## GitHub OAuth Requirement
+
+- Every signed-in Firmcode user must connect a GitHub OAuth account before using GitHub-backed dashboard workflows.
+- OAuth identifies the user, supports GitHub username/audit display, and can be used for organization membership checks.
+- OAuth does not grant repository review execution by itself. Review, sync, webhook handling, and PR comment publishing must use GitHub App installation tokens.
+- Owners/Admins can install or manage GitHub App installations after connecting OAuth. Developers/Viewers connect OAuth but cannot install, disconnect, or rescope GitHub App installations unless their workspace role changes.
 
 ## GitHub Installation Mapping
 

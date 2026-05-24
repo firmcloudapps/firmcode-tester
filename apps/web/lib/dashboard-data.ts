@@ -16,6 +16,13 @@ import type { ViewState } from "./view-state";
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
+export type GitHubInstallationsState =
+  | { status: "loading" }
+  | { status: "signed-out" }
+  | { status: "empty"; data: WorkspaceSettingsResponse }
+  | { status: "error"; message: string }
+  | { status: "populated"; data: WorkspaceSettingsResponse };
+
 class DashboardApiError extends Error {
   constructor(
     message: string,
@@ -84,6 +91,20 @@ export async function loadSettingsState(): Promise<ViewState<WorkspaceSettingsRe
 
     return data.githubApp.installations.length === 0 ? { status: "empty", data } : { status: "populated", data };
   } catch (error) {
+    return { status: "error", message: toErrorMessage(error) };
+  }
+}
+
+export async function loadGitHubInstallationsState(): Promise<GitHubInstallationsState> {
+  try {
+    const data = await requestAuthenticatedJson<WorkspaceSettingsResponse>("/api/settings");
+
+    return data.githubApp.installations.length === 0 ? { status: "empty", data } : { status: "populated", data };
+  } catch (error) {
+    if (error instanceof DashboardApiError && error.status === 401) {
+      return { status: "signed-out" };
+    }
+
     return { status: "error", message: toErrorMessage(error) };
   }
 }

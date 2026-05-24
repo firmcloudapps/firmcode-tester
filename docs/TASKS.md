@@ -56,7 +56,7 @@ Tests:
 
 ### Task 0.3: Clerk And NeonDB Foundation
 
-Add project-level configuration conventions for Clerk authentication, Clerk Billing, and NeonDB/PostgreSQL.
+Add project-level configuration conventions for Clerk authentication, Clerk Organizations/workspaces, Clerk Billing, and NeonDB/PostgreSQL.
 
 Acceptance criteria:
 
@@ -64,6 +64,7 @@ Acceptance criteria:
 - Web app has Clerk provider wiring planned or scaffolded.
 - API/database config uses `DATABASE_URL` compatible with NeonDB.
 - Billing page is defined as Clerk-managed subscription portal entry point.
+- SaaS account-management requirements are documented: sign-up/sign-in, user profile, workspace switcher, member management, billing portal, role mapping, plan/capability metadata, and tenant isolation.
 
 Tests:
 
@@ -591,8 +592,9 @@ Acceptance criteria:
 
 - Overview includes review activity, security findings, CI failures, repositories monitored, recent review runs, and needs-attention panel.
 - Findings page supports severity, source, category, repository, status, posted inline, and date filters.
-- Settings page includes General, GitHub App, Members, API Keys, Data Retention, and Notifications tabs.
-- Billing page displays plan/usage placeholders and links to Clerk Billing subscription management.
+- Settings page includes General, GitHub Account/OAuth, GitHub App, Members, API Keys, Data Retention, and Notifications tabs or equivalent sections.
+- Settings exposes SaaS account-management entry points: Clerk profile, workspace/organization profile, member management where allowed, required GitHub OAuth connection, GitHub App installation status, and explicit disabled states for unavailable account features.
+- Billing page displays plan/usage placeholders or counters, role-gated plan capability messaging, and links to Clerk Billing subscription management.
 - All screens use the approved light-mode Tailwind design.
 
 Tests:
@@ -611,6 +613,8 @@ Acceptance criteria:
 - Owner/Admin/Developer/Viewer role capabilities are enforced.
 - Billing and sensitive settings require elevated role.
 - Raw artifact access is role-gated.
+- Tenant isolation is enforced for every SaaS account resource, including workspace settings, members, billing context, GitHub OAuth identity, GitHub installations, repositories, review runs, findings, policies, artifacts, and audit events.
+- Sensitive account and integration actions write audit events.
 
 Tests:
 
@@ -620,22 +624,24 @@ Tests:
 
 ### Task 9.5: GitHub App Setup And Repository Sync Dashboard Flow
 
-Implement the dashboard GitHub App install/status/sync flow so Connect GitHub and Sync GitHub are real product actions rather than placeholder links.
+Implement the dashboard GitHub OAuth account connection plus GitHub App install/status/sync flow so Connect GitHub and Sync GitHub are real product actions rather than placeholder links.
 
 Acceptance criteria:
 
 - `/github/installations` is an implemented Clerk-authenticated dashboard page or route that shows installation status, setup instructions, and a GitHub App install entry point.
-- A PR Review workspace is implemented or planned in the same flow, combining provider tabs, GitHub connection status, GitHub App installation status, repository readiness, enabled state, configure actions, and run/retry actions.
+- Every signed-in Firmcode user must connect a GitHub OAuth account before using GitHub-backed dashboard workflows; OAuth identifies the user, while GitHub App installation tokens remain the only tokens used for repository review, sync, and PR comment publishing.
+- A PR Review workspace is implemented or planned in the same flow, combining provider tabs, required GitHub OAuth account status, GitHub App installation status, repository readiness, enabled state, configure actions, and run/retry actions.
 - GitHub App installation callback/status handling is documented and wired to workspace ownership checks.
 - Dashboard APIs list installations for the caller workspace and sync installation repository metadata.
 - Repository-level sync is available only for repositories owned by the caller workspace.
+- Owners/Admins can install or manage the GitHub App after OAuth is connected; Developers/Viewers must connect OAuth but see an explicit Owner/Admin-required state for installation management.
 - Connect/sync buttons show loading, success, error, and disabled states and never link to missing routes.
 - Empty states explain how to connect GitHub without exposing secrets or private installation tokens.
 
 Tests:
 
-- API tests for installation listing, installation sync, repository sync, ownership denial, and role denial.
-- Component tests for no installation, connected installation, sync loading/error/success, and unauthorized states.
+- API tests for OAuth connection state, installation listing, installation sync, repository sync, ownership denial, and role denial.
+- Component tests for missing OAuth, no installation, connected installation, sync loading/error/success, and unauthorized states.
 - Route/navigation tests proving Connect GitHub and Sync GitHub do not 404.
 
 ### Task 9.6: Repository Detail And Rules/Policies Dashboard Pages

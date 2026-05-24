@@ -60,7 +60,7 @@ REDIS_URL=redis://redis:6379
 | `CLERK_WEBHOOK_SECRET` | api | Clerk webhook signing secret if syncing users/orgs. |
 | `CLERK_BILLING_PORTAL_URL` | web | Clerk-managed subscription portal or account billing entry point shown from the dashboard Billing page. |
 
-Clerk owns sign-in, sign-up, sessions, user profile, organizations where enabled, and Billing. Firmcode should validate Clerk session tokens in the API, map Clerk user/org IDs to internal workspaces, and route subscription management to Clerk Billing instead of storing payment state locally.
+Clerk owns SaaS sign-in, sign-up, sessions, user profile, organizations/workspaces where enabled, member lifecycle where enabled, and Billing. Firmcode should validate Clerk session tokens in the API, map Clerk user/org IDs to internal workspaces, cache only the plan/capability/usage metadata needed for app authorization and display, and route subscription management to Clerk Billing instead of storing payment state locally.
 
 ## GitHub App
 
@@ -69,9 +69,11 @@ Clerk owns sign-in, sign-up, sessions, user profile, organizations where enabled
 | `GITHUB_APP_ID` | yes | GitHub App ID. |
 | `GITHUB_APP_PRIVATE_KEY` | yes | PEM private key, escaped-newline string, or base64-encoded PEM. |
 | `GITHUB_WEBHOOK_SECRET` | yes | Secret used to verify `X-Hub-Signature-256`. |
-| `GITHUB_CLIENT_ID` | oauth | GitHub OAuth client ID if OAuth is enabled. |
-| `GITHUB_CLIENT_SECRET` | oauth | GitHub OAuth client secret if OAuth is enabled. |
-| `GITHUB_ALLOWED_INSTALLATIONS` | no | Comma-separated installation IDs for personal MVP allowlist. |
+| `GITHUB_CLIENT_ID` | yes | GitHub OAuth client ID. Required because every Firmcode user must connect GitHub OAuth. |
+| `GITHUB_CLIENT_SECRET` | yes | GitHub OAuth client secret. Required because every Firmcode user must connect GitHub OAuth. |
+| `GITHUB_ALLOWED_INSTALLATIONS` | no | Comma-separated installation IDs for temporary MVP allowlisting during controlled SaaS rollout. |
+| `GITHUB_APP_INSTALL_URL` | web | Public GitHub App installation URL shown by `/github/installations`, for example `https://github.com/apps/<slug>/installations/new`. |
+| `GITHUB_APP_SLUG` | web | GitHub App slug used to derive the install URL when `GITHUB_APP_INSTALL_URL` is not set. |
 
 ## LLM
 
