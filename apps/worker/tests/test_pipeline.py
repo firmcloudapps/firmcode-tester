@@ -268,8 +268,9 @@ def test_deterministic_pipeline_publishes_actual_analysis_summary() -> None:
     assert "- Evidence: changed line `src/widget.ts:2` contains `const value = eval(input);`." in inline_body
     assert "- Check: `typescript.eval` reported `high` severity." in inline_body
     assert "- Reference: `CWE-95`." in inline_body
-    assert "```typescript" in inline_body
-    assert "  const value = eval(input);" in inline_body
+    assert "```diff" in inline_body
+    assert "-   const value = eval(input);" in inline_body
+    assert "```typescript" not in inline_body
     assert "<summary>🛠 Suggested resolution</summary>" in inline_body
     assert "```text" not in inline_body
     assert "- Validate and parse trusted input instead of evaluating it." in inline_body
@@ -285,8 +286,9 @@ def test_deterministic_pipeline_publishes_actual_analysis_summary() -> None:
     assert "- Evidence: changed line `src/widget.ts:2` contains `const value = eval(input);`." in store.summary_body
     assert "- Check: `typescript.eval` reported `high` severity." in store.summary_body
     assert "- Reference: `CWE-95`." in store.summary_body
-    assert "```typescript" in store.summary_body
-    assert "  const value = eval(input);" in store.summary_body
+    assert "```diff" in store.summary_body
+    assert "-   const value = eval(input);" in store.summary_body
+    assert "```typescript" not in store.summary_body
     assert "<summary>🛠 Suggested resolution</summary>" in store.summary_body
     assert "```text\nValidate and parse trusted input instead of evaluating it." not in store.summary_body
     assert "- Validate and parse trusted input instead of evaluating it." in store.summary_body

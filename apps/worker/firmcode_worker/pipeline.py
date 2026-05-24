@@ -1521,8 +1521,6 @@ def _render_finding_report(
 ) -> str:
     alert = "CAUTION" if severity in {"critical", "high"} else "WARNING" if severity == "medium" else "NOTE"
     severity_label = _inline_severity_label(severity)
-    language = _inline_comment_language(path)
-
     body = [
         f"⚠️ Potential issue | {severity_label} | ⚡ Quick win",
         "",
@@ -1551,8 +1549,8 @@ def _render_finding_report(
                 "",
                 "**Flagged code:**",
                 "",
-                f"```{language}",
-                code_excerpt,
+                "```diff",
+                _render_affected_code_diff(code_excerpt),
                 "```",
             ]
         )
@@ -1653,6 +1651,11 @@ def _render_resolution_bullets(value: str) -> list[str]:
     return [f"- {point}" for point in points] if points else ["- Review this changed line and update it before merging."]
 
 
+def _render_affected_code_diff(value: str) -> str:
+    lines = [line for line in value.strip("\n").splitlines() if line.strip()]
+    return "\n".join(f"- {line}" for line in lines[:12])
+
+
 def _resolution_points(value: str) -> list[str]:
     normalized = _single_line(value.replace("\r", "\n"))
     if not normalized:
@@ -1709,21 +1712,6 @@ def _render_semgrep_fix_diff(original: str, fix: str) -> str:
     diff_lines.extend(f"- {line}" for line in original_lines[:12])
     diff_lines.extend(f"+ {line}" for line in fix_lines[:12])
     return "\n".join(diff_lines) if len(diff_lines) > 1 else f"@@ Suggested replacement @@\n+ {fix.strip()[:1200]}"
-
-
-def _inline_comment_language(path: str) -> str:
-    extension = Path(path).suffix.lower()
-    return {
-        ".go": "go",
-        ".java": "java",
-        ".js": "javascript",
-        ".jsx": "jsx",
-        ".py": "python",
-        ".ts": "typescript",
-        ".tsx": "tsx",
-        ".yaml": "yaml",
-        ".yml": "yaml",
-    }.get(extension, "")
 
 
 def _severity_rank(severity: str) -> int:
