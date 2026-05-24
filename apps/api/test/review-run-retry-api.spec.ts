@@ -15,6 +15,8 @@ interface PgPoolLike {
 const WORKSPACE_ID = "00000000-0000-4000-8000-000000000101";
 const OTHER_WORKSPACE_ID = "00000000-0000-4000-8000-000000000102";
 const DEVELOPER_USER_ID = "user_developer";
+const OWNER_USER_ID = "user_owner";
+const ADMIN_USER_ID = "user_admin";
 const VIEWER_USER_ID = "user_viewer";
 const ACTIVE_FAILED_RUN_ID = "00000000-0000-4000-8000-000000000301";
 const SUCCEEDED_RUN_ID = "00000000-0000-4000-8000-000000000302";
@@ -54,7 +56,7 @@ describe("review run retry dashboard API", () => {
       new PostgresDashboardAuthStore(pool),
       queue
     );
-    controller = new ReviewRunsController(reviewRunsStore, retryService);
+    controller = new ReviewRunsController(reviewRunsStore, new PostgresDashboardAuthStore(pool), retryService);
   });
 
   afterEach(async () => {
@@ -83,6 +85,22 @@ describe("review run retry dashboard API", () => {
       deliveryId: `retry:${ACTIVE_FAILED_RUN_ID}`,
       triggerEvent: "dashboard.retry"
     });
+  });
+
+  it("allows Owner, Admin, and Developer roles to retry failed review runs while Viewer remains read-only", async () => {
+    await expect(controller.retryReviewRun(ACTIVE_FAILED_RUN_ID, WORKSPACE_ID, OWNER_USER_ID)).resolves.toMatchObject({
+      reason: "retry_queued"
+    });
+
+    await resetRetryState(pool);
+
+    await expect(controller.retryReviewRun(ACTIVE_FAILED_RUN_ID, WORKSPACE_ID, ADMIN_USER_ID)).resolves.toMatchObject({
+      reason: "retry_queued"
+    });
+
+    await expect(controller.retryReviewRun(ACTIVE_FAILED_RUN_ID, WORKSPACE_ID, VIEWER_USER_ID)).rejects.toThrow(
+      ForbiddenException
+    );
   });
 
   it("rejects malformed IDs, missing runs, non-failed runs, and deterministic validation failures", async () => {
@@ -149,6 +167,8 @@ INSERT INTO workspaces (id, clerk_org_id, name) VALUES
 ('${OTHER_WORKSPACE_ID}', 'org_other', 'Other');
 
 INSERT INTO workspace_memberships (workspace_id, clerk_user_id, role, active) VALUES
+('${WORKSPACE_ID}', '${OWNER_USER_ID}', 'owner', true),
+('${WORKSPACE_ID}', '${ADMIN_USER_ID}', 'admin', true),
 ('${WORKSPACE_ID}', '${DEVELOPER_USER_ID}', 'developer', true),
 ('${WORKSPACE_ID}', '${VIEWER_USER_ID}', 'viewer', true);
 
@@ -321,4 +341,10 @@ INSERT INTO review_runs (
 );
 `
   );
+}
+
+async function resetRetryState(pool: PgPoolLike): Promise<void> {
+  await pool.query("DELETE FROM review_run_retries WHERE original_review_run_id = $1", [ACTIVE_FAILED_RUN_ID]);
+  await pool.query("DELETE FROM review_runs WHERE id = '00000000-0000-4000-8000-000000000801'");
+  await pool.query("DELETE FROM github_deliveries WHERE delivery_id = $1", [`retry:${ACTIVE_FAILED_RUN_ID}`]);
 }

@@ -74,6 +74,31 @@ describe("ReviewRunDetailView", () => {
     expect(html).toContain("Published comments");
     expect(html).toContain("Inline body");
   });
+
+  it("disables retry and raw artifact controls for read-only review detail permissions", () => {
+    const viewerDetail: ReviewRunDetail = {
+      ...reviewRunDetail,
+      permissions: {
+        canRetryReviewRun: false,
+        canAccessRawArtifacts: false
+      },
+      artifacts: reviewRunDetail.artifacts.map((artifact) => ({
+        ...artifact,
+        storageKey: null,
+        rawAccessAllowed: false,
+        rawAccessUrl: null
+      })),
+      logExcerpts: reviewRunDetail.logExcerpts.map((log) => ({
+        ...log,
+        storageKey: null
+      }))
+    };
+    const html = renderToString(<ReviewRunDetailView state={{ status: "populated", data: viewerDetail }} />);
+
+    expect(html).toContain("Your workspace role cannot retry review runs.");
+    expect(html).toContain("Raw artifact access requires Developer, Admin, or Owner.");
+    expect(html).not.toContain("artifacts/run-6/semgrep.json");
+  });
 });
 
 describe("FindingsView", () => {
@@ -249,6 +274,9 @@ const reviewRunDetail: ReviewRunDetail = {
       artifactType: "semgrep",
       storageKey: "artifacts/run-6/semgrep.json",
       metadata: { findings: 1 },
+      rawAccessAllowed: true,
+      rawAccessRequiredRole: "developer",
+      rawAccessUrl: "/api/review-runs/00000000-0000-4000-8000-000000000006/artifacts/artifact-1/raw",
       createdAt: "2026-05-22T10:00:00.000Z"
     }
   ],
@@ -292,7 +320,11 @@ const reviewRunDetail: ReviewRunDetail = {
       dryRun: false,
       createdAt: "2026-05-22T10:00:00.000Z"
     }
-  ]
+  ],
+  permissions: {
+    canRetryReviewRun: true,
+    canAccessRawArtifacts: true
+  }
 };
 
 const emptyFindingsList: FindingsListResponse = {

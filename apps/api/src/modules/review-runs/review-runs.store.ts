@@ -5,6 +5,7 @@ import type {
   ReviewFindingSource,
   ReviewPipelineStage,
   ReviewPipelineStageStatus,
+  RawReviewRunArtifactAccess,
   ReviewRunArtifact,
   ReviewRunArtifactType,
   ReviewRunChangedFile,
@@ -26,9 +27,22 @@ export const REVIEW_RUNS_STORE = Symbol("REVIEW_RUNS_STORE");
 
 export interface ReviewRunsStore {
   listReviewRuns(filters: ReviewRunListFilters): Promise<ReviewRunListResponse>;
-  getReviewRunDetail(reviewRunId: string): Promise<ReviewRunDetail | null>;
+  getReviewRunDetail(reviewRunId: string, options?: ReviewRunDetailOptions): Promise<ReviewRunDetail | null>;
+  getRawArtifactAccess(input: RawArtifactAccessLookup): Promise<RawReviewRunArtifactAccess | null>;
   createRetryReviewRun(input: CreateRetryReviewRunInput): Promise<ReviewRunRetryCreateResult>;
   markRetryJobQueued(input: MarkRetryJobQueuedInput): Promise<void>;
+}
+
+export interface ReviewRunDetailOptions {
+  readonly workspaceId?: string;
+  readonly canRetryReviewRun?: boolean;
+  readonly canAccessRawArtifacts?: boolean;
+}
+
+export interface RawArtifactAccessLookup {
+  readonly reviewRunId: string;
+  readonly artifactId: string;
+  readonly workspaceId: string;
 }
 
 export interface CreateRetryReviewRunInput {
@@ -144,6 +158,7 @@ interface FindingRow {
 
 interface ArtifactRow {
   readonly id: string;
+  readonly review_run_id: string;
   readonly artifact_type: ReviewRunArtifactType;
   readonly storage_key: string;
   readonly metadata_json: unknown;
@@ -169,7 +184,11 @@ export class EmptyReviewRunsStore implements ReviewRunsStore {
     return { reviewRuns: [], filters };
   }
 
-  async getReviewRunDetail(_reviewRunId: string): Promise<ReviewRunDetail | null> {
+  async getReviewRunDetail(_reviewRunId: string, _options: ReviewRunDetailOptions = {}): Promise<ReviewRunDetail | null> {
+    return null;
+  }
+
+  async getRawArtifactAccess(_input: RawArtifactAccessLookup): Promise<RawReviewRunArtifactAccess | null> {
     return null;
   }
 
@@ -231,7 +250,9 @@ LIMIT 100
     };
   }
 
-  async getReviewRunDetail(reviewRunId: string): Promise<ReviewRunDetail | null> {
+  async getReviewRunDetail(reviewRunId: string, options: ReviewRunDetailOptions = {}): Promise<ReviewRunDetail | null> {
+    const runWhere = options.workspaceId === undefined ? "WHERE rr.id = $1" : "WHERE rr.id = $1 AND gi.workspace_id = $2";
+    const runValues = options.workspaceId === undefined ? [reviewRunId] : [reviewRunId, options.workspaceId];
     const runResult = await this.database.query<ReviewRunRow>(
       `
 SELECT
@@ -254,10 +275,11 @@ SELECT
   rr.updated_at
 FROM review_runs rr
 JOIN repositories r ON r.id = rr.repository_id
+JOIN github_installations gi ON gi.id = r.installation_id
 JOIN pull_requests pr ON pr.id = rr.pull_request_id
-WHERE rr.id = $1
+${runWhere}
 `,
-      [reviewRunId]
+      runValues
     );
     const row = runResult.rows[0];
 
@@ -320,6 +342,7 @@ ORDER BY
       `
 SELECT
   id,
+  review_run_id,
   artifact_type,
   storage_key,
   metadata_json,
@@ -360,7 +383,7 @@ ORDER BY created_at ASC,
     );
     const changedFiles = changedFilesResult.rows.map(toChangedFile);
     const findings = findingsResult.rows.map((finding) => toFinding(finding, postedInlineFindingIds));
-    const artifacts = artifactsResult.rows.map(toArtifact);
+    const artifacts = artifactsResult.rows.map((artifact) => toArtifact(artifact, options.canAccessRawArtifacts === true));
     const publishedComments = commentsResult.rows.map(toPublishedComment);
     const metrics = normalizeJsonObject(row.metrics_json);
     const findingsBySource = countFindingsBySource(findings);
@@ -396,7 +419,48 @@ ORDER BY created_at ASC,
       logExcerpts: deriveLogExcerpts(artifacts),
       createdAt: toRequiredIsoString(row.created_at),
       updatedAt: toRequiredIsoString(row.updated_at),
-      publishedComments
+      publishedComments,
+      permissions: {
+        canRetryReviewRun: options.canRetryReviewRun === true,
+        canAccessRawArtifacts: options.canAccessRawArtifacts === true
+      }
+    };
+  }
+
+  async getRawArtifactAccess(input: RawArtifactAccessLookup): Promise<RawReviewRunArtifactAccess | null> {
+    const result = await this.database.query<ArtifactRow & { review_run_id: string }>(
+      `
+SELECT
+  aa.id,
+  aa.review_run_id,
+  aa.artifact_type,
+  aa.storage_key,
+  aa.metadata_json,
+  aa.created_at
+FROM analysis_artifacts aa
+JOIN review_runs rr ON rr.id = aa.review_run_id
+JOIN repositories r ON r.id = rr.repository_id
+JOIN github_installations gi ON gi.id = r.installation_id
+WHERE aa.id = $1
+  AND aa.review_run_id = $2
+  AND gi.workspace_id = $3
+`,
+      [input.artifactId, input.reviewRunId, input.workspaceId]
+    );
+    const row = result.rows[0];
+
+    if (row === undefined) {
+      return null;
+    }
+
+    return {
+      reviewRunId: row.review_run_id,
+      artifactId: row.id,
+      artifactType: row.artifact_type,
+      storageKey: row.storage_key,
+      metadata: normalizeJsonObject(row.metadata_json),
+      rawAccessAllowed: true,
+      createdAt: toRequiredIsoString(row.created_at)
     };
   }
 
@@ -773,12 +837,15 @@ function toFinding(row: FindingRow, postedInlineFindingIds: ReadonlySet<string>)
   };
 }
 
-function toArtifact(row: ArtifactRow): ReviewRunArtifact {
+function toArtifact(row: ArtifactRow, canAccessRawArtifacts: boolean): ReviewRunArtifact {
   return {
     id: row.id,
     artifactType: row.artifact_type,
-    storageKey: row.storage_key,
+    storageKey: canAccessRawArtifacts ? row.storage_key : null,
     metadata: normalizeJsonObject(row.metadata_json),
+    rawAccessAllowed: canAccessRawArtifacts,
+    rawAccessRequiredRole: "developer",
+    rawAccessUrl: canAccessRawArtifacts ? `/api/review-runs/${row.review_run_id}/artifacts/${row.id}/raw` : null,
     createdAt: toRequiredIsoString(row.created_at)
   };
 }

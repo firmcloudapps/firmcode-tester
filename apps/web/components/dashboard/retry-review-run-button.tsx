@@ -13,17 +13,18 @@ interface RetryReviewRunButtonProps {
   reviewRunId: string;
   status: ReviewRunStatus;
   errorCode?: string | null;
+  canRetry?: boolean;
   compact?: boolean;
 }
 
 type Feedback = { tone: "success" | "error"; message: string } | null;
 
-export function RetryReviewRunButton({ reviewRunId, status, errorCode = null, compact = false }: RetryReviewRunButtonProps) {
-  const retryable = isReviewRunRetryable(status, errorCode);
+export function RetryReviewRunButton({ reviewRunId, status, errorCode = null, canRetry = true, compact = false }: RetryReviewRunButtonProps) {
+  const retryable = canRetry && isReviewRunRetryable(status, errorCode);
   const guardRef = React.useRef(createPendingActionGuard());
   const [pending, setPending] = React.useState(false);
   const [feedback, setFeedback] = React.useState<Feedback>(null);
-  const disabledReason = retryable ? null : getDisabledReason(status, errorCode);
+  const disabledReason = retryable ? null : getDisabledReason(status, canRetry ? errorCode : "role_forbidden");
 
   async function handleRetry() {
     if (!retryable || guardRef.current.isPending) {
@@ -76,6 +77,10 @@ export function RetryReviewRunButton({ reviewRunId, status, errorCode = null, co
 }
 
 function getDisabledReason(status: ReviewRunStatus, errorCode: string | null): string {
+  if (errorCode === "role_forbidden") {
+    return "Your workspace role cannot retry review runs.";
+  }
+
   if (status !== "failed") {
     return "Only failed review runs can be retried.";
   }

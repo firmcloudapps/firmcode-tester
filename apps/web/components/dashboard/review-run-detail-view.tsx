@@ -69,7 +69,12 @@ function ReviewRunDetailContent({ detail }: { detail: ReviewRunDetail }) {
           </div>
           <div className="flex flex-col items-start gap-3 md:items-end">
             <StatusBadge status={detail.status} />
-            <RetryReviewRunButton errorCode={detail.errorCode} reviewRunId={detail.id} status={detail.status} />
+            <RetryReviewRunButton
+              canRetry={detail.permissions.canRetryReviewRun}
+              errorCode={detail.errorCode}
+              reviewRunId={detail.id}
+              status={detail.status}
+            />
           </div>
         </div>
         {detail.errorMessage === null ? null : (
@@ -213,7 +218,13 @@ function ArtifactsSection({ detail }: { detail: ReviewRunDetail }) {
               <h3 className="font-mono text-sm font-semibold text-primary">{artifact.artifactType}</h3>
               <span className="font-mono text-xs text-secondary">{formatDateTime(artifact.createdAt)}</span>
             </div>
-            <p className="mt-2 break-all font-mono text-xs text-secondary">{artifact.storageKey}</p>
+            {artifact.rawAccessAllowed && artifact.storageKey !== null ? (
+              <a className="mt-2 block break-all font-mono text-xs text-accent" href={artifact.rawAccessUrl ?? "#"}>
+                {artifact.storageKey}
+              </a>
+            ) : (
+              <p className="mt-2 text-xs leading-5 text-secondary">Raw artifact access requires Developer, Admin, or Owner.</p>
+            )}
             <pre className="mt-3 max-h-32 overflow-auto rounded-md border border-border bg-surface p-3 text-xs text-primary">
               {JSON.stringify(artifact.metadata, null, 2)}
             </pre>

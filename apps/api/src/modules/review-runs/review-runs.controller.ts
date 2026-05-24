@@ -1,5 +1,18 @@
-import { BadRequestException, Controller, Get, Headers, Inject, NotFoundException, Param, Post, Query } from "@nestjs/common";
 import {
+  BadRequestException,
+  Controller,
+  ForbiddenException,
+  Get,
+  Headers,
+  Inject,
+  NotFoundException,
+  Param,
+  Post,
+  Query,
+  UnauthorizedException
+} from "@nestjs/common";
+import {
+  type RawReviewRunArtifactAccess,
   REVIEW_RUN_STATUSES,
   type ReviewRunDetail,
   type ReviewRunListFilters,
@@ -7,12 +20,19 @@ import {
   type ReviewRunRetryResponse
 } from "@firmcode/shared";
 import { ReviewRunRetryService } from "./review-run-retry.service";
+import {
+  DASHBOARD_AUTH_STORE,
+  roleHasDashboardCapability,
+  type DashboardAuthStore,
+  type DashboardMembership
+} from "./dashboard-auth.store";
 import { REVIEW_RUNS_STORE, type ReviewRunsStore } from "./review-runs.store";
 
 @Controller("api/review-runs")
 export class ReviewRunsController {
   constructor(
     @Inject(REVIEW_RUNS_STORE) private readonly reviewRunsStore: ReviewRunsStore,
+    @Inject(DASHBOARD_AUTH_STORE) private readonly dashboardAuthStore: DashboardAuthStore,
     private readonly retryService?: ReviewRunRetryService
   ) {}
 
@@ -22,14 +42,52 @@ export class ReviewRunsController {
   }
 
   @Get(":id")
-  async getReviewRunDetail(@Param("id") id: string): Promise<ReviewRunDetail> {
-    const detail = await this.reviewRunsStore.getReviewRunDetail(id);
+  async getReviewRunDetail(
+    @Param("id") id: string,
+    @Headers("x-firmcode-workspace-id") workspaceIdHeader?: string | string[],
+    @Headers("x-firmcode-user-id") userIdHeader?: string | string[]
+  ): Promise<ReviewRunDetail> {
+    assertUuid("review run ID", id);
+    const membership = await this.requireMembership(workspaceIdHeader, userIdHeader);
+    const detail = await this.reviewRunsStore.getReviewRunDetail(id, {
+      workspaceId: membership.workspaceId,
+      canRetryReviewRun: roleHasDashboardCapability(membership.role, "retry_review_run"),
+      canAccessRawArtifacts: roleHasDashboardCapability(membership.role, "access_raw_artifacts")
+    });
 
     if (detail === null) {
       throw new NotFoundException("Review run not found");
     }
 
     return detail;
+  }
+
+  @Get(":id/artifacts/:artifactId/raw")
+  async getRawArtifactAccess(
+    @Param("id") id: string,
+    @Param("artifactId") artifactId: string,
+    @Headers("x-firmcode-workspace-id") workspaceIdHeader?: string | string[],
+    @Headers("x-firmcode-user-id") userIdHeader?: string | string[]
+  ): Promise<RawReviewRunArtifactAccess> {
+    assertUuid("review run ID", id);
+    assertUuid("artifact ID", artifactId);
+    const membership = await this.requireMembership(workspaceIdHeader, userIdHeader);
+
+    if (!roleHasDashboardCapability(membership.role, "access_raw_artifacts")) {
+      throw new ForbiddenException("Workspace role cannot access raw analysis artifacts");
+    }
+
+    const artifact = await this.reviewRunsStore.getRawArtifactAccess({
+      reviewRunId: id,
+      artifactId,
+      workspaceId: membership.workspaceId
+    });
+
+    if (artifact === null) {
+      throw new NotFoundException("Analysis artifact not found");
+    }
+
+    return artifact;
   }
 
   @Post(":id/retry")
@@ -47,6 +105,28 @@ export class ReviewRunsController {
       workspaceId: readSingleValue(workspaceIdHeader) ?? null,
       clerkUserId: readSingleValue(userIdHeader) ?? null
     });
+  }
+
+  private async requireMembership(
+    workspaceIdHeader: string | string[] | undefined,
+    userIdHeader: string | string[] | undefined
+  ): Promise<DashboardMembership> {
+    const workspaceId = readSingleValue(workspaceIdHeader) ?? null;
+    const clerkUserId = readSingleValue(userIdHeader) ?? null;
+
+    if (workspaceId === null || clerkUserId === null) {
+      throw new UnauthorizedException("Dashboard authentication is required");
+    }
+
+    assertUuid("workspace ID", workspaceId);
+
+    const membership = await this.dashboardAuthStore.findActiveMembership({ workspaceId, clerkUserId });
+
+    if (membership === null) {
+      throw new NotFoundException("Review run not found");
+    }
+
+    return membership;
   }
 }
 
@@ -92,5 +172,13 @@ function readSingleValue(value: string | string[] | undefined): string | undefin
 function validateIsoDateFilter(name: string, value: string | undefined): void {
   if (value !== undefined && Number.isNaN(Date.parse(value))) {
     throw new BadRequestException(`${name} must be a valid date`);
+  }
+}
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function assertUuid(label: string, value: string): void {
+  if (!UUID_PATTERN.test(value)) {
+    throw new BadRequestException(`${label} must be a UUID`);
   }
 }

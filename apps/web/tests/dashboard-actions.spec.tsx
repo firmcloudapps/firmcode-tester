@@ -111,13 +111,15 @@ describe("repository automation controls", () => {
     const headers = createDashboardApiHeaders(
       {
         FIRMCODE_DASHBOARD_WORKSPACE_ID: "00000000-0000-4000-8000-000000000101",
-        FIRMCODE_DASHBOARD_CLERK_USER_ID: "user_admin"
+        FIRMCODE_DASHBOARD_CLERK_USER_ID: "user_admin",
+        FIRMCODE_DASHBOARD_CLERK_BILLING_CAPABILITY: "manage_billing"
       },
       true
     );
 
     expect(headers.get("x-firmcode-workspace-id")).toBe("00000000-0000-4000-8000-000000000101");
     expect(headers.get("x-firmcode-user-id")).toBe("user_admin");
+    expect(headers.get("x-firmcode-clerk-billing-capability")).toBe("manage_billing");
     expect(headers.get("content-type")).toBe("application/json");
   });
 });

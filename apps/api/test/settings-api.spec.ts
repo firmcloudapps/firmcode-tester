@@ -1,4 +1,4 @@
-import { UnauthorizedException } from "@nestjs/common";
+import { ForbiddenException, NotImplementedException, UnauthorizedException } from "@nestjs/common";
 import { newDb } from "pg-mem";
 import type { ApiRuntimeConfig } from "@firmcode/shared";
 import { runDatabaseMigrations } from "../src/infrastructure/database/migrations";
@@ -14,6 +14,8 @@ interface PgPoolLike {
 
 const WORKSPACE_ID = "00000000-0000-4000-8000-000000000101";
 const OWNER_USER_ID = "user_owner";
+const ADMIN_USER_ID = "user_admin";
+const DEVELOPER_USER_ID = "user_developer";
 const VIEWER_USER_ID = "user_viewer";
 
 function createTestPool(): PgPoolLike {
@@ -76,6 +78,21 @@ describe("settings dashboard API", () => {
     expect(settings.githubApp.installations[0]?.repositoryCount).toBe(2);
   });
 
+  it("requires Owner or Admin for sensitive settings mutations", async () => {
+    await expect(
+      controller.updateRetentionPolicy({ artifactRetentionDays: 14 }, WORKSPACE_ID, OWNER_USER_ID)
+    ).rejects.toThrow(NotImplementedException);
+    await expect(
+      controller.createApiKey({ name: "local smoke" }, WORKSPACE_ID, ADMIN_USER_ID)
+    ).rejects.toThrow(NotImplementedException);
+    await expect(
+      controller.updateRetentionPolicy({ artifactRetentionDays: 14 }, WORKSPACE_ID, DEVELOPER_USER_ID)
+    ).rejects.toThrow(ForbiddenException);
+    await expect(controller.createApiKey({ name: "viewer key" }, WORKSPACE_ID, VIEWER_USER_ID)).rejects.toThrow(
+      ForbiddenException
+    );
+  });
+
   it("requires the Clerk dashboard workspace and user headers", async () => {
     await expect(controller.getWorkspaceSettings(WORKSPACE_ID, undefined)).rejects.toThrow(UnauthorizedException);
     await expect(controller.getWorkspaceSettings(undefined, OWNER_USER_ID)).rejects.toThrow(UnauthorizedException);
@@ -129,6 +146,8 @@ INSERT INTO workspaces (id, clerk_org_id, name) VALUES
 
 INSERT INTO workspace_memberships (workspace_id, clerk_user_id, role, active) VALUES
 ('${WORKSPACE_ID}', '${OWNER_USER_ID}', 'owner', true),
+('${WORKSPACE_ID}', '${ADMIN_USER_ID}', 'admin', true),
+('${WORKSPACE_ID}', '${DEVELOPER_USER_ID}', 'developer', true),
 ('${WORKSPACE_ID}', '${VIEWER_USER_ID}', 'viewer', true);
 
 INSERT INTO github_installations (
