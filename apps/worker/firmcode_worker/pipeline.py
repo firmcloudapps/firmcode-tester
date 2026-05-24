@@ -1132,7 +1132,7 @@ def render_summary_comment(
     semgrep_findings = _read_list(semgrep_artifact.get("findings"))
     semgrep_errors = _read_list(semgrep_artifact.get("errors"))
     risk_level = _risk_level(semgrep_findings, semgrep_errors)
-    components = _changed_components(changed_files)
+    component_lines = _changed_component_lines(changed_files)
     review_blocks = [_render_summary_semgrep_finding(finding, changed_files) for finding in semgrep_findings[:8]]
     if not review_blocks:
         review_blocks = ["No actionable issues were found in the selected changed files."]
@@ -1153,7 +1153,7 @@ def render_summary_comment(
             *review_blocks,
             "",
             *_details_section("Risk", [f"- Level: {risk_level}"]),
-            *_details_section("Changed Components", [f"- {component}" for component in (components or ["No supported changed files were selected."])]),
+            *_details_section("Changed Components", component_lines),
             *_details_section("Suggested Tests", [f"- {suggestion}" for suggestion in suggestions]),
             "<sub>FirmcodeAI grounds this summary in changed files and automated review evidence.</sub>",
         ]
@@ -1871,6 +1871,62 @@ def _changed_components(files: Sequence[ChangedFile]) -> list[str]:
         component = "/".join(parts[:2]) if len(parts) > 1 else parts[0]
         counts[component] += 1
     return [f"`{name}` ({count} file{'s' if count != 1 else ''})" for name, count in counts.most_common(8)]
+
+
+def _changed_component_lines(files: Sequence[ChangedFile]) -> list[str]:
+    components = _changed_components(files)
+    if not components:
+        return ["- No supported changed files were selected."]
+
+    lines = [f"- {component}" for component in components]
+    files_with_patches = [file for file in files if file.patch]
+    if not files_with_patches:
+        return lines
+
+    lines.extend(["", "**Changed code**", ""])
+    for file in files_with_patches[:6]:
+        rendered_patch = _render_changed_component_patch(file.patch or "")
+        if not rendered_patch:
+            continue
+        lines.extend(
+            [
+                f"**`{file.path}`** (+{file.additions}/-{file.deletions})",
+                "",
+                "```diff",
+                rendered_patch,
+                "```",
+                "",
+            ]
+        )
+
+    hidden_count = max(0, len(files_with_patches) - 6)
+    if hidden_count:
+        lines.append(f"- ...and {hidden_count} more changed file{'s' if hidden_count != 1 else ''}.")
+    return lines
+
+
+def _render_changed_component_patch(patch: str) -> str:
+    rendered: list[str] = []
+    content_line_count = 0
+    for raw_line in patch.replace("\r\n", "\n").replace("\r", "\n").splitlines():
+        if raw_line.startswith("@@"):
+            rendered.append(raw_line[:200])
+            continue
+        if raw_line.startswith("\\"):
+            continue
+        if raw_line.startswith("-"):
+            rendered.append(f"- {raw_line[1:200]}")
+        elif raw_line.startswith("+"):
+            rendered.append(f"! {raw_line[1:200]}")
+        elif raw_line.startswith(" "):
+            rendered.append(f"  {raw_line[1:200]}")
+        else:
+            rendered.append(raw_line[:200])
+        content_line_count += 1
+        if content_line_count >= 20:
+            rendered.append("...")
+            break
+    return "\n".join(rendered[:24])
 
 
 def _test_suggestions(files: Sequence[ChangedFile], findings: Sequence[Any]) -> list[str]:
