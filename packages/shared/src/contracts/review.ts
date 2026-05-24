@@ -577,7 +577,14 @@ export interface WorkspaceSettingsResponse {
   };
 }
 
-export type ReviewRunArtifactType = "diff" | "treesitter" | "semgrep" | "context_pack" | "llm_raw" | "ci_log";
+export type ReviewRunArtifactType =
+  | "diff"
+  | "treesitter"
+  | "semgrep"
+  | "context_pack"
+  | "llm_raw"
+  | "ci_log"
+  | "ci_failure_explanation";
 
 export interface ReviewRunArtifact {
   id: string;
@@ -646,6 +653,74 @@ export interface ReviewRunDetail extends ReviewRunSummary {
     canRetryReviewRun: boolean;
     canAccessRawArtifacts: boolean;
   };
+}
+
+export interface CiFailureListFilters {
+  repositoryId?: string;
+  repository?: string;
+  status?: ReviewRunStatus;
+  flaky?: boolean;
+  dateFrom?: string;
+  dateTo?: string;
+  limit?: number;
+}
+
+export interface CiFailureFailedJob {
+  id: string;
+  workflowName: string | null;
+  jobName: string;
+  checkRunId: number;
+  conclusion: string;
+  stepName: string | null;
+  category: string;
+  detailsUrl: string | null;
+}
+
+export interface CiFailureListItem {
+  id: string;
+  repositoryId: string;
+  repositoryFullName: string;
+  pullRequestId: string;
+  pullRequestNumber: number;
+  pullRequestTitle: string;
+  reviewRunId: string;
+  failedJob: CiFailureFailedJob;
+  rootCauseSummary: string;
+  flakySuspected: boolean;
+  suggestedFix: string | null;
+  status: ReviewRunStatus;
+  createdAt: string;
+}
+
+export interface CiFailureListResponse {
+  ciFailures: CiFailureListItem[];
+  filters: CiFailureListFilters;
+  pagination: {
+    limit: number;
+    returned: number;
+  };
+}
+
+export interface CiFailureSuggestedFix {
+  id: string;
+  text: string;
+}
+
+export interface CiFailureRelatedReviewRun {
+  id: string;
+  status: ReviewRunStatus;
+  createdAt: string;
+  detailUrl: string;
+}
+
+export interface CiFailureDetailResponse extends CiFailureListItem {
+  rootCause: string;
+  suggestedFixes: CiFailureSuggestedFix[];
+  failedJobs: CiFailureFailedJob[];
+  relatedReviewRun: CiFailureRelatedReviewRun;
+  relatedArtifacts: ReviewRunArtifact[];
+  logExcerpts: Array<ReviewRunLogExcerpt & { collapsed: true }>;
+  unavailableLogNotes: unknown[];
 }
 
 export interface WorkspaceBillingResponse {
