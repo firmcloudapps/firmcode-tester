@@ -10,6 +10,7 @@ from firmcode_worker.pipeline import (
     DeterministicReviewPipeline,
     GitHubFile,
     ReviewContext,
+    _inline_review_body,
     _partition_existing_inline_comments,
     _render_resolution_bullets,
     normalize_private_key,
@@ -225,6 +226,13 @@ def test_render_resolution_bullets_splits_major_points() -> None:
     ]
 
 
+def test_inline_review_body_omits_internal_run_ids() -> None:
+    body = _inline_review_body([{"path": "src/a.ts"}, {"path": "src/b.ts"}])
+
+    assert body == "FirmcodeAI left 2 inline code review comments on changed code."
+    assert "review run" not in body
+
+
 def test_deterministic_pipeline_publishes_actual_analysis_summary() -> None:
     store = RecordingStore()
     github = FakeGitHub()
@@ -246,6 +254,9 @@ def test_deterministic_pipeline_publishes_actual_analysis_summary() -> None:
     inline_body = str(github.inline_review_comments[0]["body"])
     assert "⚠️ Potential issue | 🟠 Major | ⚡ Quick win" in inline_body
     assert "<summary>Analysis chain</summary>" in inline_body
+    assert "- Evidence: changed line `src/widget.ts:2` contains `const value = eval(input);`." in inline_body
+    assert "- Check: `typescript.eval` reported `high` severity." in inline_body
+    assert "- Reference: `CWE-95`." in inline_body
     assert "```typescript" in inline_body
     assert "  const value = eval(input);" in inline_body
     assert "<summary>🛠 Suggested resolution</summary>" in inline_body
@@ -260,6 +271,9 @@ def test_deterministic_pipeline_publishes_actual_analysis_summary() -> None:
     assert "### Code Review" in store.summary_body
     assert "⚠️ Potential issue | 🟠 Major | ⚡ Quick win" in store.summary_body
     assert "<summary>Analysis chain</summary>" in store.summary_body
+    assert "- Evidence: changed line `src/widget.ts:2` contains `const value = eval(input);`." in store.summary_body
+    assert "- Check: `typescript.eval` reported `high` severity." in store.summary_body
+    assert "- Reference: `CWE-95`." in store.summary_body
     assert "```typescript" in store.summary_body
     assert "  const value = eval(input);" in store.summary_body
     assert "<summary>🛠 Suggested resolution</summary>" in store.summary_body
