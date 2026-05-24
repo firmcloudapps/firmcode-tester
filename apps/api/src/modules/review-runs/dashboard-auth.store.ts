@@ -8,7 +8,8 @@ export type DashboardCapability =
   | "manage_repository_configuration"
   | "manage_sensitive_settings"
   | "access_raw_artifacts"
-  | "manage_billing";
+  | "manage_billing"
+  | "manage_github_installations";
 
 export interface DashboardMembership {
   workspaceId: string;
@@ -42,6 +43,8 @@ export function roleHasDashboardCapability(
       return role === "owner" || role === "admin" || role === "developer";
     case "manage_billing":
       return role === "owner" || role === "admin" || options.hasClerkBillingCapability === true;
+    case "manage_github_installations":
+      return role === "owner" || role === "admin";
   }
 }
 

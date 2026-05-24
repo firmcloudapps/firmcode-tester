@@ -13,6 +13,8 @@ const EXPECTED_TABLES = [
   "findings",
   "github_deliveries",
   "github_installations",
+  "github_oauth_connections",
+  "github_oauth_states",
   "published_comments",
   "pull_requests",
   "repositories",
@@ -160,7 +162,8 @@ ORDER BY table_name
       "001_initial_review_schema",
       "002_dry_run_published_comments",
       "003_dashboard_auth_retry_state",
-      "004_repository_review_configuration"
+      "004_repository_review_configuration",
+      "005_github_oauth_and_sync"
     ]);
     expect(secondRunMigrationIds).toEqual([]);
     expect(tables.rows.map((row) => row.table_name)).toEqual(EXPECTED_TABLES);
@@ -168,7 +171,8 @@ ORDER BY table_name
       { id: "001_initial_review_schema" },
       { id: "002_dry_run_published_comments" },
       { id: "003_dashboard_auth_retry_state" },
-      { id: "004_repository_review_configuration" }
+      { id: "004_repository_review_configuration" },
+      { id: "005_github_oauth_and_sync" }
     ]);
   });
 
