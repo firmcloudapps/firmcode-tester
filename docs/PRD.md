@@ -33,7 +33,7 @@ Supporting production-planning docs:
 - Run Semgrep scans against changed files and infrastructure code.
 - Generate grounded AI review comments, PR summaries, test suggestions, and CI failure explanations.
 - Post summaries and inline review comments back to GitHub.
-- Provide a local dashboard for review runs, findings, repositories, and job failures.
+- Provide a local dashboard for review runs, findings, repositories, pull requests, CI failures, rules/policies, settings, billing, and GitHub App setup.
 - Use Clerk for authentication and billing.
 - Use NeonDB as the managed PostgreSQL database.
 - Enforce app-level workspace authorization on top of Clerk identity.
@@ -88,7 +88,8 @@ Supporting production-planning docs:
 - LLM review generation using structured prompts.
 - Inline review comment posting through GitHub Reviews API.
 - PR summary as a normal issue comment or review body.
-- Light-mode TypeScript/Tailwind dashboard with repositories, review runs, status, findings, and logs.
+- Light-mode TypeScript/Tailwind dashboard with repositories, repository detail/configuration, pull requests, review runs, findings, CI failures, rules/policies, settings, billing, GitHub App setup, and raw/redacted artifacts.
+- GitHub App install entry point, installation status, and repository metadata sync controls that are functional or explicitly disabled until backend support exists.
 - Clerk-backed sign-in, user menu, organizations/workspaces where enabled, and billing portal.
 - Webhook idempotency, superseded-run protection, and delivery replay handling.
 - Large-PR handling with prioritized and summary-only modes.
@@ -103,6 +104,27 @@ Supporting production-planning docs:
 - Kubernetes operator.
 - Custom Semgrep rule authoring UI.
 - Enterprise audit log UI beyond basic persisted audit events.
+
+### Required Dashboard Surfaces
+
+The MVP dashboard navigation must not expose dead links as active controls. Each sidebar/topbar action must either route to an implemented page/API flow or render as a disabled planned-state control with clear accessible labeling.
+
+Required implemented pages and flows:
+
+- Overview: review activity, recent runs, needs-attention items, and links only to implemented destination pages.
+- PR Review: primary workflow for GitHub connection status, GitHub App installation status, repository automation readiness, enabled/disabled review state, and manual run/retry actions.
+- Repositories: repository list, filters, automation status, last review, findings count, and safe row actions.
+- Repository detail/configuration: Overview, Pull Requests, Findings, Configuration, and Activity tabs for one repository.
+- Pull Requests: PR queue and PR detail/history views backed by stored pull request and review run data.
+- Review Runs: run list, run detail, retry controls, redacted summaries, and role-gated raw artifacts.
+- Findings: filterable findings inbox and detail surface.
+- CI Failures: queue/detail view for failed workflows, failed jobs, root cause summaries, suggested fixes, and redacted log excerpts.
+- Rules / Policies: workspace and repository review policies, comment limits, severity thresholds, ignored paths, prompt instructions, and Semgrep/analysis toggles.
+- Settings: General, GitHub App, Members, API Keys, Data Retention, and Notifications.
+- Billing: Clerk-managed billing status, usage placeholders or counters, and a role-gated Manage Subscription entry point.
+- GitHub App setup: connect/install entry point, installation callback/status, installation list, repository sync, and clear error/retry states.
+
+Until a required flow is implemented, the dashboard must not present it as an active link or button.
 
 ## 7. System Architecture
 
@@ -145,6 +167,9 @@ apps/
         webhooks/
         repositories/
         pull-requests/
+        ci-failures/
+        rules/
+        billing/
         review-runs/
         queues/
         health/
@@ -324,18 +349,34 @@ docs/
 
 ### Dashboard API
 
-- `GET /api/repositories`: list enabled repositories.
-- `PATCH /api/repositories/:id`: enable/disable review automation.
+- `GET /api/repositories`: list repositories with dashboard filters.
+- `GET /api/repositories/:id`: repository detail with PRs, findings, activity, and configuration summary.
+- `GET /api/repositories/:id/configuration`: repository review configuration.
+- `PATCH /api/repositories/:id/configuration`: update repository review configuration.
+- `POST /api/repositories/:id/sync`: sync one repository from GitHub.
 - `GET /api/review-runs`: list runs with filters.
 - `GET /api/review-runs/:id`: run detail, metrics, findings, artifacts.
 - `POST /api/review-runs/:id/retry`: retry failed run.
+- `GET /api/review-runs/:id/artifacts/:artifactId/raw`: role-gated raw artifact access metadata.
+- `GET /api/pull-requests`: PR queue with filters.
 - `GET /api/pull-requests/:id`: PR detail and review history.
+- `GET /api/ci-failures`: CI failure queue with filters.
+- `GET /api/ci-failures/:id`: CI failure detail with redacted log excerpts.
+- `GET /api/rules`: workspace and repository policy settings.
+- `PATCH /api/rules`: update policy settings with role authorization.
+- `GET /api/settings`: workspace settings.
+- `PATCH /api/settings/retention`: update retention policy with elevated role.
+- `POST /api/settings/api-keys`: create/manage API keys when implemented.
+- `GET /api/billing`: role-gated Clerk-managed billing context.
 
 ### GitHub App API
 
 - `GET /auth/github/callback`: OAuth callback for user login if enabled.
-- `GET /github/installations`: list GitHub App installations.
-- `POST /github/repositories/:id/sync`: sync repository metadata.
+- `GET /github/installations`: web entry point for GitHub App installation/status.
+- `GET /github/installations/callback`: GitHub App installation callback.
+- `GET /api/github/installations`: list GitHub App installations for the workspace.
+- `POST /api/github/installations/sync`: sync installation and repository metadata.
+- `POST /api/github/repositories/:id/sync`: sync one repository metadata record.
 
 ## 11. Webhook Flow
 

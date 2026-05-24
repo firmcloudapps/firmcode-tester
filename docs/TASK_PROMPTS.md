@@ -366,6 +366,46 @@ Code context requirement: Before implementing, inspect the current Firmcode code
 Implement Clerk-backed app authorization rules from docs/AUTHORIZATION.md. Every dashboard API must check workspace membership and resource ownership. Enforce Owner/Admin/Developer/Viewer role capabilities, require elevated roles for billing and sensitive settings, and role-gate raw artifact access. Add API authorization tests for every dashboard resource type, role capability tests, and cross-workspace access denial tests. Acceptance criteria are in docs/TASKS.md Task 9.4.
 ```
 
+## Task 9.5: GitHub App Setup And Repository Sync Dashboard Flow
+
+```text
+Read AGENTS.md first and follow it strictly.
+Relevant planning docs: docs/TASKS.md Task 9.5, docs/PRD.md, docs/DASHBOARD_DESIGN.md, docs/DASHBOARD_PROMPTS.md, docs/AUTHORIZATION.md, docs/ENVIRONMENT.md, docs/DEPLOYMENT.md, docs/WEBHOOK_IDEMPOTENCY.md.
+Acceptance/test criteria: Follow the acceptance criteria and tests for this task in docs/TASKS.md; add or update automated tests and do not declare the task done until those checks pass or any inability to run them is documented.
+Code context requirement: Before implementing, inspect the current GitHub App configuration, dashboard shell/topbar/sidebar, repository list actions, settings GitHub App tab, dashboard API clients, API GitHub modules, installation persistence, repository sync code, authorization helpers, and tests.
+Implement the GitHub App install/status/sync dashboard flow so Connect GitHub and Sync GitHub are real product actions. Add a Clerk-authenticated /github/installations route or page and a PR Review workspace pattern that combines provider tabs, GitHub connection status, GitHub App installation status, repository readiness, enabled state, configure actions, and run/retry actions. Add installation callback/status handling, workspace-scoped installation listing, installation repository sync, repository-level sync, and complete loading/success/error/disabled UI states. Ensure no route or button points to a missing page. Add API, component, and route/navigation tests for installation listing, installation sync, repository sync, ownership denial, role denial, connected and unconnected states, and no-404 navigation. Acceptance criteria are in docs/TASKS.md Task 9.5.
+```
+
+## Task 9.6: Repository Detail And Rules/Policies Dashboard Pages
+
+```text
+Read AGENTS.md first and follow it strictly.
+Relevant planning docs: docs/TASKS.md Task 9.6, docs/PRD.md, docs/DASHBOARD_DESIGN.md, docs/DASHBOARD_PROMPTS.md, docs/AUTHORIZATION.md, docs/PRIVACY_RETENTION.md, docs/LARGE_PR_HANDLING.md.
+Acceptance/test criteria: Follow the acceptance criteria and tests for this task in docs/TASKS.md; add or update automated tests and do not declare the task done until those checks pass or any inability to run them is documented.
+Code context requirement: Before implementing, inspect existing repository list/detail routes, review run and finding APIs, repository configuration APIs, authorization policies, sidebar links, repository row actions, rules/policy data models, dashboard components, and tests.
+Build the repository detail/configuration page and Rules / Policies page referenced by dashboard navigation. /repositories/:id must include Overview, Pull Requests, Findings, Configuration, and Activity tabs with ownership checks and role-aware configuration controls. /rules must cover review preferences, comment policy, prompt instructions, ignored paths, Semgrep/analysis toggles, and infrastructure/security policies, with mutations restricted to Owner/Admin. Add API tests, component tests, read-only role tests, cross-workspace denial tests, and navigation tests proving repository Configure and Rules / Policies destinations do not 404. Acceptance criteria are in docs/TASKS.md Task 9.6.
+```
+
+## Task 9.7: Pull Requests And CI Failures Dashboard Pages
+
+```text
+Read AGENTS.md first and follow it strictly.
+Relevant planning docs: docs/TASKS.md Task 9.7, docs/PRD.md, docs/DASHBOARD_DESIGN.md, docs/DASHBOARD_PROMPTS.md, docs/AUTHORIZATION.md, docs/LLM_STRATEGY.md, docs/PRIVACY_RETENTION.md.
+Acceptance/test criteria: Follow the acceptance criteria and tests for this task in docs/TASKS.md; add or update automated tests and do not declare the task done until those checks pass or any inability to run them is documented.
+Code context requirement: Before implementing, inspect current pull request persistence, review run APIs, findings APIs, CI failure explanation artifacts, overview needs-attention links, sidebar navigation, dashboard data fixtures, API filters, authorization helpers, and tests.
+Build the Pull Requests and CI Failures dashboard pages. /pull-requests must provide a filterable PR queue and PR detail/history view. /ci-failures must provide failed workflow/job queue and detail views with root cause summaries, suggested fixes, related review runs, and collapsed redacted log excerpts. APIs must enforce workspace membership, resource ownership, and safe malformed-filter handling. Add API tests, component tests for loading/empty/error/populated and responsive states, and navigation tests proving Pull Requests and CI Failures routes do not 404 once enabled. Acceptance criteria are in docs/TASKS.md Task 9.7.
+```
+
+## Task 9.8: Dashboard Navigation Readiness And No-Dead-Link QA
+
+```text
+Read AGENTS.md first and follow it strictly.
+Relevant planning docs: docs/TASKS.md Task 9.8, docs/PRD.md, docs/DASHBOARD_DESIGN.md, docs/DASHBOARD_PROMPTS.md, docs/AUTHORIZATION.md.
+Acceptance/test criteria: Follow the acceptance criteria and tests for this task in docs/TASKS.md; add or update automated tests and do not declare the task done until those checks pass or any inability to run them is documented.
+Code context requirement: Before implementing, inspect the dashboard route tree, sidebar/topbar navigation definitions, overview needs-attention links, repository row actions, settings and billing actions, route tests, component tests, and visual smoke tooling.
+Audit dashboard navigation and primary actions so implemented destinations are active, planned destinations are disabled, and no dashboard control leads to a 404. Add route manifest or component tests that fail when an active internal dashboard link points to an unimplemented route. Add regression coverage for disabled planned actions and run or document a browser smoke test across Overview, Repositories, Review Runs, Findings, Settings, Billing, and any newly enabled pages. Acceptance criteria are in docs/TASKS.md Task 9.8.
+```
+
 ## Task 10.1: Observability
 
 ```text

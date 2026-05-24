@@ -15,10 +15,10 @@ interface OverviewViewProps {
 
 const metricToneClassName: Record<OverviewMetric["tone"], string> = {
   neutral: "text-secondary",
-  info: "text-sky-700",
-  success: "text-green-700",
-  warning: "text-amber-700",
-  critical: "text-red-700"
+  info: "text-ember",
+  success: "text-success",
+  warning: "text-warning",
+  critical: "text-critical"
 };
 
 const attentionKindLabel: Record<OverviewDashboardData["needsAttention"][number]["kind"], string> = {
@@ -99,7 +99,7 @@ function TrendBars({ metric }: { metric: OverviewMetric }) {
       {metric.trend.slice(-6).map((value, index) => (
         <span
           key={`${metric.id}-${index}`}
-          className={`w-1.5 rounded-sm ${metric.tone === "critical" ? "bg-red-300" : "bg-blue-300"}`}
+          className={`w-1.5 rounded-sm ${metric.tone === "critical" ? "bg-red-300" : "bg-orange-300"}`}
           style={{ height: `${Math.max(6, Math.round((value / max) * 36))}px` }}
         />
       ))}

@@ -17,7 +17,7 @@ Read docs/DASHBOARD_DESIGN.md, docs/PRD.md, docs/TASKS.md, CLAUDE.md, and docs/R
 Read AGENTS.md first and follow it strictly.
 Relevant planning docs: docs/DASHBOARD_DESIGN.md, docs/DASHBOARD_PROMPTS.md, docs/PRD.md, docs/AUTHORIZATION.md, docs/ENVIRONMENT.md, docs/DEPLOYMENT.md, docs/TASKS.md, CLAUDE.md.
 Acceptance/test criteria: Verify against docs/DASHBOARD_DESIGN.md with component tests for loading, empty, error, and populated states where applicable, plus responsive/accessibility/visual smoke checks; do not declare done until checks pass or any inability to run them is documented.
-Build the Firmcode dashboard app shell following docs/DASHBOARD_DESIGN.md. Implement a light-mode SaaS layout with top bar, workspace switcher, global search placeholder, GitHub connect action, notifications placeholder, Clerk user menu area, and left sidebar navigation for Overview, Repositories, Pull Requests, Review Runs, Findings, CI Failures, Rules / Policies, Settings, and Billing. Use TypeScript and Tailwind CSS. Make the shell responsive with a mobile sidebar drawer. Include accessible navigation states, active route styling, loading states, and component tests.
+Build the Firmcode dashboard app shell following docs/DASHBOARD_DESIGN.md. Implement a light-mode SaaS layout with top bar, workspace switcher, global search placeholder, GitHub connect action, notifications placeholder, Clerk user menu area, and grouped left sidebar navigation. Include Review links for Overview, PR Review, Repositories, Pull Requests, Review Runs, Findings, and CI Failures; Configuration links for Rules / Policies and GitHub App; and Account links for Billing and Settings. Use TypeScript and Tailwind CSS. Make the shell responsive with a mobile sidebar drawer. Include accessible navigation states, active route styling, disabled planned states, loading states, and component tests.
 ```
 
 ## Overview Page
@@ -36,6 +36,15 @@ Read AGENTS.md first and follow it strictly.
 Relevant planning docs: docs/DASHBOARD_DESIGN.md, docs/DASHBOARD_PROMPTS.md, docs/PRD.md, docs/AUTHORIZATION.md, docs/ENVIRONMENT.md, docs/DEPLOYMENT.md, docs/TASKS.md, CLAUDE.md.
 Acceptance/test criteria: Verify against docs/DASHBOARD_DESIGN.md with component tests for loading, empty, error, and populated states where applicable, plus responsive/accessibility/visual smoke checks; do not declare done until checks pass or any inability to run them is documented.
 Build the Firmcode Repositories page following docs/DASHBOARD_DESIGN.md. Include header actions for Sync GitHub and Connect GitHub App, filters for enabled/disabled/private/public/language, and a repository table with repository name, default branch, visibility, review automation status, last PR reviewed, last run status, open findings, and actions. Add row actions for enable/disable, configure, view runs, and sync. Use TypeScript, Tailwind CSS, typed DTOs, Clerk-authenticated access, and tests for loading, empty, error, and populated states.
+```
+
+## PR Review Workspace
+
+```text
+Read AGENTS.md first and follow it strictly.
+Relevant planning docs: docs/DASHBOARD_DESIGN.md, docs/DASHBOARD_PROMPTS.md, docs/PRD.md, docs/AUTHORIZATION.md, docs/ENVIRONMENT.md, docs/DEPLOYMENT.md, docs/TASKS.md Task 9.5, CLAUDE.md.
+Acceptance/test criteria: Verify against docs/DASHBOARD_DESIGN.md with component tests for loading, empty, error, connected, disconnected, unauthorized, and repository automation states; route/navigation tests must prove the PR Review link and related actions do not 404; do not declare done until checks pass or any inability to run them is documented.
+Build the Firmcode PR Review workspace as the focused page for repository review automation. Use a full-width light layout with provider tabs where GitHub is active and future providers are disabled planned states. Show separate connection cards for GitHub account/OAuth status and Firmcode GitHub App installation status. Render compact repository automation rows with repository identity, exact owner/repo, readiness status, enabled control, last review/run status, configure action, and run/retry action. Do not expose raw installation tokens, private keys, webhook secrets, or raw payloads. Role-gate mutating controls according to docs/AUTHORIZATION.md.
 ```
 
 ## Repository Detail
@@ -101,6 +110,24 @@ Acceptance/test criteria: Verify against docs/DASHBOARD_DESIGN.md with component
 Build the Firmcode Settings and Billing shells following docs/DASHBOARD_DESIGN.md. Settings should include General, GitHub App, Members, API Keys, Data Retention, and Notifications tabs. Clerk owns identity and member management where possible. Billing should show current plan, monthly usage, review runs, AI tokens, repositories, seats, and a Manage Subscription action through Clerk Billing. Use TypeScript, Tailwind CSS, Clerk-gated access, NeonDB-backed settings data, and tests.
 ```
 
+## GitHub App Setup And Sync
+
+```text
+Read AGENTS.md first and follow it strictly.
+Relevant planning docs: docs/DASHBOARD_DESIGN.md, docs/DASHBOARD_PROMPTS.md, docs/PRD.md, docs/AUTHORIZATION.md, docs/ENVIRONMENT.md, docs/DEPLOYMENT.md, docs/TASKS.md Task 9.5, CLAUDE.md.
+Acceptance/test criteria: Verify against docs/DASHBOARD_DESIGN.md with component tests for loading, empty, error, unauthorized, and connected states, plus route/navigation tests proving Connect GitHub and Sync GitHub do not 404; do not declare done until checks pass or any inability to run them is documented.
+Build the Firmcode GitHub App setup and sync dashboard flow. Implement /github/installations as a Clerk-authenticated setup/status page with GitHub App install entry point, missing-config state, installation status, repository sync status, and safe error/retry states. Wire Connect GitHub, Settings GitHub App actions, repository Sync GitHub, and row sync controls to real routes/APIs or disabled planned states. Do not expose private keys, webhook secrets, installation tokens, or raw payloads. Use the full-width light dashboard layout and brand tokens from docs/DASHBOARD_DESIGN.md.
+```
+
+## Navigation Readiness QA
+
+```text
+Read AGENTS.md first and follow it strictly.
+Relevant planning docs: docs/DASHBOARD_DESIGN.md, docs/DASHBOARD_PROMPTS.md, docs/PRD.md, docs/AUTHORIZATION.md, docs/TASKS.md Task 9.8, CLAUDE.md.
+Acceptance/test criteria: Add or update route manifest/component tests so active dashboard links and primary actions point only to implemented internal routes or external Clerk/GitHub URLs; verify planned actions are disabled and accessible; do not declare done until checks pass or any inability to run them is documented.
+Audit the Firmcode dashboard sidebar, topbar, overview needs-attention links, repository row actions, settings actions, billing actions, and empty-state CTAs. Implement or disable every active destination so no dashboard control leads to a 404. Keep disabled planned controls visually clear and accessible. Run browser smoke checks across Overview, Repositories, Review Runs, Findings, Settings, Billing, and newly enabled dashboard pages, verifying the full-width brand-refresh layout on desktop and mobile.
+```
+
 ## Dashboard Visual QA
 
 ```text
@@ -109,4 +136,3 @@ Relevant planning docs: docs/DASHBOARD_DESIGN.md, docs/DASHBOARD_PROMPTS.md, doc
 Acceptance/test criteria: Verify against docs/DASHBOARD_DESIGN.md with component tests for loading, empty, error, and populated states where applicable, plus responsive/accessibility/visual smoke checks; do not declare done until checks pass or any inability to run them is documented.
 Perform visual QA for the Firmcode dashboard implementation against docs/DASHBOARD_DESIGN.md. Verify light-mode styling, responsive desktop/mobile layouts, no text overflow, usable tables, accessible status labels, coherent spacing, consistent Tailwind tokens, empty/loading/error states, Clerk-authenticated navigation, Billing entry point, and no landing-page hero treatment. Use screenshots or browser checks where available. Report findings with file paths, severity, and concrete fixes.
 ```
-

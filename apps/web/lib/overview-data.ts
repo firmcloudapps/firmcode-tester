@@ -37,7 +37,7 @@ const DEFAULT_OVERVIEW_SUPPLEMENT: OverviewSupplementData = {
       kind: "ci_failure",
       title: "CI failure",
       detail: "firmcode dashboard tests need a failure explanation review.",
-      href: "/ci-failures?status=open",
+      href: "/findings?category=ci&status=open",
       severity: "medium",
       updatedAt: "2026-05-22T08:45:00.000Z"
     }
@@ -225,7 +225,7 @@ function buildIncompleteRepositoryItems(
       kind: "incomplete_repository_configuration",
       title: "Incomplete repository configuration",
       detail: `${repository.fullName} needs review automation configuration.`,
-      href: `/repositories/${encodeURIComponent(repository.id)}`,
+      href: "/repositories",
       severity: "none",
       updatedAt: repository.updatedAt
     }));

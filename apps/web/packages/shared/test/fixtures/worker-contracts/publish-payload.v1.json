@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "publish-payload/v1",
+  "reviewRunId": "run-1",
+  "repositoryFullName": "acme/widgets",
+  "pullRequestNumber": 7,
+  "headSha": "abc123def456",
+  "mode": "dry_run",
+  "summaryBody": "Firmcode review summary\n\nOne high-confidence security finding was identified.",
+  "inlineComments": [
+    {
+      "findingId": "finding-1",
+      "path": "src/server.ts",
+      "line": 42,
+      "body": "Validate the command against an allowlist before invoking the shell.",
+      "severity": "high"
+    }
+  ]
+}

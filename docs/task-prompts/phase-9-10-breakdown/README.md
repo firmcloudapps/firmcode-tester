@@ -1,6 +1,6 @@
 # Phase 9 And 10 Granular Task Prompts
 
-This directory breaks the broad prompts in `docs/TASK_PROMPTS.md` for Tasks 9.2, 9.3, 9.4, 10.1, 10.2, 10.3, and 10.4 into smaller implementation prompts.
+This directory breaks the broad prompts in `docs/TASK_PROMPTS.md` for Tasks 9.2, 9.3, 9.4, 9.5, 9.6, 9.7, 9.8, 10.1, 10.2, 10.3, and 10.4 into smaller implementation prompts.
 
 Use these prompts in order where possible. Each prompt is intended to be independently handable to a coding agent and includes its own testing and acceptance criteria while preserving the source requirements from `docs/TASKS.md`.
 
@@ -22,6 +22,30 @@ Use these prompts in order where possible. Each prompt is intended to be indepen
 1. `task-9.4a-authorization-foundation.md`
 2. `task-9.4b-dashboard-resource-ownership.md`
 3. `task-9.4c-role-gated-sensitive-access.md`
+
+## Task 9.5: GitHub App Setup And Repository Sync Dashboard Flow
+
+1. `task-9.5a-github-installation-entrypoint.md`
+2. `task-9.5b-github-installation-and-repository-sync-api.md`
+3. `task-9.5c-github-sync-dashboard-ui.md`
+
+## Task 9.6: Repository Detail And Rules/Policies Dashboard Pages
+
+1. `task-9.6a-repository-detail-page.md`
+2. `task-9.6b-rules-policies-api.md`
+3. `task-9.6c-rules-policies-dashboard-ui.md`
+
+## Task 9.7: Pull Requests And CI Failures Dashboard Pages
+
+1. `task-9.7a-pull-requests-dashboard-api.md`
+2. `task-9.7b-pull-requests-dashboard-ui.md`
+3. `task-9.7c-ci-failures-dashboard-api.md`
+4. `task-9.7d-ci-failures-dashboard-ui.md`
+
+## Task 9.8: Dashboard Navigation Readiness And No-Dead-Link QA
+
+1. `task-9.8a-dashboard-navigation-route-readiness.md`
+2. `task-9.8b-dashboard-visual-navigation-qa.md`
 
 ## Task 10.1: Observability
 
@@ -46,4 +70,3 @@ Use these prompts in order where possible. Each prompt is intended to be indepen
 1. `task-10.4a-runbook-failure-playbooks.md`
 2. `task-10.4b-executable-release-checklist.md`
 3. `task-10.4c-release-smoke-and-readiness-docs.md`
-
