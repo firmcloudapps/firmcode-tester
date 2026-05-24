@@ -5,6 +5,7 @@ interface DashboardShellProps {
     | "Overview"
     | "PR Review"
     | "Repositories"
+    | "Pull Requests"
     | "Review Runs"
     | "Findings"
     | "CI Failures"
@@ -18,7 +19,7 @@ const navItems = [
   { label: "Overview", href: "/", enabled: true },
   { label: "PR Review", href: "/github/installations", enabled: true },
   { label: "Repositories", href: "/repositories", enabled: true },
-  { label: "Pull Requests", href: "/pull-requests", enabled: false },
+  { label: "Pull Requests", href: "/pull-requests", enabled: true },
   { label: "Review Runs", href: "/review-runs", enabled: true },
   { label: "Findings", href: "/findings", enabled: true },
   { label: "CI Failures", href: "/ci-failures", enabled: false },

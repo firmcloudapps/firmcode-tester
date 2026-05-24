@@ -112,9 +112,14 @@ function RecentReviewRunsTable({ data }: { data: OverviewDashboardData }) {
     <section className="overflow-hidden rounded-lg border border-border bg-surface" aria-label="Recent review runs">
       <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
         <h2 className="text-sm font-semibold text-primary">Recent Review Runs</h2>
-        <a className="text-sm font-medium text-accent" href="/review-runs">
-          View all
-        </a>
+        <div className="flex items-center gap-3">
+          <a className="text-sm font-medium text-accent" href="/pull-requests">
+            Pull requests
+          </a>
+          <a className="text-sm font-medium text-accent" href="/review-runs">
+            View all
+          </a>
+        </div>
       </div>
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-border text-sm">

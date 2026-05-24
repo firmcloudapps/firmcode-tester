@@ -4,6 +4,9 @@ import type {
   FindingsListResponse,
   GitHubOAuthStatusResponse,
   OverviewDashboardData,
+  PullRequestDetailResponse,
+  PullRequestListFilters,
+  PullRequestListResponse,
   RepositoryDetailResponse,
   RepositoryListResponse,
   RulesPolicyResponse,
@@ -109,6 +112,31 @@ export async function loadFindingsState(searchParams: SearchParams): Promise<Vie
 
     return data.findings.length === 0 ? { status: "empty", data } : { status: "populated", data };
   } catch (error) {
+    return { status: "error", message: toErrorMessage(error) };
+  }
+}
+
+export async function loadPullRequestsState(searchParams: SearchParams): Promise<ViewState<PullRequestListResponse>> {
+  try {
+    const filters = pickPullRequestFilters(searchParams);
+    const data = await requestAuthenticatedJsonWithQuery<PullRequestListResponse>("/api/pull-requests", filters);
+
+    return data.pullRequests.length === 0 ? { status: "empty", data } : { status: "populated", data };
+  } catch (error) {
+    return { status: "error", message: toErrorMessage(error) };
+  }
+}
+
+export async function loadPullRequestDetailState(pullRequestId: string): Promise<ViewState<PullRequestDetailResponse>> {
+  try {
+    const data = await requestAuthenticatedJson<PullRequestDetailResponse>(`/api/pull-requests/${encodeURIComponent(pullRequestId)}`);
+
+    return { status: "populated", data };
+  } catch (error) {
+    if (error instanceof DashboardApiError && error.status === 404) {
+      return { status: "empty" };
+    }
+
     return { status: "error", message: toErrorMessage(error) };
   }
 }
@@ -226,6 +254,22 @@ function pickFindingsFilters(searchParams: SearchParams): FindingsListFilters {
   });
 }
 
+function pickPullRequestFilters(searchParams: SearchParams): PullRequestListFilters {
+  const limit = parsePositiveInteger(readSingleValue(searchParams.limit));
+
+  return removeUndefinedValues({
+    repositoryId: readSingleValue(searchParams.repositoryId),
+    repository: readSingleValue(searchParams.repository),
+    status: readSingleValue(searchParams.status) as PullRequestListFilters["status"],
+    riskLevel: readSingleValue(searchParams.riskLevel) as PullRequestListFilters["riskLevel"],
+    reviewStatus: readSingleValue(searchParams.reviewStatus) as PullRequestListFilters["reviewStatus"],
+    author: readSingleValue(searchParams.author),
+    dateFrom: readSingleValue(searchParams.dateFrom),
+    dateTo: readSingleValue(searchParams.dateTo),
+    limit
+  });
+}
+
 async function requestJson<T>(path: string, query: object): Promise<T> {
   const url = new URL(path, getApiBaseUrl());
 
@@ -240,6 +284,27 @@ async function requestJson<T>(path: string, query: object): Promise<T> {
     headers: {
       accept: "application/json"
     }
+  });
+
+  if (!response.ok) {
+    throw new DashboardApiError(`Dashboard API returned ${response.status}`, response.status);
+  }
+
+  return (await response.json()) as T;
+}
+
+async function requestAuthenticatedJsonWithQuery<T>(path: string, query: object): Promise<T> {
+  const url = new URL(path, getApiBaseUrl());
+
+  for (const [key, value] of Object.entries(query)) {
+    if (value !== undefined) {
+      url.searchParams.set(key, String(value));
+    }
+  }
+
+  const response = await fetch(url, {
+    cache: "no-store",
+    headers: createDashboardApiHeaders(process.env, false)
   });
 
   if (!response.ok) {
@@ -277,6 +342,16 @@ function parseBoolean(value: string | undefined): boolean | undefined {
   }
 
   return undefined;
+}
+
+function parsePositiveInteger(value: string | undefined): number | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const parsed = Number(value);
+
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
 }
 
 function readSingleValue(value: string | string[] | undefined): string | undefined {
