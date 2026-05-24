@@ -10,7 +10,7 @@ interface BillingViewProps {
 export function BillingView({ state, billingPortalUrl }: BillingViewProps) {
   if (state.status === "error") {
     return (
-      <BillingShell>
+      <div className="space-y-4">
         <section className="rounded-lg border border-red-200 bg-red-50 p-4">
           <h2 className="text-sm font-semibold text-red-800">Billing could not be loaded</h2>
           <p className="mt-2 text-sm leading-6 text-red-700">{state.message}</p>
@@ -18,14 +18,14 @@ export function BillingView({ state, billingPortalUrl }: BillingViewProps) {
             Manage subscription
           </button>
         </section>
-      </BillingShell>
+      </div>
     );
   }
 
   const data = state.status === "populated" ? state.data : null;
 
   return (
-    <BillingShell>
+    <div className="space-y-4">
       <section className="rounded-lg border border-border bg-surface p-6">
         <div className="flex flex-col gap-2">
           <p className="text-sm font-medium text-accent">Billing</p>
@@ -49,12 +49,8 @@ export function BillingView({ state, billingPortalUrl }: BillingViewProps) {
           </button>
         )}
       </section>
-    </BillingShell>
+    </div>
   );
-}
-
-function BillingShell({ children }: { children: React.ReactNode }) {
-  return <main className="min-h-screen px-6 py-8">{children}</main>;
 }
 
 function BillingMetric({ label, value }: { label: string; value: string }) {

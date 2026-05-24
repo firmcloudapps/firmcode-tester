@@ -8,16 +8,21 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        border: "#E2E8F0",
-        shell: "#F8FAFC",
+        border: "#E8E7E4",
+        shell: "#F5F4F2",
         surface: "#FFFFFF",
-        subtle: "#F1F5F9",
-        primary: "#0F172A",
-        secondary: "#64748B",
-        accent: "#2563EB",
+        subtle: "#FDE9D9",
+        primary: "#1A1A18",
+        secondary: "#9B9B96",
+        accent: "#F26522",
+        accentPressed: "#D94F0A",
         success: "#16A34A",
-        warning: "#D97706",
-        critical: "#DC2626"
+        warning: "#F7931A",
+        critical: "#DC2626",
+        mist: "#E8E7E4",
+        stone: "#9B9B96",
+        blush: "#FDE9D9",
+        ember: "#D94F0A"
       }
     }
   },

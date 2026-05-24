@@ -69,7 +69,7 @@ describe("SettingsView", () => {
     const viewerHtml = renderToString(<SettingsView state={{ status: "populated", data: viewerSettings }} activeTab="github-app" />);
     const viewerMembers = renderToString(<SettingsView state={{ status: "populated", data: viewerSettings }} activeTab="members" />);
 
-    expect(ownerHtml).toContain('href="/github/installations"');
+    expect(ownerHtml).toContain("GitHub App connection is not wired");
     expect(ownerHtml).toContain("Sensitive settings enabled");
     expect(viewerHtml).toContain("Read-only sensitive settings");
     expect(viewerHtml).toContain("disabled=\"\"");

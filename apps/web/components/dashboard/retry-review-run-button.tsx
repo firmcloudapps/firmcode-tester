@@ -52,7 +52,7 @@ export function RetryReviewRunButton({ reviewRunId, status, errorCode = null, ca
           "rounded-md border px-3 py-2 text-sm font-medium transition",
           compact ? "px-2 py-1 text-xs" : "",
           retryable
-            ? "border-accent bg-accent text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:border-border disabled:bg-subtle disabled:text-secondary"
+            ? "border-accent bg-accent text-white hover:bg-accentPressed disabled:cursor-not-allowed disabled:border-border disabled:bg-subtle disabled:text-secondary"
             : "cursor-not-allowed border-border bg-subtle text-secondary"
         ].join(" ")}
         disabled={!retryable || pending}

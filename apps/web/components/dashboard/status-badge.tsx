@@ -29,11 +29,11 @@ const findingStatusTone: Record<ReviewFindingStatus, Tone> = {
 };
 
 const toneClassName: Record<Tone, string> = {
-  neutral: "border-slate-200 bg-slate-100 text-slate-700",
-  info: "border-sky-200 bg-sky-50 text-sky-700",
-  success: "border-green-200 bg-green-50 text-green-700",
-  warning: "border-amber-200 bg-amber-50 text-amber-700",
-  critical: "border-red-200 bg-red-50 text-red-700"
+  neutral: "border-mist bg-shell text-secondary",
+  info: "border-orange-200 bg-blush text-ember",
+  success: "border-green-200 bg-green-50 text-success",
+  warning: "border-orange-200 bg-blush text-ember",
+  critical: "border-red-200 bg-red-50 text-critical"
 };
 
 export function StatusBadge({ status }: { status: ReviewRunStatus }) {

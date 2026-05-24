@@ -618,6 +618,82 @@ Tests:
 - Role capability tests.
 - Cross-workspace access denial tests.
 
+### Task 9.5: GitHub App Setup And Repository Sync Dashboard Flow
+
+Implement the dashboard GitHub App install/status/sync flow so Connect GitHub and Sync GitHub are real product actions rather than placeholder links.
+
+Acceptance criteria:
+
+- `/github/installations` is an implemented Clerk-authenticated dashboard page or route that shows installation status, setup instructions, and a GitHub App install entry point.
+- A PR Review workspace is implemented or planned in the same flow, combining provider tabs, GitHub connection status, GitHub App installation status, repository readiness, enabled state, configure actions, and run/retry actions.
+- GitHub App installation callback/status handling is documented and wired to workspace ownership checks.
+- Dashboard APIs list installations for the caller workspace and sync installation repository metadata.
+- Repository-level sync is available only for repositories owned by the caller workspace.
+- Connect/sync buttons show loading, success, error, and disabled states and never link to missing routes.
+- Empty states explain how to connect GitHub without exposing secrets or private installation tokens.
+
+Tests:
+
+- API tests for installation listing, installation sync, repository sync, ownership denial, and role denial.
+- Component tests for no installation, connected installation, sync loading/error/success, and unauthorized states.
+- Route/navigation tests proving Connect GitHub and Sync GitHub do not 404.
+
+### Task 9.6: Repository Detail And Rules/Policies Dashboard Pages
+
+Build the missing repository detail/configuration and Rules / Policies pages that are referenced by the dashboard navigation and repository actions.
+
+Acceptance criteria:
+
+- `/repositories/:id` is implemented with Overview, Pull Requests, Findings, Configuration, and Activity tabs.
+- Repository detail verifies workspace ownership and returns 404 for cross-workspace or missing repositories.
+- Configuration tab uses existing repository review configuration APIs and respects role capabilities.
+- `/rules` is implemented with review preferences, comment policy, prompt instructions, ignored paths, Semgrep/analysis toggles, and infrastructure/security policy sections.
+- Rules/policy mutations require Owner/Admin and preserve read-only views for Developer/Viewer.
+- Repository Configure links route to implemented pages and do not 404.
+
+Tests:
+
+- API tests for repository detail, repository activity, rules read/update, role denial, and cross-workspace denial.
+- Component tests for repository tabs, configuration controls, rules/policies loading/empty/error/populated states, and read-only role behavior.
+- Navigation tests for repository Configure and Rules / Policies destinations.
+
+### Task 9.7: Pull Requests And CI Failures Dashboard Pages
+
+Build the missing Pull Requests and CI Failures dashboard pages referenced by the app shell and overview needs-attention model.
+
+Acceptance criteria:
+
+- `/pull-requests` lists PRs with repository, status, risk, review status, author, and date filters.
+- PR detail shows summary, changed components, risk analysis, review timeline, findings, metadata, branches, commit SHA, changed files, duration, and GitHub link.
+- `/ci-failures` lists failed workflows/jobs with repository, PR, failed job, root cause summary, flaky suspicion, suggested fix, and created time.
+- CI failure detail shows root cause, suggested fixes, failed jobs, collapsed redacted log excerpts, and related review run/artifact links.
+- API endpoints enforce workspace membership and resource ownership.
+- Overview and sidebar links point only to implemented PR/CI pages when active.
+
+Tests:
+
+- API tests for PR list/detail, CI failure list/detail, filters, ownership denial, and malformed filters.
+- Component tests for loading, empty, error, populated, desktop/mobile states.
+- Navigation tests proving Pull Requests and CI Failures routes do not 404 once enabled.
+
+### Task 9.8: Dashboard Navigation Readiness And No-Dead-Link QA
+
+Make dashboard navigation truthful: implemented destinations are active, planned destinations are disabled, and no primary action leads to a 404.
+
+Acceptance criteria:
+
+- Sidebar, topbar, overview needs-attention links, repository row actions, settings actions, and billing actions are audited.
+- Active links point only to implemented app routes or external Clerk/GitHub URLs.
+- Planned but unimplemented actions render as disabled controls with accessible labels and titles.
+- Tests fail if a dashboard nav item or primary action points at an unimplemented internal route.
+- Visual QA confirms the full-width brand-refresh layout still works on desktop and mobile after navigation changes.
+
+Tests:
+
+- Component or route manifest tests for all dashboard navigation destinations.
+- Browser smoke test across Overview, Repositories, Review Runs, Findings, Settings, and Billing.
+- Regression test for disabled planned actions.
+
 ## Phase 10: Hardening And Release Candidate
 
 ### Task 10.1: Observability

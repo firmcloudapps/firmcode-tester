@@ -1,0 +1,78 @@
+{
+  "files": [
+    {
+      "oldPath": "src/greeting.ts",
+      "newPath": "src/greeting.ts",
+      "status": "modified",
+      "hunks": [
+        {
+          "oldStart": 1,
+          "oldLineCount": 3,
+          "newStart": 1,
+          "newLineCount": 4,
+          "sectionHeader": "",
+          "lines": [
+            {
+              "type": "context",
+              "content": "export function greet(name: string) {",
+              "oldLineNumber": 1,
+              "newLineNumber": 1
+            },
+            {
+              "type": "deletion",
+              "content": "  return `Hello ${name}`;",
+              "oldLineNumber": 2,
+              "newLineNumber": null
+            },
+            {
+              "type": "addition",
+              "content": "  const suffix = \"!\";",
+              "oldLineNumber": null,
+              "newLineNumber": 2
+            },
+            {
+              "type": "addition",
+              "content": "  return `Hello ${name}${suffix}`;",
+              "oldLineNumber": null,
+              "newLineNumber": 3
+            },
+            {
+              "type": "context",
+              "content": "}",
+              "oldLineNumber": 3,
+              "newLineNumber": 4
+            }
+          ]
+        }
+      ],
+      "changedNewLines": [2, 3],
+      "lineMappings": [
+        {
+          "type": "context",
+          "oldLineNumber": 1,
+          "newLineNumber": 1
+        },
+        {
+          "type": "deletion",
+          "oldLineNumber": 2,
+          "newLineNumber": null
+        },
+        {
+          "type": "addition",
+          "oldLineNumber": null,
+          "newLineNumber": 2
+        },
+        {
+          "type": "addition",
+          "oldLineNumber": null,
+          "newLineNumber": 3
+        },
+        {
+          "type": "context",
+          "oldLineNumber": 3,
+          "newLineNumber": 4
+        }
+      ]
+    }
+  ]
+}

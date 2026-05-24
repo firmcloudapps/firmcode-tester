@@ -67,15 +67,20 @@ Top Bar
 └── Clerk user menu
 
 Left Sidebar
-├── Overview
-├── Repositories
-├── Pull Requests
-├── Review Runs
-├── Findings
-├── CI Failures
-├── Rules / Policies
-├── Settings
-└── Billing
+├── Review
+│   ├── Overview
+│   ├── PR Review
+│   ├── Repositories
+│   ├── Pull Requests
+│   ├── Review Runs
+│   ├── Findings
+│   └── CI Failures
+├── Configuration
+│   ├── Rules / Policies
+│   └── GitHub App
+└── Account
+    ├── Billing
+    └── Settings
 ```
 
 ### Top Bar
@@ -89,8 +94,52 @@ Left Sidebar
 ### Sidebar
 
 - Icon plus label navigation.
+- Group links under clear operational sections rather than one long flat list.
+- Keep PR Review prominent because it is the main workflow for connecting repos, enabling automation, and running/retrying reviews.
+- Show small status indicators only where they communicate live product state, such as GitHub connected, app installed, enabled repository, or failed review.
 - Active item has soft accent background and left accent indicator.
 - Collapse behavior can be deferred for MVP, but mobile should use a drawer.
+- Links for unimplemented pages must be disabled or hidden until route readiness tests prove the destination exists.
+
+### Reference-Informed PR Review Workspace
+
+The PR Review page should learn from developer tools that put setup status and repo automation in one focused workspace. Do not copy the reference UI directly; use the structure in Firmcode's light, full-width brand system.
+
+Recommended layout:
+
+```text
+Header
+├── Title: PR Review
+├── Description: Automated pull request review status
+└── Refresh / Sync action
+
+Provider Tabs
+├── GitHub
+├── GitLab disabled planned state
+├── Bitbucket disabled planned state
+└── Azure DevOps disabled planned state
+
+Connection Cards
+├── GitHub OAuth / account connection status
+└── Firmcode GitHub App installation status and Add Repository action
+
+Repository Automation Rows
+├── Repository identity and owner/name
+├── Review readiness status
+├── Enabled switch
+├── Last review / last run
+├── Configure action
+└── Run or retry action
+```
+
+Behavior notes:
+
+- GitHub is the only active provider in the MVP. Other providers should appear only as disabled planned states if shown at all.
+- Connection cards should separate user/account connection from GitHub App installation status.
+- Repository rows should make automation state obvious: Ready, Needs setup, Enabled, Disabled, Last reviewed, Failed, or Running.
+- Run/retry controls must respect role capabilities and duplicate-click protection.
+- A short tip can clarify that repositories are matched by exact `owner/repo` name.
+- The page should support a manual refresh/sync action, but it must be disabled until the sync API is implemented.
 
 ## Clerk Responsibilities
 
@@ -225,6 +274,51 @@ Repository Table
 - Configure.
 - View runs.
 - Sync.
+
+## 2a. PR Review
+
+Purpose: provide the primary operational workspace for GitHub connection health and repository review automation.
+
+### Layout
+
+```text
+Header
+├── PR Review
+└── Refresh / Sync
+
+Provider Tabs
+├── GitHub active
+└── Planned providers disabled
+
+Connection Status Grid
+├── GitHub account/OAuth connection
+└── GitHub App installation
+
+Repository Automation List
+```
+
+### Connection Status Cards
+
+Each card includes:
+
+- Integration name.
+- Purpose text.
+- Status pill: Connected, Installed, Missing, Error, or Setup needed.
+- Primary action only when backed by a real route or external URL.
+
+### Repository Automation Rows
+
+Rows include:
+
+- Repository display name and exact `owner/repo`.
+- Readiness status.
+- Enabled switch or checkbox.
+- Last review/run status and timestamp.
+- Configure action.
+- Run/retry action.
+- Settings overflow where needed.
+
+Rows should be compact, full-width, and scannable. Prefer inline status pills and toggles over large nested cards.
 
 ### Repository Detail Tabs
 
@@ -475,11 +569,12 @@ The manage subscription action should link to `CLERK_BILLING_PORTAL_URL`, which 
 Build in this order:
 
 1. Overview.
-2. Repositories.
-3. Review Runs.
-4. Review Run Detail.
-5. Findings.
-6. Settings.
+2. PR Review setup and repository automation workspace.
+3. Repositories.
+4. Review Runs.
+5. Review Run Detail.
+6. Findings.
+7. Settings.
 
 Pull Requests, CI Failures, Rules / Policies, and Billing can follow once the core review loop is visible.
 

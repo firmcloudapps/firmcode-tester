@@ -21,12 +21,22 @@ export function RepositoriesView({ state }: RepositoriesViewProps) {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <a className="rounded-md border border-border bg-surface px-3 py-2 text-sm font-medium text-primary" href="/github/sync">
+          <button
+            className="cursor-not-allowed rounded-md border border-border bg-surface px-3 py-2 text-sm font-medium text-secondary opacity-75"
+            type="button"
+            disabled
+            title="GitHub repository sync is not wired yet"
+          >
             Sync GitHub
-          </a>
-          <a className="rounded-md bg-accent px-3 py-2 text-sm font-medium text-white" href="/github/installations">
+          </button>
+          <button
+            className="cursor-not-allowed rounded-md bg-accent px-3 py-2 text-sm font-medium text-white opacity-70"
+            type="button"
+            disabled
+            title="GitHub App connection is not wired to an install flow yet"
+          >
             Connect GitHub App
-          </a>
+          </button>
         </div>
       </div>
       <RepositoryFilters />
@@ -158,18 +168,28 @@ function RepositoryTable({ data }: { data: RepositoryListResponse }) {
                 <td className="px-4 py-3 font-mono text-sm text-primary">{repository.openFindingsCount}</td>
                 <td className="px-4 py-3">
                   <div className="flex flex-wrap gap-2">
-                    <a className="rounded-md border border-border px-2 py-1 text-xs font-medium text-primary" href={`/repositories/${repository.id}`}>
+                    <button
+                      className="cursor-not-allowed rounded-md border border-border px-2 py-1 text-xs font-medium text-secondary opacity-70"
+                      type="button"
+                      disabled
+                      title="Repository detail configuration page is not wired yet"
+                    >
                       Configure
-                    </a>
+                    </button>
                     <a
                       className="rounded-md border border-border px-2 py-1 text-xs font-medium text-primary"
                       href={`/review-runs?repositoryId=${encodeURIComponent(repository.id)}`}
                     >
                       View runs
                     </a>
-                    <a className="rounded-md border border-border px-2 py-1 text-xs font-medium text-primary" href={`/github/sync?repositoryId=${repository.id}`}>
+                    <button
+                      className="cursor-not-allowed rounded-md border border-border px-2 py-1 text-xs font-medium text-secondary opacity-70"
+                      type="button"
+                      disabled
+                      title="Repository sync is not wired yet"
+                    >
                       Sync
-                    </a>
+                    </button>
                   </div>
                 </td>
               </tr>

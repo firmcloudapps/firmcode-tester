@@ -58,7 +58,7 @@ function SettingsTabs({ activeTab }: { activeTab: SettingsTabKey }) {
             <a
               key={tab.key}
               className={`rounded-md px-3 py-2 text-sm font-medium ${
-                active ? "bg-blue-50 text-accent" : "text-secondary hover:bg-subtle hover:text-primary"
+                active ? "bg-blush text-accent" : "text-secondary hover:bg-subtle hover:text-primary"
               }`}
               href={`/settings?tab=${tab.key}`}
               aria-current={active ? "page" : undefined}
@@ -194,11 +194,16 @@ function GitHubAppPanel({ data }: { data: WorkspaceSettingsResponse }) {
     >
       <div className="flex flex-wrap gap-2">
         {canManage ? (
-          <a className="rounded-md bg-accent px-3 py-2 text-sm font-medium text-white" href={data.githubApp.installUrl}>
+          <button
+            className="cursor-not-allowed rounded-md bg-accent px-3 py-2 text-sm font-medium text-white opacity-70"
+            type="button"
+            disabled
+            title="GitHub App connection is not wired to an install flow yet"
+          >
             Connect GitHub App
-          </a>
+          </button>
         ) : (
-          <button className="rounded-md bg-slate-200 px-3 py-2 text-sm font-medium text-secondary" type="button" disabled>
+          <button className="rounded-md bg-mist px-3 py-2 text-sm font-medium text-secondary" type="button" disabled>
             Connect GitHub App
           </button>
         )}

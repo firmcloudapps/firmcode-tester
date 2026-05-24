@@ -166,7 +166,7 @@ const supplement: OverviewSupplementData = {
       kind: "ci_failure",
       title: "CI failure",
       detail: "Unit test failure needs triage.",
-      href: "/ci-failures?status=open",
+      href: "/findings?category=ci&status=open",
       severity: "medium",
       updatedAt: "2026-05-22T09:15:00.000Z"
     }

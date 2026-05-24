@@ -7,6 +7,16 @@
 }
 
 body {
-  background: #f8fafc;
-  color: #0f172a;
+  margin: 0;
+  background: #f5f4f2;
+  color: #1a1a18;
+}
+
+* {
+  scrollbar-color: #d94f0a #f5f4f2;
+}
+
+::selection {
+  background: #fde9d9;
+  color: #1a1a18;
 }
