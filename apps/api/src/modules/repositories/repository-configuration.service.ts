@@ -1,26 +1,22 @@
 import {
   BadRequestException,
-  ForbiddenException,
   Inject,
   Injectable,
-  NotFoundException,
-  UnauthorizedException
+  NotFoundException
 } from "@nestjs/common";
 import {
   type RepositoryReviewConfiguration,
   type UpdateRepositoryReviewConfigurationRequest
 } from "@firmcode/shared";
 import {
-  DASHBOARD_AUTH_STORE,
-  roleHasDashboardCapability,
-  type DashboardAuthStore
-} from "../review-runs/dashboard-auth.store";
+  DashboardAuthorizationService,
+  type DashboardRequestContext
+} from "../auth/dashboard-authorization.service";
 import { REPOSITORIES_STORE, type RepositoriesStore } from "./repositories.store";
 
 export interface RepositoryConfigurationRequestContext {
   readonly repositoryId: string;
-  readonly workspaceId: string | null;
-  readonly clerkUserId: string | null;
+  readonly auth: DashboardRequestContext;
 }
 
 export interface RepositoryConfigurationUpdateContext extends RepositoryConfigurationRequestContext {
@@ -46,7 +42,7 @@ const SEVERITY_THRESHOLDS = new Set<string>(["info", "low", "medium", "high", "c
 export class RepositoryConfigurationService {
   constructor(
     @Inject(REPOSITORIES_STORE) private readonly repositoriesStore: RepositoriesStore,
-    @Inject(DASHBOARD_AUTH_STORE) private readonly dashboardAuthStore: DashboardAuthStore
+    private readonly dashboardAuthorization: DashboardAuthorizationService
   ) {}
 
   async getRepositoryConfiguration(input: RepositoryConfigurationRequestContext): Promise<RepositoryReviewConfiguration> {
@@ -82,26 +78,17 @@ export class RepositoryConfigurationService {
     clerkUserId: string;
   }> {
     assertUuid("repository ID", input.repositoryId);
-    assertAuthenticated(input);
-    assertUuid("workspace ID", input.workspaceId);
-
-    const membership = await this.dashboardAuthStore.findActiveMembership({
-      workspaceId: input.workspaceId,
-      clerkUserId: input.clerkUserId
+    const context = await this.dashboardAuthorization.requireWorkspaceMembership(input.auth, {
+      capability: "manage_repository_configuration",
+      concealMembershipFailure: true,
+      notFoundMessage: "Repository not found",
+      forbiddenMessage: "Workspace role cannot manage repository configuration"
     });
-
-    if (membership === null) {
-      throw new NotFoundException("Repository not found");
-    }
-
-    if (!roleHasDashboardCapability(membership.role, "manage_repository_configuration")) {
-      throw new ForbiddenException("Workspace role cannot manage repository configuration");
-    }
 
     return {
       repositoryId: input.repositoryId,
-      workspaceId: input.workspaceId,
-      clerkUserId: input.clerkUserId
+      workspaceId: context.workspaceId,
+      clerkUserId: context.clerkUserId
     };
   }
 }
@@ -158,15 +145,6 @@ function parseRepositoryConfigurationUpdate(body: unknown): UpdateRepositoryRevi
   }
 
   return updates;
-}
-
-function assertAuthenticated(input: RepositoryConfigurationRequestContext): asserts input is RepositoryConfigurationRequestContext & {
-  workspaceId: string;
-  clerkUserId: string;
-} {
-  if (input.workspaceId === null || input.clerkUserId === null) {
-    throw new UnauthorizedException("Dashboard authentication is required");
-  }
 }
 
 function assertUuid(label: string, value: string): void {

@@ -1,6 +1,11 @@
 import type { ReviewRunStatus } from "../enums/review-run-status";
 import type { ChangedFileRiskClassification } from "../risk/changed-file-risk";
 import type { LargePullRequestReviewArtifact, ReviewSkippedFileReport } from "../review/large-pr-handling";
+import {
+  canManageSensitiveWorkspaceSettings,
+  DASHBOARD_WORKSPACE_ROLES,
+  type DashboardWorkspaceRole
+} from "../auth/dashboard-authorization";
 
 export interface ReviewRunSummary {
   id: string;
@@ -53,13 +58,7 @@ export interface RepositoryListResponse {
   filters: DashboardRepositoryListFilters;
 }
 
-export const DASHBOARD_WORKSPACE_ROLES = ["owner", "admin", "developer", "viewer"] as const;
-
-export type DashboardWorkspaceRole = (typeof DASHBOARD_WORKSPACE_ROLES)[number];
-
-export function canManageSensitiveWorkspaceSettings(role: DashboardWorkspaceRole): boolean {
-  return role === "owner" || role === "admin";
-}
+export { canManageSensitiveWorkspaceSettings, DASHBOARD_WORKSPACE_ROLES, type DashboardWorkspaceRole };
 
 export const REPOSITORY_REVIEW_SEVERITY_THRESHOLDS = ["info", "low", "medium", "high", "critical"] as const;
 

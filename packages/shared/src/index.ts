@@ -1,3 +1,4 @@
+export * from "./auth/dashboard-authorization";
 export * from "./contracts/health";
 export * from "./contracts/review";
 export * from "./contracts/worker";

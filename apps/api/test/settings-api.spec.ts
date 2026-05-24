@@ -2,6 +2,7 @@ import { UnauthorizedException } from "@nestjs/common";
 import { newDb } from "pg-mem";
 import type { ApiRuntimeConfig } from "@firmcode/shared";
 import { runDatabaseMigrations } from "../src/infrastructure/database/migrations";
+import { DashboardAuthorizationService } from "../src/modules/auth/dashboard-authorization.service";
 import { PostgresDashboardAuthStore } from "../src/modules/review-runs/dashboard-auth.store";
 import { SettingsController } from "../src/modules/settings/settings.controller";
 import { SettingsService } from "../src/modules/settings/settings.service";
@@ -32,8 +33,9 @@ describe("settings dashboard API", () => {
     await runDatabaseMigrations(pool);
     await seedSettingsData(pool);
 
+    const dashboardAuthStore = new PostgresDashboardAuthStore(pool);
     controller = new SettingsController(
-      new SettingsService(new PostgresSettingsStore(pool, testConfig), new PostgresDashboardAuthStore(pool))
+      new SettingsService(new PostgresSettingsStore(pool, testConfig), new DashboardAuthorizationService(dashboardAuthStore))
     );
   });
 
