@@ -1,6 +1,6 @@
 import { DashboardShell } from "../../components/dashboard/dashboard-shell";
 import { RepositoriesView } from "../../components/dashboard/repositories-view";
-import { loadRepositoriesState } from "../../lib/dashboard-data";
+import { loadGitHubRepositoryControlsState, loadRepositoriesState } from "../../lib/dashboard-data";
 
 export const dynamic = "force-dynamic";
 
@@ -9,11 +9,14 @@ interface RepositoriesPageProps {
 }
 
 export default async function RepositoriesPage({ searchParams = {} }: RepositoriesPageProps) {
-  const state = await loadRepositoriesState(searchParams);
+  const [state, controlsState] = await Promise.all([
+    loadRepositoriesState(searchParams),
+    loadGitHubRepositoryControlsState()
+  ]);
 
   return (
     <DashboardShell activeItem="Repositories">
-      <RepositoriesView state={state} />
+      <RepositoriesView state={state} controlsState={controlsState} />
     </DashboardShell>
   );
 }

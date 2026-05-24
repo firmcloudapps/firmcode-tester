@@ -1,4 +1,6 @@
 import type {
+  GitHubInstallationSyncResponse,
+  GitHubRepositorySyncResponse,
   RepositoryReviewConfiguration,
   ReviewRunRetryResponse,
   ReviewRunStatus
@@ -69,6 +71,36 @@ export async function requestReviewRunRetry(
   return readMutationResponse<ReviewRunRetryResponse>(response, "Review retry could not be queued.");
 }
 
+export async function syncGitHubInstallations(
+  installationId?: number,
+  fetcher: DashboardMutationFetcher = fetch
+): Promise<GitHubInstallationSyncResponse> {
+  const response = await fetcher("/api/github/installations/sync", {
+    method: "POST",
+    headers: {
+      accept: "application/json",
+      "content-type": "application/json"
+    },
+    body: JSON.stringify(installationId === undefined ? {} : { installationId })
+  });
+
+  return readMutationResponse<GitHubInstallationSyncResponse>(response, "GitHub installation sync could not be completed.");
+}
+
+export async function syncGitHubRepository(
+  repositoryId: string,
+  fetcher: DashboardMutationFetcher = fetch
+): Promise<GitHubRepositorySyncResponse> {
+  const response = await fetcher(`/api/repositories/${encodeURIComponent(repositoryId)}/sync`, {
+    method: "POST",
+    headers: {
+      accept: "application/json"
+    }
+  });
+
+  return readMutationResponse<GitHubRepositorySyncResponse>(response, "Repository sync could not be completed.");
+}
+
 export async function updateRepositoryAutomation(
   repositoryId: string,
   automationEnabled: boolean,
@@ -94,6 +126,16 @@ export function toRetryFeedbackMessage(response: ReviewRunRetryResponse): string
   return response.retryRunId === null
     ? response.message
     : `Retry queued as run ${response.retryRunId.slice(0, 8)}.`;
+}
+
+export function toGitHubInstallationSyncFeedbackMessage(response: GitHubInstallationSyncResponse): string {
+  return response.syncedRepositoryCount === 1
+    ? "Synced 1 GitHub repository."
+    : `Synced ${response.syncedRepositoryCount} GitHub repositories.`;
+}
+
+export function toGitHubRepositorySyncFeedbackMessage(response: GitHubRepositorySyncResponse): string {
+  return `Synced ${response.repository.fullName}.`;
 }
 
 async function readMutationResponse<T>(response: Response, fallbackMessage: string): Promise<T> {

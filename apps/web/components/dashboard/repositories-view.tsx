@@ -1,15 +1,20 @@
 import React from "react";
-import type { RepositoryListResponse } from "@firmcode/shared";
+import { canManageRepositoryConfiguration, type RepositoryListResponse } from "@firmcode/shared";
 import type { ViewState } from "../../lib/view-state";
+import type { GitHubRepositoryControlsState } from "../../lib/dashboard-data";
+import { GitHubInstallationSyncButton, GitHubRepositorySyncButton } from "./github-sync-controls";
 import { RepositoryAutomationToggle } from "./repository-automation-toggle";
 import { BooleanBadge, StatusBadge } from "./status-badge";
 import { formatDateTime, shortSha } from "./format";
 
 interface RepositoriesViewProps {
   state: ViewState<RepositoryListResponse>;
+  controlsState?: GitHubRepositoryControlsState;
 }
 
-export function RepositoriesView({ state }: RepositoriesViewProps) {
+export function RepositoriesView({ state, controlsState }: RepositoriesViewProps) {
+  const controls = toRepositoryControls(controlsState);
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -21,29 +26,15 @@ export function RepositoriesView({ state }: RepositoriesViewProps) {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button
-            className="cursor-not-allowed rounded-md border border-border bg-surface px-3 py-2 text-sm font-medium text-secondary opacity-75"
-            type="button"
-            disabled
-            title="GitHub repository sync is not wired yet"
-          >
-            Sync GitHub
-          </button>
-          <button
-            className="cursor-not-allowed rounded-md bg-accent px-3 py-2 text-sm font-medium text-white opacity-70"
-            type="button"
-            disabled
-            title="GitHub App connection is not wired to an install flow yet"
-          >
-            Connect GitHub App
-          </button>
+          <GitHubInstallationSyncButton disabled={!controls.canSync} disabledReason={controls.syncDisabledReason} />
+          <GitHubConnectionAction controls={controls} />
         </div>
       </div>
       <RepositoryFilters />
       {state.status === "loading" ? <RepositoryLoadingState /> : null}
       {state.status === "error" ? <RepositoryErrorState message={state.message} /> : null}
       {state.status === "empty" ? <RepositoryEmptyState /> : null}
-      {state.status === "populated" ? <RepositoryTable data={state.data} /> : null}
+      {state.status === "populated" ? <RepositoryTable controls={controls} data={state.data} /> : null}
     </div>
   );
 }
@@ -117,7 +108,7 @@ function RepositoryEmptyState() {
   );
 }
 
-function RepositoryTable({ data }: { data: RepositoryListResponse }) {
+function RepositoryTable({ controls, data }: { controls: RepositoryControls; data: RepositoryListResponse }) {
   return (
     <section className="overflow-hidden rounded-lg border border-border bg-surface">
       <div className="overflow-x-auto">
@@ -145,7 +136,18 @@ function RepositoryTable({ data }: { data: RepositoryListResponse }) {
                 <td className="px-4 py-3">
                   <div className="space-y-2">
                     <BooleanBadge enabled={repository.enabled} />
-                    <RepositoryAutomationToggle repositoryId={repository.id} initialEnabled={repository.enabled} />
+                    {controls.canManageRepositoryConfiguration ? (
+                      <RepositoryAutomationToggle repositoryId={repository.id} initialEnabled={repository.enabled} />
+                    ) : (
+                      <button
+                        className="rounded-md border border-border bg-subtle px-2 py-1 text-xs font-medium text-secondary"
+                        disabled
+                        type="button"
+                        title={controls.repositoryDisabledReason}
+                      >
+                        {repository.enabled ? "Enabled" : "Disabled"}
+                      </button>
+                    )}
                   </div>
                 </td>
                 <td className="px-4 py-3">
@@ -172,7 +174,7 @@ function RepositoryTable({ data }: { data: RepositoryListResponse }) {
                       className="cursor-not-allowed rounded-md border border-border px-2 py-1 text-xs font-medium text-secondary opacity-70"
                       type="button"
                       disabled
-                      title="Repository detail configuration page is not wired yet"
+                      title="Repository detail configuration is planned"
                     >
                       Configure
                     </button>
@@ -182,14 +184,11 @@ function RepositoryTable({ data }: { data: RepositoryListResponse }) {
                     >
                       View runs
                     </a>
-                    <button
-                      className="cursor-not-allowed rounded-md border border-border px-2 py-1 text-xs font-medium text-secondary opacity-70"
-                      type="button"
-                      disabled
-                      title="Repository sync is not wired yet"
-                    >
-                      Sync
-                    </button>
+                    <GitHubRepositorySyncButton
+                      repositoryId={repository.id}
+                      disabled={!controls.canSyncRepository}
+                      disabledReason={controls.repositoryDisabledReason}
+                    />
                   </div>
                 </td>
               </tr>
@@ -199,4 +198,110 @@ function RepositoryTable({ data }: { data: RepositoryListResponse }) {
       </div>
     </section>
   );
+}
+
+interface RepositoryControls {
+  canConnectOAuth: boolean;
+  canInstall: boolean;
+  canSync: boolean;
+  canSyncRepository: boolean;
+  canManageRepositoryConfiguration: boolean;
+  connectHref: string;
+  syncDisabledReason?: string;
+  repositoryDisabledReason?: string;
+}
+
+function GitHubConnectionAction({ controls }: { controls: RepositoryControls }) {
+  if (controls.canConnectOAuth) {
+    return (
+      <a className="rounded-md bg-accent px-3 py-2 text-sm font-medium text-white" href={controls.connectHref}>
+        Connect GitHub
+      </a>
+    );
+  }
+
+  if (controls.canInstall) {
+    return (
+      <a className="rounded-md bg-accent px-3 py-2 text-sm font-medium text-white" href="/github/installations">
+        Connect GitHub App
+      </a>
+    );
+  }
+
+  if (controls.canSync) {
+    return (
+      <a className="rounded-md border border-border px-3 py-2 text-sm font-medium text-primary" href="/github/installations">
+        Manage GitHub App
+      </a>
+    );
+  }
+
+  return (
+    <button className="rounded-md bg-subtle px-3 py-2 text-sm font-medium text-secondary" type="button" disabled>
+      Connect GitHub App
+    </button>
+  );
+}
+
+function toRepositoryControls(state: GitHubRepositoryControlsState | undefined): RepositoryControls {
+  if (state?.status !== "ready") {
+    return {
+      canConnectOAuth: false,
+      canInstall: false,
+      canSync: false,
+      canSyncRepository: false,
+      canManageRepositoryConfiguration: false,
+      connectHref: "/auth/github",
+      syncDisabledReason: state?.status === "signed-out" ? "Sign in before syncing GitHub." : "GitHub connection status is unavailable.",
+      repositoryDisabledReason: state?.status === "signed-out" ? "Sign in required." : "GitHub connection status unavailable."
+    };
+  }
+
+  const { oauth, settings } = state.data;
+  const hasInstallations = settings.githubApp.installations.length > 0;
+  const canManage = settings.workspace.canManageSensitiveSettings;
+  const canManageRepositories = oauth.connected && hasInstallations && canManageRepositoryConfiguration(settings.workspace.role);
+
+  return {
+    canConnectOAuth: !oauth.connected,
+    canInstall: oauth.connected && canManage && !hasInstallations,
+    canSync: oauth.connected && canManage && hasInstallations,
+    canSyncRepository: canManageRepositories,
+    canManageRepositoryConfiguration: canManageRepositories,
+    connectHref: "/auth/github",
+    syncDisabledReason: headerSyncDisabledReason({ oauthConnected: oauth.connected, canManage, hasInstallations }),
+    repositoryDisabledReason: rowDisabledReason({ oauthConnected: oauth.connected, canManage: canManageRepositories, hasInstallations })
+  };
+}
+
+function headerSyncDisabledReason(input: { oauthConnected: boolean; canManage: boolean; hasInstallations: boolean }): string | undefined {
+  if (!input.oauthConnected) {
+    return "Connect GitHub OAuth before syncing repositories.";
+  }
+
+  if (!input.canManage) {
+    return "Owner or Admin required to sync GitHub installations.";
+  }
+
+  if (!input.hasInstallations) {
+    return "Install the GitHub App before syncing repositories.";
+  }
+
+  return undefined;
+}
+
+function rowDisabledReason(input: { oauthConnected: boolean; canManage: boolean; hasInstallations: boolean }): string | undefined {
+  if (!input.oauthConnected) {
+    return "Connect GitHub first.";
+  }
+
+  if (!input.hasInstallations) {
+    return "GitHub App required.";
+  }
+
+  if (!input.canManage) {
+    return "Owner or Admin required.";
+  }
+
+  return undefined;
 }

@@ -8,6 +8,8 @@ import {
   DashboardMutationError,
   DuplicateDashboardActionError,
   requestReviewRunRetry,
+  syncGitHubInstallations,
+  syncGitHubRepository,
   updateRepositoryAutomation
 } from "../lib/dashboard-actions";
 import { createDashboardApiHeaders } from "../lib/dashboard-api-proxy";
@@ -124,6 +126,56 @@ describe("repository automation controls", () => {
   });
 });
 
+describe("GitHub sync controls", () => {
+  it("syncs all GitHub installations through the typed dashboard mutation endpoint", async () => {
+    const fetcher = vi.fn(async () => jsonResponse(installationSyncResponse));
+
+    await expect(syncGitHubInstallations(undefined, fetcher)).resolves.toEqual(installationSyncResponse);
+    expect(fetcher).toHaveBeenCalledWith("/api/github/installations/sync", {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({})
+    });
+  });
+
+  it("syncs a single repository through the implemented repository endpoint", async () => {
+    const fetcher = vi.fn(async () => jsonResponse(repositorySyncResponse));
+
+    await expect(syncGitHubRepository("repo-1", fetcher)).resolves.toEqual(repositorySyncResponse);
+    expect(fetcher).toHaveBeenCalledWith("/api/repositories/repo-1/sync", {
+      method: "POST",
+      headers: {
+        accept: "application/json"
+      }
+    });
+  });
+
+  it("surfaces GitHub sync errors and uses the pending guard to block duplicate clicks", async () => {
+    const fetcher = vi.fn(async () => jsonResponse({ message: "Workspace role cannot manage GitHub installations" }, 403));
+
+    await expect(syncGitHubInstallations(301, fetcher)).rejects.toMatchObject({
+      message: "Workspace role cannot manage GitHub installations",
+      status: 403
+    } satisfies Partial<DashboardMutationError>);
+
+    const guard = createPendingActionGuard();
+    let releaseRequest!: (value: string) => void;
+    const firstRequest = guard.run(
+      () =>
+        new Promise<string>((resolve) => {
+          releaseRequest = resolve;
+        })
+    );
+
+    await expect(guard.run(() => Promise.resolve("duplicate sync"))).rejects.toThrow(DuplicateDashboardActionError);
+    releaseRequest("synced");
+    await expect(firstRequest).resolves.toBe("synced");
+  });
+});
+
 const retryResponse: ReviewRunRetryResponse = {
   originalRunId: "run-1",
   retryRunId: "run-2",
@@ -147,6 +199,37 @@ const repositoryConfiguration: RepositoryReviewConfiguration = {
   updatedByClerkUserId: "user_admin",
   createdAt: "2026-05-23T10:00:00.000Z",
   updatedAt: "2026-05-23T10:01:00.000Z"
+};
+
+const installationSyncResponse = {
+  installations: [
+    {
+      id: "install-1",
+      installationId: 301,
+      accountLogin: "openclaw",
+      accountType: "Organization",
+      repositoryCount: 2,
+      enabledRepositoryCount: 1,
+      updatedAt: "2026-05-23T10:00:00.000Z"
+    }
+  ],
+  syncedRepositoryCount: 2
+};
+
+const repositorySyncResponse = {
+  repository: {
+    id: "repo-1",
+    owner: "openclaw",
+    name: "firmcode",
+    fullName: "openclaw/firmcode",
+    private: false,
+    defaultBranch: "main",
+    enabled: true,
+    primaryLanguage: null,
+    openFindingsCount: 0,
+    lastReview: null,
+    updatedAt: "2026-05-23T10:00:00.000Z"
+  }
 };
 
 function jsonResponse(body: unknown, status = 200): Response {
