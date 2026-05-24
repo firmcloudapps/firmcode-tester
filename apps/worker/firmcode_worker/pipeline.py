@@ -326,7 +326,7 @@ class GitHubClient:
             body={
                 "commit_id": head_sha,
                 "event": "COMMENT",
-                "body": f"FirmcodeAI code scan review for review run `{review_run_id}`.",
+                "body": _inline_review_body(missing_comments),
                 "comments": [
                     {
                         "path": _read_str(comment.get("path"), ""),
@@ -1446,11 +1446,7 @@ def _render_summary_semgrep_finding(value: Any, changed_files: Sequence[ChangedF
         remediation=_public_message(_summary_remediation(finding)),
         fix=_read_optional_str(finding.get("fix")),
         location_label=f"`{path}:{line}`",
-        analysis_lines=[
-            "- An automated review rule matched this changed code.",
-            f"- Severity: `{severity}`.",
-            "- The finding is included because it maps to code changed in this PR.",
-        ],
+        analysis_lines=_finding_analysis_lines(finding, path=path, line=line, severity=severity, lines=display_lines, inline=False),
     )
 
 
@@ -1498,19 +1494,17 @@ def _render_inline_semgrep_comment(finding: Mapping[str, Any]) -> str:
     lines = _read_str(finding.get("displayLines"), "") or _read_str(finding.get("lines"), "")
     metadata = _read_object(finding.get("metadata"))
     fix = _read_optional_str(finding.get("fix"))
+    path = _read_str(finding.get("path"), "")
+    line = _read_int(_read_object(finding.get("start")).get("line"), 1)
     return _render_finding_report(
         severity=severity,
         message=message,
-        path=_read_str(finding.get("path"), ""),
+        path=path,
         lines=lines,
         remediation=_public_message(_read_optional_str(metadata.get("remediation")) or fix or "Review this changed line and update it before merging."),
         fix=fix,
         location_label=None,
-        analysis_lines=[
-            "- An automated review rule matched this changed line.",
-            f"- Severity: `{severity}`.",
-            "- This comment is anchored because the finding maps to a line added or modified in this PR.",
-        ],
+        analysis_lines=_finding_analysis_lines(finding, path=path, line=line, severity=severity, lines=lines, inline=True),
     )
 
 
@@ -1584,6 +1578,65 @@ def _render_finding_report(
 def _summary_remediation(finding: Mapping[str, Any]) -> str:
     metadata = _read_object(finding.get("metadata"))
     return _read_optional_str(metadata.get("remediation")) or _read_optional_str(finding.get("fix")) or "Review this changed code and update it before merging."
+
+
+def _inline_review_body(comments: Sequence[Mapping[str, Any]]) -> str:
+    count = len(comments)
+    noun = "comment" if count == 1 else "comments"
+    return f"FirmcodeAI left {count} inline code review {noun} on changed code."
+
+
+def _finding_analysis_lines(
+    finding: Mapping[str, Any],
+    *,
+    path: str,
+    line: int,
+    severity: str,
+    lines: str,
+    inline: bool,
+) -> list[str]:
+    metadata = _read_object(finding.get("metadata"))
+    rule_id = _read_str(finding.get("ruleId"), "")
+    excerpt = _first_non_empty_line(_trim_code_excerpt(lines))
+    analysis = [f"- Evidence: changed line `{path}:{line}`" + (f" contains `{excerpt}`." if excerpt else ".")]
+    if rule_id:
+        analysis.append(f"- Check: `{rule_id}` reported `{severity}` severity.")
+    else:
+        analysis.append(f"- Severity: `{severity}`.")
+
+    category = _read_optional_str(metadata.get("category"))
+    technology = _metadata_values(metadata.get("technology"))
+    if category or technology:
+        context = []
+        if category:
+            context.append(f"category `{category}`")
+        if technology:
+            context.append("technology " + ", ".join(f"`{value}`" for value in technology))
+        analysis.append("- Context: " + "; ".join(context) + ".")
+
+    standards = [*_metadata_values(metadata.get("cwe")), *_metadata_values(metadata.get("owasp"))]
+    if standards:
+        analysis.append("- Reference: " + ", ".join(f"`{value}`" for value in standards[:4]) + ".")
+
+    scope = "This inline comment is anchored to a line added or modified in this PR." if inline else "This finding is included because it maps to code changed in this PR."
+    analysis.append(f"- Scope: {scope}")
+    return analysis
+
+
+def _metadata_values(value: Any) -> list[str]:
+    if isinstance(value, str) and value:
+        return [value]
+    if isinstance(value, list):
+        return [item for item in value if isinstance(item, str) and item]
+    return []
+
+
+def _first_non_empty_line(value: str) -> str:
+    for line in value.splitlines():
+        stripped = line.strip()
+        if stripped:
+            return stripped[:160]
+    return ""
 
 
 def _trim_code_excerpt(value: str) -> str:
