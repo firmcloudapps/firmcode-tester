@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, ForbiddenException, NotFoundExc
 import { newDb } from "pg-mem";
 import { runDatabaseMigrations } from "../src/infrastructure/database/migrations";
 import { InMemoryReviewQueueProducer } from "../src/modules/queues/review-queue";
+import { DashboardAuthorizationService } from "../src/modules/auth/dashboard-authorization.service";
 import { PostgresDashboardAuthStore } from "../src/modules/review-runs/dashboard-auth.store";
 import { ReviewRunRetryService } from "../src/modules/review-runs/review-run-retry.service";
 import { ReviewRunsController } from "../src/modules/review-runs/review-runs.controller";
@@ -49,9 +50,10 @@ describe("review run retry dashboard API", () => {
     await seedRetryData(pool);
 
     const reviewRunsStore = new PostgresReviewRunsStore(pool, createDeterministicUuidFactory());
+    const dashboardAuthStore = new PostgresDashboardAuthStore(pool);
     const retryService = new ReviewRunRetryService(
       reviewRunsStore,
-      new PostgresDashboardAuthStore(pool),
+      new DashboardAuthorizationService(dashboardAuthStore),
       queue
     );
     controller = new ReviewRunsController(reviewRunsStore, retryService);

@@ -4,6 +4,7 @@ import type {
   RepositoryListResponse,
   RepositoryReviewConfiguration
 } from "@firmcode/shared";
+import { readDashboardRequestContext } from "../auth/dashboard-request-context";
 import { RepositoryConfigurationService } from "./repository-configuration.service";
 import { REPOSITORIES_STORE, type RepositoriesStore } from "./repositories.store";
 
@@ -31,8 +32,10 @@ export class RepositoriesController {
 
     return this.configurationService.getRepositoryConfiguration({
       repositoryId: id,
-      workspaceId: readSingleValue(workspaceIdHeader) ?? null,
-      clerkUserId: readSingleValue(userIdHeader) ?? null
+      auth: readDashboardRequestContext({
+        workspaceIdHeader,
+        clerkUserIdHeader: userIdHeader
+      })
     });
   }
 
@@ -49,8 +52,10 @@ export class RepositoriesController {
 
     return this.configurationService.updateRepositoryConfiguration({
       repositoryId: id,
-      workspaceId: readSingleValue(workspaceIdHeader) ?? null,
-      clerkUserId: readSingleValue(userIdHeader) ?? null,
+      auth: readDashboardRequestContext({
+        workspaceIdHeader,
+        clerkUserIdHeader: userIdHeader
+      }),
       body
     });
   }

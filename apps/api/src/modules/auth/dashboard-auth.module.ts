@@ -2,34 +2,30 @@ import { Module } from "@nestjs/common";
 import { Pool } from "pg";
 import type { ApiRuntimeConfig } from "@firmcode/shared";
 import { API_RUNTIME_CONFIG, apiRuntimeConfigProvider } from "../../config/api-config.provider";
-import { DashboardAuthModule } from "../auth/dashboard-auth.module";
-import { SettingsController } from "./settings.controller";
-import { SettingsService } from "./settings.service";
-import { EmptySettingsStore, PostgresSettingsStore, SETTINGS_STORE } from "./settings.store";
+import { DashboardAuthorizationService } from "./dashboard-authorization.service";
+import { DASHBOARD_AUTH_STORE, EmptyDashboardAuthStore, PostgresDashboardAuthStore } from "./dashboard-auth.store";
 
 @Module({
-  imports: [DashboardAuthModule],
-  controllers: [SettingsController],
   providers: [
     apiRuntimeConfigProvider,
     {
-      provide: SETTINGS_STORE,
+      provide: DASHBOARD_AUTH_STORE,
       useFactory: (config: ApiRuntimeConfig) => {
         if (config.nodeEnv === "test") {
-          return new EmptySettingsStore(config);
+          return new EmptyDashboardAuthStore();
         }
 
-        return new PostgresSettingsStore(
+        return new PostgresDashboardAuthStore(
           new Pool({
             connectionString: config.database.url,
             ssl: config.database.ssl ? { rejectUnauthorized: false } : false
-          }),
-          config
+          })
         );
       },
       inject: [API_RUNTIME_CONFIG]
     },
-    SettingsService
-  ]
+    DashboardAuthorizationService
+  ],
+  exports: [DASHBOARD_AUTH_STORE, DashboardAuthorizationService]
 })
-export class SettingsModule {}
+export class DashboardAuthModule {}

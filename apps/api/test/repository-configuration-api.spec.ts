@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, NotFoundException, UnauthorizedException } from "@nestjs/common";
 import { newDb } from "pg-mem";
 import { runDatabaseMigrations } from "../src/infrastructure/database/migrations";
+import { DashboardAuthorizationService } from "../src/modules/auth/dashboard-authorization.service";
 import { RepositoriesController } from "../src/modules/repositories/repositories.controller";
 import { RepositoryConfigurationService } from "../src/modules/repositories/repository-configuration.service";
 import { PostgresRepositoriesStore } from "../src/modules/repositories/repositories.store";
@@ -37,9 +38,10 @@ describe("repository automation configuration dashboard API", () => {
     await seedRepositoryConfigurationData(pool);
 
     const repositoriesStore = new PostgresRepositoriesStore(pool);
+    const dashboardAuthStore = new PostgresDashboardAuthStore(pool);
     controller = new RepositoriesController(
       repositoriesStore,
-      new RepositoryConfigurationService(repositoriesStore, new PostgresDashboardAuthStore(pool))
+      new RepositoryConfigurationService(repositoriesStore, new DashboardAuthorizationService(dashboardAuthStore))
     );
   });
 

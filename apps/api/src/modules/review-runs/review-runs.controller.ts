@@ -8,6 +8,7 @@ import {
 } from "@firmcode/shared";
 import { ReviewRunRetryService } from "./review-run-retry.service";
 import { REVIEW_RUNS_STORE, type ReviewRunsStore } from "./review-runs.store";
+import { readDashboardRequestContext } from "../auth/dashboard-request-context";
 
 @Controller("api/review-runs")
 export class ReviewRunsController {
@@ -44,8 +45,10 @@ export class ReviewRunsController {
 
     return this.retryService.retryReviewRun({
       reviewRunId: id,
-      workspaceId: readSingleValue(workspaceIdHeader) ?? null,
-      clerkUserId: readSingleValue(userIdHeader) ?? null
+      auth: readDashboardRequestContext({
+        workspaceIdHeader,
+        clerkUserIdHeader: userIdHeader
+      })
     });
   }
 }

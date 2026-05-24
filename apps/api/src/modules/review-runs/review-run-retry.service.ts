@@ -1,23 +1,20 @@
 import {
   BadRequestException,
   ConflictException,
-  ForbiddenException,
   Inject,
   Injectable,
-  NotFoundException,
-  UnauthorizedException
+  NotFoundException
 } from "@nestjs/common";
 import {
   WORKER_REVIEW_JOB_INPUT_SCHEMA_VERSION,
   type ReviewRunRetryResponse,
   type ReviewRunStatus
 } from "@firmcode/shared";
-import { REVIEW_QUEUE, type ReviewQueueProducer } from "../queues/review-queue";
 import {
-  DASHBOARD_AUTH_STORE,
-  roleHasDashboardCapability,
-  type DashboardAuthStore
-} from "./dashboard-auth.store";
+  DashboardAuthorizationService,
+  type DashboardRequestContext
+} from "../auth/dashboard-authorization.service";
+import { REVIEW_QUEUE, type ReviewQueueProducer } from "../queues/review-queue";
 import {
   REVIEW_RUNS_STORE,
   type ReviewRunRetryCreation,
@@ -26,8 +23,7 @@ import {
 
 export interface ReviewRunRetryRequest {
   readonly reviewRunId: string;
-  readonly workspaceId: string | null;
-  readonly clerkUserId: string | null;
+  readonly auth: DashboardRequestContext;
 }
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -36,33 +32,23 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3
 export class ReviewRunRetryService {
   constructor(
     @Inject(REVIEW_RUNS_STORE) private readonly reviewRunsStore: ReviewRunsStore,
-    @Inject(DASHBOARD_AUTH_STORE) private readonly dashboardAuthStore: DashboardAuthStore,
+    private readonly dashboardAuthorization: DashboardAuthorizationService,
     @Inject(REVIEW_QUEUE) private readonly reviewQueue: ReviewQueueProducer
   ) {}
 
   async retryReviewRun(input: ReviewRunRetryRequest): Promise<ReviewRunRetryResponse> {
     assertUuid("review run ID", input.reviewRunId);
-    assertAuthenticated(input);
-
-    assertUuid("workspace ID", input.workspaceId);
-
-    const membership = await this.dashboardAuthStore.findActiveMembership({
-      workspaceId: input.workspaceId,
-      clerkUserId: input.clerkUserId
+    const context = await this.dashboardAuthorization.requireWorkspaceMembership(input.auth, {
+      capability: "retry_review_run",
+      concealMembershipFailure: true,
+      notFoundMessage: "Review run not found",
+      forbiddenMessage: "Workspace role cannot retry review runs"
     });
-
-    if (membership === null) {
-      throw new NotFoundException("Review run not found");
-    }
-
-    if (!roleHasDashboardCapability(membership.role, "retry_review_run")) {
-      throw new ForbiddenException("Workspace role cannot retry review runs");
-    }
 
     const retry = await this.reviewRunsStore.createRetryReviewRun({
       reviewRunId: input.reviewRunId,
-      workspaceId: input.workspaceId,
-      clerkUserId: input.clerkUserId
+      workspaceId: context.workspaceId,
+      clerkUserId: context.clerkUserId
     });
 
     if (retry.kind === "not_found") {
@@ -108,15 +94,6 @@ export class ReviewRunRetryService {
       reason: "retry_queued",
       message: "Review retry queued."
     };
-  }
-}
-
-function assertAuthenticated(input: ReviewRunRetryRequest): asserts input is ReviewRunRetryRequest & {
-  workspaceId: string;
-  clerkUserId: string;
-} {
-  if (input.workspaceId === null || input.clerkUserId === null) {
-    throw new UnauthorizedException("Dashboard authentication is required");
   }
 }
 
