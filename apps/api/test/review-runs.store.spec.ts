@@ -28,9 +28,10 @@ describe("PostgresReviewRunsStore", () => {
   });
 
   it("exposes dry-run summary and inline outputs for the dashboard API", async () => {
-    const detail = await new PostgresReviewRunsStore(pool).getReviewRunDetail(
-      "00000000-0000-4000-8000-000000000006"
-    );
+    const detail = await new PostgresReviewRunsStore(pool).getReviewRunDetail({
+      reviewRunId: "00000000-0000-4000-8000-000000000006",
+      workspaceId: "00000000-0000-4000-8000-000000000101"
+    });
 
     expect(detail).toMatchObject({
       id: "00000000-0000-4000-8000-000000000006",
@@ -62,12 +63,17 @@ describe("PostgresReviewRunsStore", () => {
 async function seedReviewRunWithDryRunOutputs(pool: PgPoolLike): Promise<void> {
   await pool.query(
     `
+INSERT INTO workspaces (id, clerk_org_id, name) VALUES
+('00000000-0000-4000-8000-000000000101', 'org_firmcode', 'Firmcode');
+
 INSERT INTO github_installations (
   id,
+  workspace_id,
   installation_id,
   permissions_json
 ) VALUES (
   '00000000-0000-4000-8000-000000000001',
+  '00000000-0000-4000-8000-000000000101',
   101,
   '{"pull_requests":"write"}'
 );

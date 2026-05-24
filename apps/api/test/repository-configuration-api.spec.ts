@@ -37,9 +37,11 @@ describe("repository automation configuration dashboard API", () => {
     await seedRepositoryConfigurationData(pool);
 
     const repositoriesStore = new PostgresRepositoriesStore(pool);
+    const authStore = new PostgresDashboardAuthStore(pool);
     controller = new RepositoriesController(
       repositoriesStore,
-      new RepositoryConfigurationService(repositoriesStore, new PostgresDashboardAuthStore(pool))
+      authStore,
+      new RepositoryConfigurationService(repositoriesStore, authStore)
     );
   });
 

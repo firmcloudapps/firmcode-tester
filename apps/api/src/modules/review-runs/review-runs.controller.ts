@@ -6,6 +6,15 @@ import {
   type ReviewRunListResponse,
   type ReviewRunRetryResponse
 } from "@firmcode/shared";
+import {
+  authorizeDashboardRequest,
+  readSingleHeader
+} from "./dashboard-authorization";
+import {
+  DASHBOARD_AUTH_STORE,
+  roleHasDashboardCapability,
+  type DashboardAuthStore
+} from "./dashboard-auth.store";
 import { ReviewRunRetryService } from "./review-run-retry.service";
 import { REVIEW_RUNS_STORE, type ReviewRunsStore } from "./review-runs.store";
 
@@ -13,23 +22,47 @@ import { REVIEW_RUNS_STORE, type ReviewRunsStore } from "./review-runs.store";
 export class ReviewRunsController {
   constructor(
     @Inject(REVIEW_RUNS_STORE) private readonly reviewRunsStore: ReviewRunsStore,
+    @Inject(DASHBOARD_AUTH_STORE) private readonly dashboardAuthStore: DashboardAuthStore,
     private readonly retryService?: ReviewRunRetryService
   ) {}
 
   @Get()
-  async listReviewRuns(@Query() query: Record<string, string | string[] | undefined>): Promise<ReviewRunListResponse> {
-    return this.reviewRunsStore.listReviewRuns(parseReviewRunListFilters(query));
+  async listReviewRuns(
+    @Query() query: Record<string, string | string[] | undefined>,
+    @Headers("x-firmcode-workspace-id") workspaceIdHeader?: string | string[],
+    @Headers("x-firmcode-user-id") userIdHeader?: string | string[]
+  ): Promise<ReviewRunListResponse> {
+    const membership = await authorizeDashboardRequest(this.dashboardAuthStore, {
+      workspaceId: readSingleHeader(workspaceIdHeader),
+      clerkUserId: readSingleHeader(userIdHeader)
+    });
+
+    return this.reviewRunsStore.listReviewRuns({
+      workspaceId: membership.workspaceId,
+      filters: parseReviewRunListFilters(query)
+    });
   }
 
   @Get(":id")
-  async getReviewRunDetail(@Param("id") id: string): Promise<ReviewRunDetail> {
-    const detail = await this.reviewRunsStore.getReviewRunDetail(id);
+  async getReviewRunDetail(
+    @Param("id") id: string,
+    @Headers("x-firmcode-workspace-id") workspaceIdHeader?: string | string[],
+    @Headers("x-firmcode-user-id") userIdHeader?: string | string[]
+  ): Promise<ReviewRunDetail> {
+    const membership = await authorizeDashboardRequest(this.dashboardAuthStore, {
+      workspaceId: readSingleHeader(workspaceIdHeader),
+      clerkUserId: readSingleHeader(userIdHeader)
+    });
+    const detail = await this.reviewRunsStore.getReviewRunDetail({
+      reviewRunId: id,
+      workspaceId: membership.workspaceId
+    });
 
     if (detail === null) {
       throw new NotFoundException("Review run not found");
     }
 
-    return detail;
+    return roleHasDashboardCapability(membership.role, "view_raw_artifacts") ? detail : redactRawArtifacts(detail);
   }
 
   @Post(":id/retry")
@@ -44,8 +77,8 @@ export class ReviewRunsController {
 
     return this.retryService.retryReviewRun({
       reviewRunId: id,
-      workspaceId: readSingleValue(workspaceIdHeader) ?? null,
-      clerkUserId: readSingleValue(userIdHeader) ?? null
+      workspaceId: readSingleHeader(workspaceIdHeader),
+      clerkUserId: readSingleHeader(userIdHeader)
     });
   }
 }
@@ -93,4 +126,16 @@ function validateIsoDateFilter(name: string, value: string | undefined): void {
   if (value !== undefined && Number.isNaN(Date.parse(value))) {
     throw new BadRequestException(`${name} must be a valid date`);
   }
+}
+
+function redactRawArtifacts(detail: ReviewRunDetail): ReviewRunDetail {
+  return {
+    ...detail,
+    artifacts: [],
+    logExcerpts: [],
+    pipelineStages: detail.pipelineStages.map((stage) => ({
+      ...stage,
+      artifactId: null
+    }))
+  };
 }

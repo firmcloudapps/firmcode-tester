@@ -12,9 +12,14 @@ import type { DatabaseExecutor } from "../../infrastructure/database/migrations"
 export const REPOSITORIES_STORE = Symbol("REPOSITORIES_STORE");
 
 export interface RepositoriesStore {
-  listRepositories(filters: DashboardRepositoryListFilters): Promise<RepositoryListResponse>;
+  listRepositories(input: RepositoryListLookup): Promise<RepositoryListResponse>;
   getRepositoryConfiguration(input: RepositoryConfigurationLookup): Promise<RepositoryReviewConfiguration | null>;
   updateRepositoryConfiguration(input: RepositoryConfigurationUpdate): Promise<RepositoryReviewConfiguration | null>;
+}
+
+export interface RepositoryListLookup {
+  readonly workspaceId: string;
+  readonly filters: DashboardRepositoryListFilters;
 }
 
 export interface RepositoryConfigurationLookup {
@@ -76,8 +81,8 @@ interface RepositoryConfigurationRow {
 }
 
 export class EmptyRepositoriesStore implements RepositoriesStore {
-  async listRepositories(filters: DashboardRepositoryListFilters): Promise<RepositoryListResponse> {
-    return { repositories: [], filters };
+  async listRepositories(input: RepositoryListLookup): Promise<RepositoryListResponse> {
+    return { repositories: [], filters: input.filters };
   }
 
   async getRepositoryConfiguration(_input: RepositoryConfigurationLookup): Promise<RepositoryReviewConfiguration | null> {
@@ -92,8 +97,9 @@ export class EmptyRepositoriesStore implements RepositoriesStore {
 export class PostgresRepositoriesStore implements RepositoriesStore {
   constructor(private readonly database: DatabaseExecutor) {}
 
-  async listRepositories(filters: DashboardRepositoryListFilters): Promise<RepositoryListResponse> {
-    const { whereSql, values } = buildRepositoryWhereClause(filters);
+  async listRepositories(input: RepositoryListLookup): Promise<RepositoryListResponse> {
+    const { filters } = input;
+    const { whereSql, values } = buildRepositoryWhereClause(input.workspaceId, filters);
     const result = await this.database.query<RepositoryListRow>(
       `
 SELECT
@@ -106,6 +112,7 @@ SELECT
   r.enabled,
   r.updated_at
 FROM repositories r
+JOIN github_installations gi ON gi.id = r.installation_id
 ${whereSql}
 ORDER BY r.full_name ASC
 LIMIT 100
@@ -125,8 +132,12 @@ SELECT
   pr.title AS pull_request_title
 FROM review_runs rr
 JOIN pull_requests pr ON pr.id = rr.pull_request_id
+JOIN repositories r ON r.id = rr.repository_id
+JOIN github_installations gi ON gi.id = r.installation_id
+WHERE gi.workspace_id = $1
 ORDER BY rr.created_at DESC
-`
+`,
+      [input.workspaceId]
     );
     const changedFiles = await this.database.query<RepositoryChangedFileRow>(
       `
@@ -135,9 +146,13 @@ SELECT
   cf.language
 FROM changed_files cf
 JOIN review_runs rr ON rr.id = cf.review_run_id
+JOIN repositories r ON r.id = rr.repository_id
+JOIN github_installations gi ON gi.id = r.installation_id
 WHERE cf.language IS NOT NULL
+  AND gi.workspace_id = $1
 ORDER BY cf.created_at DESC
-`
+`,
+      [input.workspaceId]
     );
     const findings = await this.database.query<RepositoryFindingRow>(
       `
@@ -146,7 +161,11 @@ SELECT
   f.id AS finding_id
 FROM findings f
 JOIN review_runs rr ON rr.id = f.review_run_id
-`
+JOIN repositories r ON r.id = rr.repository_id
+JOIN github_installations gi ON gi.id = r.installation_id
+WHERE gi.workspace_id = $1
+`,
+      [input.workspaceId]
     );
     const aggregates = buildRepositoryAggregates(reviewRuns.rows, changedFiles.rows, findings.rows);
     const repositories = result.rows
@@ -258,9 +277,12 @@ RETURNING *
   }
 }
 
-function buildRepositoryWhereClause(filters: DashboardRepositoryListFilters): { whereSql: string; values: unknown[] } {
-  const conditions: string[] = [];
-  const values: unknown[] = [];
+function buildRepositoryWhereClause(
+  workspaceId: string,
+  filters: DashboardRepositoryListFilters
+): { whereSql: string; values: unknown[] } {
+  const conditions: string[] = ["gi.workspace_id = $1"];
+  const values: unknown[] = [workspaceId];
 
   if (filters.enabled !== undefined) {
     values.push(filters.enabled);

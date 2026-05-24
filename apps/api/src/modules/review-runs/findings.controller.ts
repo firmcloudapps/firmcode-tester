@@ -1,4 +1,4 @@
-import { BadRequestException, Controller, Get, Inject, Query } from "@nestjs/common";
+import { BadRequestException, Controller, Get, Headers, Inject, Query } from "@nestjs/common";
 import {
   REVIEW_FINDING_CATEGORIES,
   REVIEW_FINDING_SEVERITIES,
@@ -7,15 +7,35 @@ import {
   type FindingsListFilters,
   type FindingsListResponse
 } from "@firmcode/shared";
+import {
+  authorizeDashboardRequest,
+  readSingleHeader
+} from "./dashboard-authorization";
+import { DASHBOARD_AUTH_STORE, type DashboardAuthStore } from "./dashboard-auth.store";
 import { FINDINGS_STORE, type FindingsStore } from "./findings.store";
 
 @Controller("api/findings")
 export class FindingsController {
-  constructor(@Inject(FINDINGS_STORE) private readonly findingsStore: FindingsStore) {}
+  constructor(
+    @Inject(FINDINGS_STORE) private readonly findingsStore: FindingsStore,
+    @Inject(DASHBOARD_AUTH_STORE) private readonly dashboardAuthStore: DashboardAuthStore
+  ) {}
 
   @Get()
-  async listFindings(@Query() query: Record<string, string | string[] | undefined>): Promise<FindingsListResponse> {
-    return this.findingsStore.listFindings(parseFindingsListFilters(query));
+  async listFindings(
+    @Query() query: Record<string, string | string[] | undefined>,
+    @Headers("x-firmcode-workspace-id") workspaceIdHeader?: string | string[],
+    @Headers("x-firmcode-user-id") userIdHeader?: string | string[]
+  ): Promise<FindingsListResponse> {
+    const membership = await authorizeDashboardRequest(this.dashboardAuthStore, {
+      workspaceId: readSingleHeader(workspaceIdHeader),
+      clerkUserId: readSingleHeader(userIdHeader)
+    });
+
+    return this.findingsStore.listFindings({
+      workspaceId: membership.workspaceId,
+      filters: parseFindingsListFilters(query)
+    });
   }
 }
 
