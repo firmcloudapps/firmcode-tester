@@ -1,6 +1,7 @@
 import React from "react";
 import { renderToString } from "react-dom/server";
 import { DashboardShell } from "../components/dashboard/dashboard-shell";
+import { RepositoriesView } from "../components/dashboard/repositories-view";
 import { SettingsView } from "../components/dashboard/settings-view";
 
 describe("dashboard navigation", () => {
@@ -22,6 +23,14 @@ describe("dashboard navigation", () => {
 
     expect(html).toContain('href="/github/installations"');
     expect(html).toContain(">Connect GitHub App</a>");
+  });
+
+  it("routes repository Configure actions to the implemented repository detail page", () => {
+    const html = renderToString(<RepositoriesView state={{ status: "populated", data: repositoryList }} />);
+
+    expect(html).toContain('href="/repositories/repo-1?tab=configuration"');
+    expect(html).toContain(">Configure</a>");
+    expect(html).not.toContain("Repository detail configuration is planned");
   });
 });
 
@@ -62,4 +71,23 @@ const settings = {
     enabled: false,
     message: "Email and Slack notification routing is planned after review delivery stabilizes."
   }
+};
+
+const repositoryList = {
+  filters: {},
+  repositories: [
+    {
+      id: "repo-1",
+      owner: "openclaw",
+      name: "firmcode",
+      fullName: "openclaw/firmcode",
+      private: false,
+      defaultBranch: "main",
+      enabled: true,
+      primaryLanguage: "TypeScript",
+      openFindingsCount: 0,
+      lastReview: null,
+      updatedAt: "2026-05-22T10:00:00.000Z"
+    }
+  ]
 };

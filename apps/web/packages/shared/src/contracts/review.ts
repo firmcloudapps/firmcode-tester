@@ -53,6 +53,55 @@ export interface RepositoryListResponse {
   filters: DashboardRepositoryListFilters;
 }
 
+export interface RepositoryPullRequestSummary {
+  id: string;
+  number: number;
+  title: string;
+  authorLogin: string;
+  baseRef: string;
+  headRef: string;
+  state: string;
+  draft: boolean;
+  latestReviewRun: RepositoryLastReview | null;
+  updatedAt: string;
+}
+
+export type RepositoryActivityKind =
+  | "repository_synced"
+  | "configuration_updated"
+  | "pull_request_seen"
+  | "review_run_updated"
+  | "finding_created";
+
+export interface RepositoryActivityItem {
+  id: string;
+  kind: RepositoryActivityKind;
+  title: string;
+  detail: string;
+  createdAt: string;
+}
+
+export interface RepositoryDetailPermissions {
+  canManageConfiguration: boolean;
+  canRetryReviewRuns: boolean;
+  canAccessRawArtifacts: boolean;
+}
+
+export interface RepositoryDetailResponse {
+  repository: RepositoryListItem;
+  configuration: RepositoryReviewConfiguration;
+  pullRequests: RepositoryPullRequestSummary[];
+  reviewRuns: ReviewRunListItem[];
+  findings: FindingInboxItem[];
+  activity: RepositoryActivityItem[];
+  permissions: RepositoryDetailPermissions;
+}
+
+export interface RepositoryActivityResponse {
+  repositoryId: string;
+  activity: RepositoryActivityItem[];
+}
+
 export interface GitHubOAuthUserSummary {
   githubUserId: number;
   login: string;

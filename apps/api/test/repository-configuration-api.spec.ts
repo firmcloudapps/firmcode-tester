@@ -67,6 +67,22 @@ describe("repository automation configuration dashboard API", () => {
     expect(configuration.updatedAt).toEqual(expect.any(String));
   });
 
+  it("allows lower workspace roles to read repository configuration without mutating it", async () => {
+    const developerConfiguration = await controller.getRepositoryConfiguration(REPOSITORY_ID, WORKSPACE_ID, DEVELOPER_USER_ID);
+    const viewerConfiguration = await controller.getRepositoryConfiguration(REPOSITORY_ID, WORKSPACE_ID, VIEWER_USER_ID);
+
+    expect(developerConfiguration).toMatchObject({
+      repositoryId: REPOSITORY_ID,
+      automationEnabled: true,
+      severityThreshold: "medium"
+    });
+    expect(viewerConfiguration).toMatchObject({
+      repositoryId: REPOSITORY_ID,
+      automationEnabled: true,
+      severityThreshold: "medium"
+    });
+  });
+
   it("allows owners and admins to disable and enable repository automation", async () => {
     const disabled = await controller.updateRepositoryConfiguration(
       REPOSITORY_ID,
