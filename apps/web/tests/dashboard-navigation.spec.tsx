@@ -61,6 +61,19 @@ describe("dashboard navigation", () => {
     expect(html).not.toContain("Pull Requests</span>");
   });
 
+  it("enables CI Failures sidebar navigation once the route exists", () => {
+    const html = renderToString(
+      <DashboardShell activeItem="CI Failures">
+        <main>CI failures body</main>
+      </DashboardShell>
+    );
+
+    expect(html).toContain('href="/ci-failures"');
+    expect(html).toContain(">CI Failures</a>");
+    expect(html).toContain('aria-current="page"');
+    expect(html).not.toContain("CI Failures</span>");
+  });
+
   it("routes overview pull request links to the implemented queue", () => {
     const data = buildOverviewDashboardData({
       repositories: repositoryList.repositories,
@@ -71,6 +84,18 @@ describe("dashboard navigation", () => {
 
     expect(html).toContain('href="/pull-requests"');
     expect(html).toContain(">Pull requests</a>");
+  });
+
+  it("routes overview CI failure needs-attention links to the implemented queue", () => {
+    const data = buildOverviewDashboardData({
+      repositories: repositoryList.repositories,
+      reviewRuns: [],
+      now: new Date("2026-05-24T12:00:00.000Z")
+    });
+    const html = renderToString(<OverviewView state={{ status: "populated", data }} />);
+
+    expect(html).toContain('href="/ci-failures"');
+    expect(html).toContain("CI failure");
   });
 });
 

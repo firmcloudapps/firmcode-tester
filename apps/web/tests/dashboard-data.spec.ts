@@ -1,6 +1,8 @@
 import type { FindingsListResponse } from "@firmcode/shared";
 import {
   loadBillingState,
+  loadCiFailureDetailState,
+  loadCiFailuresState,
   loadFindingsState,
   loadGitHubInstallationsState,
   loadGitHubRepositoryControlsState,
@@ -194,6 +196,67 @@ describe("dashboard findings data loader", () => {
     const headers = new Headers(init.headers);
 
     expect(url.pathname).toBe("/api/review-runs/run-1");
+    expect(headers.get("x-firmcode-workspace-id")).toBe("workspace-1");
+    expect(headers.get("x-firmcode-user-id")).toBe("user-1");
+  });
+
+  it("maps CI failure filters into the authenticated API query string", async () => {
+    process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
+    process.env.FIRMCODE_DASHBOARD_WORKSPACE_ID = "workspace-1";
+    process.env.FIRMCODE_DASHBOARD_CLERK_USER_ID = "user-1";
+    const fetcher = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      jsonResponse({ ciFailures: [{ id: "failure-1" }], filters: {}, pagination: { limit: 25, returned: 1 } })
+    );
+
+    vi.stubGlobal("fetch", fetcher);
+
+    await expect(
+      loadCiFailuresState({
+        repository: "openclaw/firmcode",
+        repositoryId: "repo-1",
+        status: "failed",
+        flaky: "false",
+        dateFrom: "2026-05-20",
+        dateTo: "2026-05-24",
+        limit: "25"
+      })
+    ).resolves.toMatchObject({ status: "populated" });
+
+    const url = new URL(String(fetcher.mock.calls[0]?.[0]));
+    const init = fetcher.mock.calls[0]?.[1] as RequestInit;
+    const headers = new Headers(init.headers);
+
+    expect(url.pathname).toBe("/api/ci-failures");
+    expect(url.searchParams.get("repository")).toBe("openclaw/firmcode");
+    expect(url.searchParams.get("repositoryId")).toBe("repo-1");
+    expect(url.searchParams.get("status")).toBe("failed");
+    expect(url.searchParams.get("flaky")).toBe("false");
+    expect(url.searchParams.get("dateFrom")).toBe("2026-05-20");
+    expect(url.searchParams.get("dateTo")).toBe("2026-05-24");
+    expect(url.searchParams.get("limit")).toBe("25");
+    expect(headers.get("x-firmcode-workspace-id")).toBe("workspace-1");
+    expect(headers.get("x-firmcode-user-id")).toBe("user-1");
+  });
+
+  it("fetches CI failure detail with dashboard auth headers and maps 404 to empty", async () => {
+    process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
+    process.env.FIRMCODE_DASHBOARD_WORKSPACE_ID = "workspace-1";
+    process.env.FIRMCODE_DASHBOARD_CLERK_USER_ID = "user-1";
+    const fetcher = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
+      const pathname = new URL(String(input)).pathname;
+      return pathname.endsWith("/missing") ? jsonResponse({ message: "CI failure not found" }, 404) : jsonResponse({ id: "failure-1" });
+    });
+
+    vi.stubGlobal("fetch", fetcher);
+
+    await expect(loadCiFailureDetailState("failure-1%3Aunit-tests")).resolves.toMatchObject({ status: "populated" });
+    await expect(loadCiFailureDetailState("missing")).resolves.toEqual({ status: "empty" });
+
+    const url = new URL(String(fetcher.mock.calls[0]?.[0]));
+    const init = fetcher.mock.calls[0]?.[1] as RequestInit;
+    const headers = new Headers(init.headers);
+
+    expect(url.pathname).toBe("/api/ci-failures/failure-1%3Aunit-tests");
     expect(headers.get("x-firmcode-workspace-id")).toBe("workspace-1");
     expect(headers.get("x-firmcode-user-id")).toBe("user-1");
   });
