@@ -1,12 +1,22 @@
 import React from "react";
 
 interface DashboardShellProps {
-  activeItem: "Overview" | "Repositories" | "Review Runs" | "Findings" | "CI Failures" | "Rules" | "Settings" | "Billing";
+  activeItem:
+    | "Overview"
+    | "PR Review"
+    | "Repositories"
+    | "Review Runs"
+    | "Findings"
+    | "CI Failures"
+    | "Rules"
+    | "Settings"
+    | "Billing";
   children: React.ReactNode;
 }
 
 const navItems = [
   { label: "Overview", href: "/", enabled: true },
+  { label: "PR Review", href: "/github/installations", enabled: true },
   { label: "Repositories", href: "/repositories", enabled: true },
   { label: "Pull Requests", href: "/pull-requests", enabled: false },
   { label: "Review Runs", href: "/review-runs", enabled: true },
@@ -36,14 +46,12 @@ export function DashboardShell({ activeItem, children }: DashboardShellProps) {
               aria-label="Global search"
             />
           </label>
-          <button
-            className="hidden shrink-0 cursor-not-allowed rounded-md border border-border bg-surface px-3 py-2 text-sm font-medium text-secondary shadow-sm opacity-75 sm:inline-flex"
-            type="button"
-            disabled
-            title="GitHub App connection is not wired to an install flow yet"
+          <a
+            className="hidden shrink-0 rounded-md border border-border bg-surface px-3 py-2 text-sm font-medium text-primary shadow-sm hover:border-accent sm:inline-flex"
+            href="/github/installations"
           >
             Connect GitHub
-          </button>
+          </a>
           <button
             className="hidden h-9 w-9 items-center justify-center rounded-md border border-border bg-surface text-sm font-semibold text-accent shadow-sm hover:border-accent sm:inline-flex"
             type="button"

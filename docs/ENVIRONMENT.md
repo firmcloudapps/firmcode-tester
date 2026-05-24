@@ -72,6 +72,8 @@ Clerk owns sign-in, sign-up, sessions, user profile, organizations where enabled
 | `GITHUB_CLIENT_ID` | oauth | GitHub OAuth client ID if OAuth is enabled. |
 | `GITHUB_CLIENT_SECRET` | oauth | GitHub OAuth client secret if OAuth is enabled. |
 | `GITHUB_ALLOWED_INSTALLATIONS` | no | Comma-separated installation IDs for personal MVP allowlist. |
+| `GITHUB_APP_INSTALL_URL` | web | Public GitHub App installation URL shown by `/github/installations`, for example `https://github.com/apps/<slug>/installations/new`. |
+| `GITHUB_APP_SLUG` | web | GitHub App slug used to derive the install URL when `GITHUB_APP_INSTALL_URL` is not set. |
 
 ## LLM
 

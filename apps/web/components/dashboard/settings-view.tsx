@@ -194,14 +194,12 @@ function GitHubAppPanel({ data }: { data: WorkspaceSettingsResponse }) {
     >
       <div className="flex flex-wrap gap-2">
         {canManage ? (
-          <button
-            className="cursor-not-allowed rounded-md bg-accent px-3 py-2 text-sm font-medium text-white opacity-70"
-            type="button"
-            disabled
-            title="GitHub App connection is not wired to an install flow yet"
+          <a
+            className="rounded-md bg-accent px-3 py-2 text-sm font-medium text-white"
+            href={data.githubApp.installUrl}
           >
             Connect GitHub App
-          </button>
+          </a>
         ) : (
           <button className="rounded-md bg-mist px-3 py-2 text-sm font-medium text-secondary" type="button" disabled>
             Connect GitHub App
