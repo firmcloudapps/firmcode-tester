@@ -1566,15 +1566,14 @@ def _render_finding_report(
     if fix:
         body.extend(["", "<details>", "<summary>🛠 Suggested patch</summary>", "", "```diff", _render_semgrep_fix_diff(lines, fix), "```", "", "</details>"])
     else:
+        resolution_lines = _render_resolution_bullets(remediation or "Review this changed line and update it before merging.")
         body.extend(
             [
                 "",
                 "<details>",
                 "<summary>🛠 Suggested resolution</summary>",
                 "",
-                "```text",
-                remediation or "Review this changed line and update it before merging.",
-                "```",
+                *resolution_lines,
                 "",
                 "</details>",
             ]
@@ -1594,6 +1593,38 @@ def _trim_code_excerpt(value: str) -> str:
     while lines and not lines[-1].strip():
         lines.pop()
     return "\n".join(lines)[:1200]
+
+
+def _render_resolution_bullets(value: str) -> list[str]:
+    points = _resolution_points(value)
+    return [f"- {point}" for point in points] if points else ["- Review this changed line and update it before merging."]
+
+
+def _resolution_points(value: str) -> list[str]:
+    normalized = _single_line(value.replace("\r", "\n"))
+    if not normalized:
+        return []
+
+    explicit_points = [
+        line.strip().lstrip("-*•").strip()
+        for line in value.replace("\r", "\n").split("\n")
+        if line.strip()
+    ]
+    if len(explicit_points) > 1:
+        return [_normalize_resolution_point(point) for point in explicit_points if point]
+
+    sentence_parts = [part.strip() for part in re.split(r"(?<=[.!?])\s+", normalized) if part.strip()]
+    points: list[str] = []
+    for part in sentence_parts or [normalized]:
+        points.extend(piece.strip() for piece in re.split(r",\s+and\s+", part) if piece.strip())
+    return [_normalize_resolution_point(point) for point in points if point]
+
+
+def _normalize_resolution_point(value: str) -> str:
+    point = value.strip().rstrip(".")
+    if not point:
+        return ""
+    return f"{point[0].upper()}{point[1:]}."
 
 
 def _changed_file_line_excerpt(changed_files: Sequence[ChangedFile], path: str, line: int) -> str | None:
