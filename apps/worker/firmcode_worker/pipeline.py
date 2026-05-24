@@ -1705,8 +1705,10 @@ def _inline_severity_label(severity: str) -> str:
 def _render_semgrep_fix_diff(original: str, fix: str) -> str:
     original_lines = [line for line in original.strip().splitlines() if line.strip()]
     fix_lines = [line for line in fix.strip().splitlines() if line.strip()]
-    diff_lines = [*(f"- {line}" for line in original_lines[:12]), *(f"! {line}" for line in fix_lines[:12])]
-    return "\n".join(diff_lines) if diff_lines else f"! {fix.strip()[:1200]}"
+    diff_lines = ["@@ Suggested replacement @@"]
+    diff_lines.extend(f"- {line}" for line in original_lines[:12])
+    diff_lines.extend(f"+ {line}" for line in fix_lines[:12])
+    return "\n".join(diff_lines) if len(diff_lines) > 1 else f"@@ Suggested replacement @@\n+ {fix.strip()[:1200]}"
 
 
 def _inline_comment_language(path: str) -> str:

@@ -227,14 +227,14 @@ def test_render_resolution_bullets_splits_major_points() -> None:
     ]
 
 
-def test_render_semgrep_fix_diff_marks_removed_and_replacement_lines() -> None:
+def test_render_semgrep_fix_diff_uses_native_removed_and_replacement_lines() -> None:
     diff = _render_semgrep_fix_diff(
         "const value = eval(input);",
         "const value = JSON.parse(input);",
     )
 
-    assert diff == "- const value = eval(input);\n! const value = JSON.parse(input);"
-    assert "+ const value = JSON.parse(input);" not in diff
+    assert diff == "@@ Suggested replacement @@\n- const value = eval(input);\n+ const value = JSON.parse(input);"
+    assert "! const value = JSON.parse(input);" not in diff
 
 
 def test_inline_review_body_omits_internal_run_ids() -> None:
