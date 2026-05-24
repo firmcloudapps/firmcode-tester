@@ -22,7 +22,7 @@ const navItems = [
   { label: "Review Runs", href: "/review-runs", enabled: true },
   { label: "Findings", href: "/findings", enabled: true },
   { label: "CI Failures", href: "/ci-failures", enabled: false },
-  { label: "Rules / Policies", href: "/rules", enabled: false },
+  { label: "Rules / Policies", href: "/rules", enabled: true },
   { label: "Settings", href: "/settings", enabled: true },
   { label: "Billing", href: "/billing", enabled: true }
 ];

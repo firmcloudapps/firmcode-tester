@@ -203,6 +203,86 @@ export type UpdateRepositoryReviewConfigurationRequest = Partial<
   >
 >;
 
+export type ReviewPolicyScope = "workspace" | "repository";
+
+export interface ReviewPolicyReviewPreferences {
+  reviewDraftPullRequests: boolean;
+  requireTestsForRiskyChanges: boolean;
+  suggestMissingTests: boolean;
+}
+
+export interface ReviewPolicyCommentPolicy {
+  maxInlineComments: number;
+  severityThreshold: RepositoryReviewSeverityThreshold;
+}
+
+export type ReviewPolicyCategoryEnablement = Record<ReviewFindingCategory, boolean>;
+
+export interface ReviewPolicySemgrepSettings {
+  enabled: boolean;
+  includeInfrastructureRules: boolean;
+  scanGeneratedFilesForSecrets: boolean;
+}
+
+export interface ReviewPolicyAnalysisToggles {
+  treeSitterEnabled: boolean;
+  llmReviewEnabled: boolean;
+  ciExplanationEnabled: boolean;
+}
+
+export interface ReviewPolicyInfrastructureSecurity {
+  infrastructureReviewEnabled: boolean;
+  securityReviewEnabled: boolean;
+  dependencyReviewEnabled: boolean;
+  ciWorkflowReviewEnabled: boolean;
+}
+
+export interface ReviewPolicy {
+  workspaceId: string;
+  repositoryId: string | null;
+  scope: ReviewPolicyScope;
+  reviewPreferences: ReviewPolicyReviewPreferences;
+  commentPolicy: ReviewPolicyCommentPolicy;
+  categories: ReviewPolicyCategoryEnablement;
+  promptInstructions: string;
+  ignoredPaths: string[];
+  generatedFileIgnorePatterns: string[];
+  semgrep: ReviewPolicySemgrepSettings;
+  analysis: ReviewPolicyAnalysisToggles;
+  infrastructureSecurity: ReviewPolicyInfrastructureSecurity;
+  updatedByClerkUserId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ReviewPolicySummary {
+  repositoryId: string;
+  fullName: string;
+  policy: ReviewPolicy;
+}
+
+export interface RulesPolicyResponse {
+  workspacePolicy: ReviewPolicy;
+  repositoryPolicies: ReviewPolicySummary[];
+  selectedRepositoryPolicy: ReviewPolicy | null;
+  permissions: {
+    canManagePolicies: boolean;
+  };
+}
+
+export interface UpdateReviewPolicyRequest {
+  repositoryId?: string | null;
+  reviewPreferences?: Partial<ReviewPolicyReviewPreferences>;
+  commentPolicy?: Partial<ReviewPolicyCommentPolicy>;
+  categories?: Partial<ReviewPolicyCategoryEnablement>;
+  promptInstructions?: string;
+  ignoredPaths?: string[];
+  generatedFileIgnorePatterns?: string[];
+  semgrep?: Partial<ReviewPolicySemgrepSettings>;
+  analysis?: Partial<ReviewPolicyAnalysisToggles>;
+  infrastructureSecurity?: Partial<ReviewPolicyInfrastructureSecurity>;
+}
+
 export type ReviewRunRiskLevel = "low" | "medium" | "high" | "unknown";
 
 export interface ReviewRunListFilters {

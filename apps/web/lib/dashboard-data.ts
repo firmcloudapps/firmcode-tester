@@ -6,6 +6,7 @@ import type {
   OverviewDashboardData,
   RepositoryDetailResponse,
   RepositoryListResponse,
+  RulesPolicyResponse,
   ReviewRunDetail,
   ReviewRunListFilters,
   ReviewRunListResponse,
@@ -117,6 +118,19 @@ export async function loadSettingsState(): Promise<ViewState<WorkspaceSettingsRe
     const data = await requestAuthenticatedJson<WorkspaceSettingsResponse>("/api/settings");
 
     return data.githubApp.installations.length === 0 ? { status: "empty", data } : { status: "populated", data };
+  } catch (error) {
+    return { status: "error", message: toErrorMessage(error) };
+  }
+}
+
+export async function loadRulesState(searchParams: SearchParams = {}): Promise<ViewState<RulesPolicyResponse>> {
+  try {
+    const repositoryId = readSingleValue(searchParams.repositoryId);
+    const data = await requestAuthenticatedJson<RulesPolicyResponse>(
+      repositoryId === undefined ? "/api/rules" : `/api/rules?repositoryId=${encodeURIComponent(repositoryId)}`
+    );
+
+    return data.repositoryPolicies.length === 0 ? { status: "empty", data } : { status: "populated", data };
   } catch (error) {
     return { status: "error", message: toErrorMessage(error) };
   }
