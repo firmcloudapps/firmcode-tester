@@ -25,10 +25,20 @@ import { randomUUID } from "crypto";
 export const REVIEW_RUNS_STORE = Symbol("REVIEW_RUNS_STORE");
 
 export interface ReviewRunsStore {
-  listReviewRuns(filters: ReviewRunListFilters): Promise<ReviewRunListResponse>;
-  getReviewRunDetail(reviewRunId: string): Promise<ReviewRunDetail | null>;
+  listReviewRuns(input: ReviewRunListLookup): Promise<ReviewRunListResponse>;
+  getReviewRunDetail(input: ReviewRunDetailLookup): Promise<ReviewRunDetail | null>;
   createRetryReviewRun(input: CreateRetryReviewRunInput): Promise<ReviewRunRetryCreateResult>;
   markRetryJobQueued(input: MarkRetryJobQueuedInput): Promise<void>;
+}
+
+export interface ReviewRunListLookup {
+  readonly workspaceId: string;
+  readonly filters: ReviewRunListFilters;
+}
+
+export interface ReviewRunDetailLookup {
+  readonly workspaceId: string;
+  readonly reviewRunId: string;
 }
 
 export interface CreateRetryReviewRunInput {
@@ -165,11 +175,11 @@ interface PublishedCommentRow {
 }
 
 export class EmptyReviewRunsStore implements ReviewRunsStore {
-  async listReviewRuns(filters: ReviewRunListFilters): Promise<ReviewRunListResponse> {
-    return { reviewRuns: [], filters };
+  async listReviewRuns(input: ReviewRunListLookup): Promise<ReviewRunListResponse> {
+    return { reviewRuns: [], filters: input.filters };
   }
 
-  async getReviewRunDetail(_reviewRunId: string): Promise<ReviewRunDetail | null> {
+  async getReviewRunDetail(_input: ReviewRunDetailLookup): Promise<ReviewRunDetail | null> {
     return null;
   }
 
@@ -188,8 +198,9 @@ export class PostgresReviewRunsStore implements ReviewRunsStore {
     private readonly createId: () => string = randomUUID
   ) {}
 
-  async listReviewRuns(filters: ReviewRunListFilters): Promise<ReviewRunListResponse> {
-    const { whereSql, values } = buildReviewRunListWhereClause(filters);
+  async listReviewRuns(input: ReviewRunListLookup): Promise<ReviewRunListResponse> {
+    const { filters } = input;
+    const { whereSql, values } = buildReviewRunListWhereClause(input.workspaceId, filters);
     const result = await this.database.query<ReviewRunRow>(
       `
 SELECT
@@ -212,6 +223,7 @@ SELECT
   rr.updated_at
 FROM review_runs rr
 JOIN repositories r ON r.id = rr.repository_id
+JOIN github_installations gi ON gi.id = r.installation_id
 JOIN pull_requests pr ON pr.id = rr.pull_request_id
 ${whereSql}
 ORDER BY rr.created_at DESC
@@ -219,7 +231,7 @@ LIMIT 100
 `,
       values
     );
-    const counts = await this.loadReviewRunCounts();
+    const counts = await this.loadReviewRunCounts(input.workspaceId);
 
     const reviewRuns = result.rows.map((row) => toReviewRunListItem(row, counts)).filter((reviewRun) => {
       return filters.risk === undefined || reviewRun.riskLevel === filters.risk;
@@ -231,7 +243,7 @@ LIMIT 100
     };
   }
 
-  async getReviewRunDetail(reviewRunId: string): Promise<ReviewRunDetail | null> {
+  async getReviewRunDetail(input: ReviewRunDetailLookup): Promise<ReviewRunDetail | null> {
     const runResult = await this.database.query<ReviewRunRow>(
       `
 SELECT
@@ -254,10 +266,12 @@ SELECT
   rr.updated_at
 FROM review_runs rr
 JOIN repositories r ON r.id = rr.repository_id
+JOIN github_installations gi ON gi.id = r.installation_id
 JOIN pull_requests pr ON pr.id = rr.pull_request_id
 WHERE rr.id = $1
+  AND gi.workspace_id = $2
 `,
-      [reviewRunId]
+      [input.reviewRunId, input.workspaceId]
     );
     const row = runResult.rows[0];
 
@@ -282,7 +296,7 @@ FROM changed_files
 WHERE review_run_id = $1
 ORDER BY path ASC
 `,
-      [reviewRunId]
+      [input.reviewRunId]
     );
     const findingsResult = await this.database.query<FindingRow>(
       `
@@ -314,7 +328,7 @@ ORDER BY
   END,
   f.created_at ASC
 `,
-      [reviewRunId]
+      [input.reviewRunId]
     );
     const artifactsResult = await this.database.query<ArtifactRow>(
       `
@@ -328,7 +342,7 @@ FROM analysis_artifacts
 WHERE review_run_id = $1
 ORDER BY created_at ASC, artifact_type ASC
 `,
-      [reviewRunId]
+      [input.reviewRunId]
     );
     const commentsResult = await this.database.query<PublishedCommentRow>(
       `
@@ -351,7 +365,7 @@ ORDER BY created_at ASC,
   file_path ASC,
   line ASC
 `,
-      [reviewRunId]
+      [input.reviewRunId]
     );
     const postedInlineFindingIds = new Set(
       commentsResult.rows
@@ -577,11 +591,43 @@ WHERE rrr.original_review_run_id = $1
     return result.rows[0] ?? null;
   }
 
-  private async loadReviewRunCounts(): Promise<Map<string, ReviewRunCounts>> {
+  private async loadReviewRunCounts(workspaceId: string): Promise<Map<string, ReviewRunCounts>> {
     const [findings, comments, changedFiles] = await Promise.all([
-      this.database.query<ReviewRunIdRow>("SELECT review_run_id FROM findings"),
-      this.database.query<ReviewRunIdRow>("SELECT review_run_id FROM published_comments WHERE comment_type = 'inline'"),
-      this.database.query<ReviewRunIdRow>("SELECT review_run_id FROM changed_files WHERE is_supported = true")
+      this.database.query<ReviewRunIdRow>(
+        `
+SELECT f.review_run_id
+FROM findings f
+JOIN review_runs rr ON rr.id = f.review_run_id
+JOIN repositories r ON r.id = rr.repository_id
+JOIN github_installations gi ON gi.id = r.installation_id
+WHERE gi.workspace_id = $1
+`,
+        [workspaceId]
+      ),
+      this.database.query<ReviewRunIdRow>(
+        `
+SELECT pc.review_run_id
+FROM published_comments pc
+JOIN review_runs rr ON rr.id = pc.review_run_id
+JOIN repositories r ON r.id = rr.repository_id
+JOIN github_installations gi ON gi.id = r.installation_id
+WHERE pc.comment_type = 'inline'
+  AND gi.workspace_id = $1
+`,
+        [workspaceId]
+      ),
+      this.database.query<ReviewRunIdRow>(
+        `
+SELECT cf.review_run_id
+FROM changed_files cf
+JOIN review_runs rr ON rr.id = cf.review_run_id
+JOIN repositories r ON r.id = rr.repository_id
+JOIN github_installations gi ON gi.id = r.installation_id
+WHERE cf.is_supported = true
+  AND gi.workspace_id = $1
+`,
+        [workspaceId]
+      )
     ]);
     const counts = new Map<string, ReviewRunCounts>();
 
@@ -644,9 +690,12 @@ function getRetryability(
   return { retryable: true };
 }
 
-function buildReviewRunListWhereClause(filters: ReviewRunListFilters): { whereSql: string; values: unknown[] } {
-  const conditions: string[] = [];
-  const values: unknown[] = [];
+function buildReviewRunListWhereClause(
+  workspaceId: string,
+  filters: ReviewRunListFilters
+): { whereSql: string; values: unknown[] } {
+  const conditions: string[] = ["gi.workspace_id = $1"];
+  const values: unknown[] = [workspaceId];
 
   if (filters.status !== undefined) {
     values.push(filters.status);

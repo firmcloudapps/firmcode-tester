@@ -142,9 +142,7 @@ async function requestJson<T>(path: string, query: object): Promise<T> {
 
   const response = await fetch(url, {
     cache: "no-store",
-    headers: {
-      accept: "application/json"
-    }
+    headers: createDashboardApiHeaders(process.env, false)
   });
 
   if (!response.ok) {

@@ -15,6 +15,8 @@ describe("dashboard findings data loader", () => {
 
   it("maps every findings filter into the API query string", async () => {
     process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
+    process.env.FIRMCODE_DASHBOARD_WORKSPACE_ID = "workspace-1";
+    process.env.FIRMCODE_DASHBOARD_CLERK_USER_ID = "user-1";
     const fetcher = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => jsonResponse(findingsResponse));
 
     vi.stubGlobal("fetch", fetcher);
@@ -34,6 +36,8 @@ describe("dashboard findings data loader", () => {
     ).resolves.toMatchObject({ status: "populated" });
 
     const url = new URL(String(fetcher.mock.calls[0]?.[0]));
+    const init = fetcher.mock.calls[0]?.[1] as RequestInit;
+    const headers = new Headers(init.headers);
 
     expect(url.pathname).toBe("/api/findings");
     expect(url.searchParams.get("severity")).toBe("high");
@@ -45,6 +49,8 @@ describe("dashboard findings data loader", () => {
     expect(url.searchParams.get("postedInline")).toBe("true");
     expect(url.searchParams.get("dateFrom")).toBe("2026-05-22");
     expect(url.searchParams.get("dateTo")).toBe("2026-05-23");
+    expect(headers.get("x-firmcode-workspace-id")).toBe("workspace-1");
+    expect(headers.get("x-firmcode-user-id")).toBe("user-1");
   });
 
   it("fetches settings data with the temporary Clerk workspace headers", async () => {

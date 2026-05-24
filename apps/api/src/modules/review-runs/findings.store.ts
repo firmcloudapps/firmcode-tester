@@ -13,7 +13,12 @@ import type { DatabaseExecutor } from "../../infrastructure/database/migrations"
 export const FINDINGS_STORE = Symbol("FINDINGS_STORE");
 
 export interface FindingsStore {
-  listFindings(filters: FindingsListFilters): Promise<FindingsListResponse>;
+  listFindings(input: FindingsListLookup): Promise<FindingsListResponse>;
+}
+
+export interface FindingsListLookup {
+  readonly workspaceId: string;
+  readonly filters: FindingsListFilters;
 }
 
 interface FindingInboxRow {
@@ -43,16 +48,17 @@ interface FindingInboxRow {
 }
 
 export class EmptyFindingsStore implements FindingsStore {
-  async listFindings(filters: FindingsListFilters): Promise<FindingsListResponse> {
-    return { findings: [], filters };
+  async listFindings(input: FindingsListLookup): Promise<FindingsListResponse> {
+    return { findings: [], filters: input.filters };
   }
 }
 
 export class PostgresFindingsStore implements FindingsStore {
   constructor(private readonly database: DatabaseExecutor) {}
 
-  async listFindings(filters: FindingsListFilters): Promise<FindingsListResponse> {
-    const { whereSql, values } = buildFindingsWhereClause(filters);
+  async listFindings(input: FindingsListLookup): Promise<FindingsListResponse> {
+    const { filters } = input;
+    const { whereSql, values } = buildFindingsWhereClause(input.workspaceId, filters);
     const result = await this.database.query<FindingInboxRow>(
       `
 SELECT
@@ -82,6 +88,7 @@ SELECT
 FROM findings f
 JOIN review_runs rr ON rr.id = f.review_run_id
 JOIN repositories r ON r.id = rr.repository_id
+JOIN github_installations gi ON gi.id = r.installation_id
 JOIN pull_requests pr ON pr.id = rr.pull_request_id
 LEFT JOIN published_comments pc ON pc.finding_id = f.id AND pc.comment_type = 'inline'
 ${whereSql}
@@ -107,9 +114,12 @@ LIMIT 200
   }
 }
 
-function buildFindingsWhereClause(filters: FindingsListFilters): { whereSql: string; values: unknown[] } {
-  const conditions: string[] = [];
-  const values: unknown[] = [];
+function buildFindingsWhereClause(
+  workspaceId: string,
+  filters: FindingsListFilters
+): { whereSql: string; values: unknown[] } {
+  const conditions: string[] = ["gi.workspace_id = $1"];
+  const values: unknown[] = [workspaceId];
 
   if (filters.severity !== undefined) {
     values.push(filters.severity);

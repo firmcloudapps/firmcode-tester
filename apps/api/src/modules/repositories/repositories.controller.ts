@@ -4,6 +4,11 @@ import type {
   RepositoryListResponse,
   RepositoryReviewConfiguration
 } from "@firmcode/shared";
+import {
+  authorizeDashboardRequest,
+  readSingleHeader
+} from "../review-runs/dashboard-authorization";
+import { DASHBOARD_AUTH_STORE, type DashboardAuthStore } from "../review-runs/dashboard-auth.store";
 import { RepositoryConfigurationService } from "./repository-configuration.service";
 import { REPOSITORIES_STORE, type RepositoriesStore } from "./repositories.store";
 
@@ -11,12 +16,25 @@ import { REPOSITORIES_STORE, type RepositoriesStore } from "./repositories.store
 export class RepositoriesController {
   constructor(
     @Inject(REPOSITORIES_STORE) private readonly repositoriesStore: RepositoriesStore,
+    @Inject(DASHBOARD_AUTH_STORE) private readonly dashboardAuthStore: DashboardAuthStore,
     private readonly configurationService?: RepositoryConfigurationService
   ) {}
 
   @Get()
-  async listRepositories(@Query() query: Record<string, string | string[] | undefined>): Promise<RepositoryListResponse> {
-    return this.repositoriesStore.listRepositories(parseRepositoryListFilters(query));
+  async listRepositories(
+    @Query() query: Record<string, string | string[] | undefined>,
+    @Headers("x-firmcode-workspace-id") workspaceIdHeader?: string | string[],
+    @Headers("x-firmcode-user-id") userIdHeader?: string | string[]
+  ): Promise<RepositoryListResponse> {
+    const membership = await authorizeDashboardRequest(this.dashboardAuthStore, {
+      workspaceId: readSingleHeader(workspaceIdHeader),
+      clerkUserId: readSingleHeader(userIdHeader)
+    });
+
+    return this.repositoriesStore.listRepositories({
+      workspaceId: membership.workspaceId,
+      filters: parseRepositoryListFilters(query)
+    });
   }
 
   @Get(":id/configuration")
@@ -31,8 +49,8 @@ export class RepositoriesController {
 
     return this.configurationService.getRepositoryConfiguration({
       repositoryId: id,
-      workspaceId: readSingleValue(workspaceIdHeader) ?? null,
-      clerkUserId: readSingleValue(userIdHeader) ?? null
+      workspaceId: readSingleHeader(workspaceIdHeader),
+      clerkUserId: readSingleHeader(userIdHeader)
     });
   }
 
@@ -49,8 +67,8 @@ export class RepositoriesController {
 
     return this.configurationService.updateRepositoryConfiguration({
       repositoryId: id,
-      workspaceId: readSingleValue(workspaceIdHeader) ?? null,
-      clerkUserId: readSingleValue(userIdHeader) ?? null,
+      workspaceId: readSingleHeader(workspaceIdHeader),
+      clerkUserId: readSingleHeader(userIdHeader),
       body
     });
   }

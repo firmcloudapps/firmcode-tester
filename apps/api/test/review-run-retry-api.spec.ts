@@ -48,13 +48,14 @@ describe("review run retry dashboard API", () => {
     await runDatabaseMigrations(pool);
     await seedRetryData(pool);
 
+    const authStore = new PostgresDashboardAuthStore(pool);
     const reviewRunsStore = new PostgresReviewRunsStore(pool, createDeterministicUuidFactory());
     const retryService = new ReviewRunRetryService(
       reviewRunsStore,
-      new PostgresDashboardAuthStore(pool),
+      authStore,
       queue
     );
-    controller = new ReviewRunsController(reviewRunsStore, retryService);
+    controller = new ReviewRunsController(reviewRunsStore, authStore, retryService);
   });
 
   afterEach(async () => {

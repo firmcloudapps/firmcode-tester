@@ -1,10 +1,11 @@
-import { BadRequestException, NotFoundException } from "@nestjs/common";
+import { BadRequestException, NotFoundException, UnauthorizedException } from "@nestjs/common";
 import { newDb } from "pg-mem";
 import { runDatabaseMigrations } from "../src/infrastructure/database/migrations";
 import { RepositoriesController } from "../src/modules/repositories/repositories.controller";
 import { PostgresRepositoriesStore } from "../src/modules/repositories/repositories.store";
 import { FindingsController } from "../src/modules/review-runs/findings.controller";
 import { PostgresFindingsStore } from "../src/modules/review-runs/findings.store";
+import { PostgresDashboardAuthStore } from "../src/modules/review-runs/dashboard-auth.store";
 import { ReviewRunsController } from "../src/modules/review-runs/review-runs.controller";
 import { PostgresReviewRunsStore } from "../src/modules/review-runs/review-runs.store";
 
@@ -20,6 +21,16 @@ function createTestPool(): PgPoolLike {
   return new adapters.Pool();
 }
 
+const WORKSPACE_ID = "00000000-0000-4000-8000-000000000101";
+const OTHER_WORKSPACE_ID = "00000000-0000-4000-8000-000000000102";
+const OWNER_USER_ID = "user_owner";
+const VIEWER_USER_ID = "user_viewer";
+const OTHER_OWNER_USER_ID = "user_other_owner";
+const REVIEW_RUN_ID = "00000000-0000-4000-8000-000000000006";
+const OTHER_REVIEW_RUN_ID = "00000000-0000-4000-8000-000000000016";
+const REPOSITORY_ID = "00000000-0000-4000-8000-000000000002";
+const OTHER_REPOSITORY_ID = "00000000-0000-4000-8000-000000000012";
+
 describe("dashboard API controllers", () => {
   let pool: PgPoolLike;
   let repositoriesController: RepositoriesController;
@@ -30,9 +41,10 @@ describe("dashboard API controllers", () => {
     pool = createTestPool();
     await runDatabaseMigrations(pool);
     await seedDashboardData(pool);
-    repositoriesController = new RepositoriesController(new PostgresRepositoriesStore(pool));
-    findingsController = new FindingsController(new PostgresFindingsStore(pool));
-    reviewRunsController = new ReviewRunsController(new PostgresReviewRunsStore(pool));
+    const authStore = new PostgresDashboardAuthStore(pool);
+    repositoriesController = new RepositoriesController(new PostgresRepositoriesStore(pool), authStore);
+    findingsController = new FindingsController(new PostgresFindingsStore(pool), authStore);
+    reviewRunsController = new ReviewRunsController(new PostgresReviewRunsStore(pool), authStore);
   });
 
   afterEach(async () => {
@@ -40,9 +52,9 @@ describe("dashboard API controllers", () => {
   });
 
   it("lists repositories with enabled status, findings, and last review", async () => {
-    const response = await repositoriesController.listRepositories({});
+    const response = await repositoriesController.listRepositories({}, WORKSPACE_ID, OWNER_USER_ID);
 
-    expect(response.repositories).toHaveLength(2);
+    expect(response.repositories).toHaveLength(1);
     expect(response.repositories[0]).toMatchObject({
       fullName: "openclaw/firmcode",
       enabled: true,
@@ -63,7 +75,7 @@ describe("dashboard API controllers", () => {
       enabled: "true",
       private: "false",
       language: "typescript"
-    });
+    }, WORKSPACE_ID, OWNER_USER_ID);
 
     expect(response.repositories.map((repository) => repository.fullName)).toEqual(["openclaw/firmcode"]);
   });
@@ -74,11 +86,11 @@ describe("dashboard API controllers", () => {
       repository: "openclaw/firmcode",
       dateFrom: "2026-05-22T00:00:00.000Z",
       dateTo: "2026-05-23T00:00:00.000Z"
-    });
+    }, WORKSPACE_ID, OWNER_USER_ID);
 
     expect(response.reviewRuns).toHaveLength(1);
     expect(response.reviewRuns[0]).toMatchObject({
-      id: "00000000-0000-4000-8000-000000000006",
+      id: REVIEW_RUN_ID,
       repositoryFullName: "openclaw/firmcode",
       status: "succeeded",
       currentStage: "Comments Published",
@@ -90,7 +102,7 @@ describe("dashboard API controllers", () => {
   });
 
   it("returns review run detail with files, findings, artifacts, logs, and published comments", async () => {
-    const detail = await reviewRunsController.getReviewRunDetail("00000000-0000-4000-8000-000000000006");
+    const detail = await reviewRunsController.getReviewRunDetail(REVIEW_RUN_ID, WORKSPACE_ID, OWNER_USER_ID);
 
     expect(detail).toMatchObject({
       repositoryFullName: "openclaw/firmcode",
@@ -174,7 +186,7 @@ describe("dashboard API controllers", () => {
       postedInline: "true",
       dateFrom: "2026-05-22T00:00:00.000Z",
       dateTo: "2026-05-23T00:00:00.000Z"
-    });
+    }, WORKSPACE_ID, OWNER_USER_ID);
 
     expect(response.findings).toHaveLength(1);
     expect(response.findings[0]).toMatchObject({
@@ -191,33 +203,112 @@ describe("dashboard API controllers", () => {
   });
 
   it("filters open and unsupported future finding statuses", async () => {
-    const openResponse = await findingsController.listFindings({ status: "open", postedInline: "false" });
-    const resolvedResponse = await findingsController.listFindings({ status: "resolved" });
+    const openResponse = await findingsController.listFindings(
+      { status: "open", postedInline: "false" },
+      WORKSPACE_ID,
+      OWNER_USER_ID
+    );
+    const resolvedResponse = await findingsController.listFindings({ status: "resolved" }, WORKSPACE_ID, OWNER_USER_ID);
 
     expect(openResponse.findings.map((finding) => finding.title)).toEqual(["Keep filters stable"]);
     expect(resolvedResponse.findings).toEqual([]);
   });
 
   it("rejects invalid filters and missing review run details", async () => {
-    await expect(reviewRunsController.listReviewRuns({ status: "done" })).rejects.toThrow(BadRequestException);
-    await expect(findingsController.listFindings({ severity: "urgent" })).rejects.toThrow(BadRequestException);
-    await expect(findingsController.listFindings({ postedInline: "sometimes" })).rejects.toThrow(BadRequestException);
-    await expect(reviewRunsController.getReviewRunDetail("00000000-0000-4000-8000-000000999999")).rejects.toThrow(
+    await expect(reviewRunsController.listReviewRuns({ status: "done" }, WORKSPACE_ID, OWNER_USER_ID)).rejects.toThrow(
+      BadRequestException
+    );
+    await expect(findingsController.listFindings({ severity: "urgent" }, WORKSPACE_ID, OWNER_USER_ID)).rejects.toThrow(
+      BadRequestException
+    );
+    await expect(
+      findingsController.listFindings({ postedInline: "sometimes" }, WORKSPACE_ID, OWNER_USER_ID)
+    ).rejects.toThrow(BadRequestException);
+    await expect(
+      reviewRunsController.getReviewRunDetail("00000000-0000-4000-8000-000000999999", WORKSPACE_ID, OWNER_USER_ID)
+    ).rejects.toThrow(NotFoundException);
+  });
+
+  it("requires dashboard authentication headers for repository, review run, and finding reads", async () => {
+    await expect(repositoriesController.listRepositories({}, WORKSPACE_ID, undefined)).rejects.toThrow(UnauthorizedException);
+    await expect(reviewRunsController.listReviewRuns({}, undefined, OWNER_USER_ID)).rejects.toThrow(UnauthorizedException);
+    await expect(findingsController.listFindings({}, WORKSPACE_ID, undefined)).rejects.toThrow(UnauthorizedException);
+  });
+
+  it("scopes repository lists to the caller workspace and denies cross-workspace repository filters", async () => {
+    const ownRepositories = await repositoriesController.listRepositories({}, WORKSPACE_ID, OWNER_USER_ID);
+    const otherRepositories = await repositoriesController.listRepositories({}, OTHER_WORKSPACE_ID, OTHER_OWNER_USER_ID);
+    const crossWorkspaceFilter = await reviewRunsController.listReviewRuns(
+      { repositoryId: OTHER_REPOSITORY_ID },
+      WORKSPACE_ID,
+      OWNER_USER_ID
+    );
+
+    expect(ownRepositories.repositories.map((repository) => repository.fullName)).toEqual(["openclaw/firmcode"]);
+    expect(otherRepositories.repositories.map((repository) => repository.fullName)).toEqual(["openclaw/legacy"]);
+    expect(crossWorkspaceFilter.reviewRuns).toEqual([]);
+  });
+
+  it("denies cross-workspace review run detail and finding list access without leaking resource details", async () => {
+    await expect(reviewRunsController.getReviewRunDetail(OTHER_REVIEW_RUN_ID, WORKSPACE_ID, OWNER_USER_ID)).rejects.toThrow(
       NotFoundException
     );
+
+    const crossWorkspaceFindings = await findingsController.listFindings(
+      { repositoryId: OTHER_REPOSITORY_ID },
+      WORKSPACE_ID,
+      OWNER_USER_ID
+    );
+    const otherWorkspaceFindings = await findingsController.listFindings({}, OTHER_WORKSPACE_ID, OTHER_OWNER_USER_ID);
+
+    expect(crossWorkspaceFindings.findings).toEqual([]);
+    expect(otherWorkspaceFindings.findings.map((finding) => finding.repositoryFullName)).toEqual(["openclaw/legacy"]);
+  });
+
+  it("role-gates raw review artifacts while preserving valid viewer access to run metadata", async () => {
+    const ownerDetail = await reviewRunsController.getReviewRunDetail(REVIEW_RUN_ID, WORKSPACE_ID, OWNER_USER_ID);
+    const viewerDetail = await reviewRunsController.getReviewRunDetail(REVIEW_RUN_ID, WORKSPACE_ID, VIEWER_USER_ID);
+
+    expect(ownerDetail.artifacts).toHaveLength(3);
+    expect(ownerDetail.logExcerpts).toHaveLength(1);
+    expect(viewerDetail).toMatchObject({
+      id: REVIEW_RUN_ID,
+      repositoryFullName: "openclaw/firmcode",
+      findingsCount: 2
+    });
+    expect(viewerDetail.artifacts).toEqual([]);
+    expect(viewerDetail.logExcerpts).toEqual([]);
+    expect(viewerDetail.pipelineStages.every((stage) => stage.artifactId === null)).toBe(true);
   });
 });
 
 async function seedDashboardData(pool: PgPoolLike): Promise<void> {
   await pool.query(
     `
+INSERT INTO workspaces (id, clerk_org_id, name) VALUES
+('${WORKSPACE_ID}', 'org_firmcode', 'Firmcode'),
+('${OTHER_WORKSPACE_ID}', 'org_other', 'Other');
+
+INSERT INTO workspace_memberships (workspace_id, clerk_user_id, role, active) VALUES
+('${WORKSPACE_ID}', '${OWNER_USER_ID}', 'owner', true),
+('${WORKSPACE_ID}', '${VIEWER_USER_ID}', 'viewer', true),
+('${OTHER_WORKSPACE_ID}', '${OTHER_OWNER_USER_ID}', 'owner', true);
+
 INSERT INTO github_installations (
   id,
+  workspace_id,
   installation_id,
   permissions_json
 ) VALUES (
   '00000000-0000-4000-8000-000000000001',
+  '${WORKSPACE_ID}',
   101,
+  '{"pull_requests":"write"}'
+),
+(
+  '00000000-0000-4000-8000-000000000011',
+  '${OTHER_WORKSPACE_ID}',
+  111,
   '{"pull_requests":"write"}'
 );
 
@@ -245,7 +336,7 @@ INSERT INTO repositories (
 ),
 (
   '00000000-0000-4000-8000-000000000012',
-  '00000000-0000-4000-8000-000000000001',
+  '00000000-0000-4000-8000-000000000011',
   212,
   'openclaw',
   'legacy',
@@ -439,6 +530,24 @@ INSERT INTO findings (
   'finding-dashboard-2',
   false,
   '2026-05-22T10:01:00.000Z'
+),
+(
+  '00000000-0000-4000-8000-000000000032',
+  '00000000-0000-4000-8000-000000000016',
+  'ci',
+  'ci',
+  'critical',
+  'high',
+  NULL,
+  NULL,
+  NULL,
+  'Other workspace CI failed',
+  'This finding belongs to another workspace.',
+  '[{"source":"ci","excerpt":"FAIL"}]',
+  NULL,
+  'finding-other-workspace',
+  false,
+  '2026-05-21T10:01:00.000Z'
 );
 
 INSERT INTO analysis_artifacts (
