@@ -4,6 +4,7 @@ import {
   loadFindingsState,
   loadGitHubInstallationsState,
   loadGitHubRepositoryControlsState,
+  loadRepositoryDetailState,
   loadReviewRunDetailState,
   loadSettingsState
 } from "../lib/dashboard-data";
@@ -176,6 +177,29 @@ describe("dashboard findings data loader", () => {
     expect(headers.get("x-firmcode-user-id")).toBe("user-1");
   });
 
+  it("fetches repository detail with dashboard auth headers and maps 404 to empty", async () => {
+    process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
+    process.env.FIRMCODE_DASHBOARD_WORKSPACE_ID = "workspace-1";
+    process.env.FIRMCODE_DASHBOARD_CLERK_USER_ID = "user-1";
+    const fetcher = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
+      const pathname = new URL(String(input)).pathname;
+      return pathname.endsWith("/missing") ? jsonResponse({ message: "Repository not found" }, 404) : jsonResponse(repositoryDetailResponse);
+    });
+
+    vi.stubGlobal("fetch", fetcher);
+
+    await expect(loadRepositoryDetailState("repo-1")).resolves.toMatchObject({ status: "populated" });
+    await expect(loadRepositoryDetailState("missing")).resolves.toEqual({ status: "empty" });
+
+    const url = new URL(String(fetcher.mock.calls[0]?.[0]));
+    const init = fetcher.mock.calls[0]?.[1] as RequestInit;
+    const headers = new Headers(init.headers);
+
+    expect(url.pathname).toBe("/api/repositories/repo-1");
+    expect(headers.get("x-firmcode-workspace-id")).toBe("workspace-1");
+    expect(headers.get("x-firmcode-user-id")).toBe("user-1");
+  });
+
   it("fetches billing with Clerk-managed billing capability forwarded when present", async () => {
     process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
     process.env.FIRMCODE_DASHBOARD_WORKSPACE_ID = "workspace-1";
@@ -309,6 +333,34 @@ const repositoryResponse = {
       updatedAt: "2026-05-22T10:00:00.000Z"
     }
   ]
+};
+
+const repositoryDetailResponse = {
+  repository: repositoryResponse.repositories[0],
+  configuration: {
+    repositoryId: "repo-1",
+    automationEnabled: true,
+    draftPullRequestReviewsEnabled: false,
+    maxInlineComments: 10,
+    severityThreshold: "medium",
+    semgrepEnabled: true,
+    treeSitterEnabled: true,
+    ciExplanationEnabled: true,
+    infrastructureReviewEnabled: true,
+    dryRunEnabled: true,
+    updatedByClerkUserId: null,
+    createdAt: "2026-05-22T09:00:00.000Z",
+    updatedAt: "2026-05-22T09:00:00.000Z"
+  },
+  pullRequests: [],
+  reviewRuns: [],
+  findings: [],
+  activity: [],
+  permissions: {
+    canManageConfiguration: true,
+    canRetryReviewRuns: true,
+    canAccessRawArtifacts: true
+  }
 };
 
 const reviewRunDetailResponse = {

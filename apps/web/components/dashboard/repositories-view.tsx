@@ -170,14 +170,12 @@ function RepositoryTable({ controls, data }: { controls: RepositoryControls; dat
                 <td className="px-4 py-3 font-mono text-sm text-primary">{repository.openFindingsCount}</td>
                 <td className="px-4 py-3">
                   <div className="flex flex-wrap gap-2">
-                    <button
-                      className="cursor-not-allowed rounded-md border border-border px-2 py-1 text-xs font-medium text-secondary opacity-70"
-                      type="button"
-                      disabled
-                      title="Repository detail configuration is planned"
+                    <a
+                      className="rounded-md border border-border px-2 py-1 text-xs font-medium text-primary"
+                      href={`/repositories/${encodeURIComponent(repository.id)}?tab=configuration`}
                     >
                       Configure
-                    </button>
+                    </a>
                     <a
                       className="rounded-md border border-border px-2 py-1 text-xs font-medium text-primary"
                       href={`/review-runs?repositoryId=${encodeURIComponent(repository.id)}`}

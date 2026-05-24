@@ -2,6 +2,7 @@ import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { newDb } from "pg-mem";
 import { runDatabaseMigrations } from "../src/infrastructure/database/migrations";
 import { RepositoriesController } from "../src/modules/repositories/repositories.controller";
+import { RepositoryConfigurationService } from "../src/modules/repositories/repository-configuration.service";
 import { PostgresRepositoriesStore } from "../src/modules/repositories/repositories.store";
 import { FindingsController } from "../src/modules/review-runs/findings.controller";
 import { PostgresFindingsStore } from "../src/modules/review-runs/findings.store";
@@ -35,11 +36,17 @@ describe("dashboard API controllers", () => {
     pool = createTestPool();
     await runDatabaseMigrations(pool);
     await seedDashboardData(pool);
-    repositoriesController = new RepositoriesController(new PostgresRepositoriesStore(pool));
+    const repositoriesStore = new PostgresRepositoriesStore(pool);
+    const dashboardAuthStore = new PostgresDashboardAuthStore(pool);
+    repositoriesController = new RepositoriesController(
+      repositoriesStore,
+      dashboardAuthStore,
+      new RepositoryConfigurationService(repositoriesStore, dashboardAuthStore)
+    );
     findingsController = new FindingsController(new PostgresFindingsStore(pool));
     reviewRunsController = new ReviewRunsController(
       new PostgresReviewRunsStore(pool),
-      new PostgresDashboardAuthStore(pool)
+      dashboardAuthStore
     );
   });
 
@@ -74,6 +81,81 @@ describe("dashboard API controllers", () => {
     });
 
     expect(response.repositories.map((repository) => repository.fullName)).toEqual(["openclaw/firmcode"]);
+  });
+
+  it("returns repository detail with PRs, findings, configuration, activity, and role permissions", async () => {
+    const detail = await repositoriesController.getRepositoryDetail(
+      "00000000-0000-4000-8000-000000000002",
+      WORKSPACE_ID,
+      DEVELOPER_USER_ID
+    );
+
+    expect(detail.repository).toMatchObject({
+      id: "00000000-0000-4000-8000-000000000002",
+      fullName: "openclaw/firmcode",
+      enabled: true,
+      openFindingsCount: 2,
+      primaryLanguage: "TypeScript"
+    });
+    expect(detail.configuration).toMatchObject({
+      repositoryId: "00000000-0000-4000-8000-000000000002",
+      automationEnabled: true,
+      maxInlineComments: 10,
+      severityThreshold: "medium"
+    });
+    expect(detail.pullRequests).toEqual([
+      expect.objectContaining({
+        number: 7,
+        title: "Add repository dashboard",
+        latestReviewRun: expect.objectContaining({ status: "succeeded" })
+      })
+    ]);
+    expect(detail.reviewRuns[0]).toMatchObject({
+      id: "00000000-0000-4000-8000-000000000006",
+      currentStage: "Comments Published",
+      findingsCount: 2
+    });
+    expect(detail.findings.map((finding) => finding.title)).toEqual(["Guard repository access", "Keep filters stable"]);
+    expect(detail.activity.map((item) => item.kind)).toContain("review_run_updated");
+    expect(detail.permissions).toEqual({
+      canManageConfiguration: false,
+      canRetryReviewRuns: true,
+      canAccessRawArtifacts: true
+    });
+    expect(JSON.stringify(detail)).not.toContain("artifacts/run-6");
+  });
+
+  it("returns repository activity independently from detail data", async () => {
+    const response = await repositoriesController.getRepositoryActivity(
+      "00000000-0000-4000-8000-000000000002",
+      WORKSPACE_ID,
+      DEVELOPER_USER_ID
+    );
+
+    expect(response.repositoryId).toBe("00000000-0000-4000-8000-000000000002");
+    expect(response.activity.length).toBeGreaterThan(0);
+    expect(response.activity[0]).toMatchObject({
+      id: expect.any(String),
+      title: expect.any(String),
+      createdAt: expect.any(String)
+    });
+  });
+
+  it("denies cross-workspace and missing repository detail reads as not found", async () => {
+    await expect(
+      repositoriesController.getRepositoryDetail(
+        "00000000-0000-4000-8000-000000000002",
+        "00000000-0000-4000-8000-000000000999",
+        DEVELOPER_USER_ID
+      )
+    ).rejects.toThrow(NotFoundException);
+    await expect(
+      repositoriesController.getRepositoryActivity(
+        "00000000-0000-4000-8000-000000000999",
+        WORKSPACE_ID,
+        DEVELOPER_USER_ID
+      )
+    ).rejects.toThrow(NotFoundException);
   });
 
   it("lists review runs with status, repository, and date filters", async () => {

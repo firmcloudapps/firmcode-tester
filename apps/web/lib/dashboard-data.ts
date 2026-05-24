@@ -4,6 +4,7 @@ import type {
   FindingsListResponse,
   GitHubOAuthStatusResponse,
   OverviewDashboardData,
+  RepositoryDetailResponse,
   RepositoryListResponse,
   ReviewRunDetail,
   ReviewRunListFilters,
@@ -52,6 +53,20 @@ export async function loadRepositoriesState(searchParams: SearchParams): Promise
 
     return data.repositories.length === 0 ? { status: "empty", data } : { status: "populated", data };
   } catch (error) {
+    return { status: "error", message: toErrorMessage(error) };
+  }
+}
+
+export async function loadRepositoryDetailState(repositoryId: string): Promise<ViewState<RepositoryDetailResponse>> {
+  try {
+    const data = await requestAuthenticatedJson<RepositoryDetailResponse>(`/api/repositories/${encodeURIComponent(repositoryId)}`);
+
+    return { status: "populated", data };
+  } catch (error) {
+    if (error instanceof DashboardApiError && error.status === 404) {
+      return { status: "empty" };
+    }
+
     return { status: "error", message: toErrorMessage(error) };
   }
 }

@@ -50,7 +50,7 @@ export class RepositoryConfigurationService {
   ) {}
 
   async getRepositoryConfiguration(input: RepositoryConfigurationRequestContext): Promise<RepositoryReviewConfiguration> {
-    const context = await this.authorize(input);
+    const context = await this.authorize(input, { requireManageConfiguration: false });
     const configuration = await this.repositoriesStore.getRepositoryConfiguration(context);
 
     if (configuration === null) {
@@ -61,7 +61,7 @@ export class RepositoryConfigurationService {
   }
 
   async updateRepositoryConfiguration(input: RepositoryConfigurationUpdateContext): Promise<RepositoryReviewConfiguration> {
-    const context = await this.authorize(input);
+    const context = await this.authorize(input, { requireManageConfiguration: true });
     const updates = parseRepositoryConfigurationUpdate(input.body);
     const configuration = await this.repositoriesStore.updateRepositoryConfiguration({
       ...context,
@@ -76,7 +76,10 @@ export class RepositoryConfigurationService {
     return configuration;
   }
 
-  private async authorize(input: RepositoryConfigurationRequestContext): Promise<{
+  private async authorize(
+    input: RepositoryConfigurationRequestContext,
+    options: { requireManageConfiguration: boolean }
+  ): Promise<{
     repositoryId: string;
     workspaceId: string;
     clerkUserId: string;
@@ -94,7 +97,7 @@ export class RepositoryConfigurationService {
       throw new NotFoundException("Repository not found");
     }
 
-    if (!roleHasDashboardCapability(membership.role, "manage_repository_configuration")) {
+    if (options.requireManageConfiguration && !roleHasDashboardCapability(membership.role, "manage_repository_configuration")) {
       throw new ForbiddenException("Workspace role cannot manage repository configuration");
     }
 

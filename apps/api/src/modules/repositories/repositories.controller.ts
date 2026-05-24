@@ -1,22 +1,101 @@
-import { BadRequestException, Body, Controller, Get, Headers, Inject, NotFoundException, Param, Patch, Query } from "@nestjs/common";
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Headers,
+  Inject,
+  NotFoundException,
+  Param,
+  Patch,
+  Query,
+  UnauthorizedException
+} from "@nestjs/common";
 import type {
   DashboardRepositoryListFilters,
+  RepositoryActivityResponse,
+  RepositoryDetailResponse,
   RepositoryListResponse,
   RepositoryReviewConfiguration
 } from "@firmcode/shared";
+import {
+  DASHBOARD_AUTH_STORE,
+  EmptyDashboardAuthStore,
+  roleHasDashboardCapability,
+  type DashboardAuthStore,
+  type DashboardMembership
+} from "../review-runs/dashboard-auth.store";
 import { RepositoryConfigurationService } from "./repository-configuration.service";
 import { REPOSITORIES_STORE, type RepositoriesStore } from "./repositories.store";
 
 @Controller("api/repositories")
 export class RepositoriesController {
+  private readonly dashboardAuthStore: DashboardAuthStore;
+  private readonly configurationService?: RepositoryConfigurationService;
+
   constructor(
     @Inject(REPOSITORIES_STORE) private readonly repositoriesStore: RepositoriesStore,
-    private readonly configurationService?: RepositoryConfigurationService
-  ) {}
+    @Inject(DASHBOARD_AUTH_STORE) dashboardAuthOrConfiguration: DashboardAuthStore | RepositoryConfigurationService = new EmptyDashboardAuthStore(),
+    configurationService?: RepositoryConfigurationService
+  ) {
+    if (dashboardAuthOrConfiguration instanceof RepositoryConfigurationService) {
+      this.dashboardAuthStore = new EmptyDashboardAuthStore();
+      this.configurationService = dashboardAuthOrConfiguration;
+      return;
+    }
+
+    this.dashboardAuthStore = dashboardAuthOrConfiguration;
+    this.configurationService = configurationService;
+  }
 
   @Get()
   async listRepositories(@Query() query: Record<string, string | string[] | undefined>): Promise<RepositoryListResponse> {
     return this.repositoriesStore.listRepositories(parseRepositoryListFilters(query));
+  }
+
+  @Get(":id")
+  async getRepositoryDetail(
+    @Param("id") id: string,
+    @Headers("x-firmcode-workspace-id") workspaceIdHeader: string | string[] | undefined,
+    @Headers("x-firmcode-user-id") userIdHeader: string | string[] | undefined
+  ): Promise<RepositoryDetailResponse> {
+    assertUuid("repository ID", id);
+    const membership = await this.requireMembership(workspaceIdHeader, userIdHeader);
+    const detail = await this.repositoriesStore.getRepositoryDetail({
+      repositoryId: id,
+      workspaceId: membership.workspaceId,
+      permissions: {
+        canManageConfiguration: roleHasDashboardCapability(membership.role, "manage_repository_configuration"),
+        canRetryReviewRuns: roleHasDashboardCapability(membership.role, "retry_review_run"),
+        canAccessRawArtifacts: roleHasDashboardCapability(membership.role, "access_raw_artifacts")
+      }
+    });
+
+    if (detail === null) {
+      throw new NotFoundException("Repository not found");
+    }
+
+    return detail;
+  }
+
+  @Get(":id/activity")
+  async getRepositoryActivity(
+    @Param("id") id: string,
+    @Headers("x-firmcode-workspace-id") workspaceIdHeader: string | string[] | undefined,
+    @Headers("x-firmcode-user-id") userIdHeader: string | string[] | undefined
+  ): Promise<RepositoryActivityResponse> {
+    assertUuid("repository ID", id);
+    const membership = await this.requireMembership(workspaceIdHeader, userIdHeader);
+    const activity = await this.repositoriesStore.listRepositoryActivity({
+      repositoryId: id,
+      workspaceId: membership.workspaceId
+    });
+
+    if (activity === null) {
+      throw new NotFoundException("Repository not found");
+    }
+
+    return activity;
   }
 
   @Get(":id/configuration")
@@ -54,6 +133,28 @@ export class RepositoriesController {
       body
     });
   }
+
+  private async requireMembership(
+    workspaceIdHeader: string | string[] | undefined,
+    userIdHeader: string | string[] | undefined
+  ): Promise<DashboardMembership> {
+    const workspaceId = readSingleValue(workspaceIdHeader) ?? null;
+    const clerkUserId = readSingleValue(userIdHeader) ?? null;
+
+    if (workspaceId === null || clerkUserId === null) {
+      throw new UnauthorizedException("Dashboard authentication is required");
+    }
+
+    assertUuid("workspace ID", workspaceId);
+
+    const membership = await this.dashboardAuthStore.findActiveMembership({ workspaceId, clerkUserId });
+
+    if (membership === null) {
+      throw new NotFoundException("Repository not found");
+    }
+
+    return membership;
+  }
 }
 
 function parseRepositoryListFilters(query: Record<string, string | string[] | undefined>): DashboardRepositoryListFilters {
@@ -86,4 +187,12 @@ function readSingleValue(value: string | string[] | undefined): string | undefin
   }
 
   return value === "" ? undefined : value;
+}
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function assertUuid(label: string, value: string): void {
+  if (!UUID_PATTERN.test(value)) {
+    throw new BadRequestException(`${label} must be a UUID`);
+  }
 }
