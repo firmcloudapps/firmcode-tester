@@ -1,4 +1,6 @@
 import { GET as startGitHubOAuth } from "../app/auth/github/route";
+import { GET as listCiFailures } from "../app/api/ci-failures/route";
+import { GET as readCiFailure } from "../app/api/ci-failures/[id]/route";
 import { POST as syncInstallations } from "../app/api/github/installations/sync/route";
 import { GET as readRules, PATCH as saveRules } from "../app/api/rules/route";
 import { POST as syncRepository } from "../app/api/repositories/[id]/sync/route";
@@ -128,6 +130,30 @@ describe("GitHub sync routes", () => {
     expect(headers.get("content-type")).toBe("application/json");
     expect(headers.get("x-firmcode-workspace-id")).toBe("workspace-1");
     expect(headers.get("x-firmcode-user-id")).toBe("user-1");
+  });
+
+  it("routes CI failure list and detail reads to the authenticated dashboard API", async () => {
+    process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
+    process.env.FIRMCODE_DASHBOARD_WORKSPACE_ID = "workspace-1";
+    process.env.FIRMCODE_DASHBOARD_CLERK_USER_ID = "user-1";
+    const fetcher = vi.fn(async () => jsonResponse({ ciFailures: [], filters: {}, pagination: { limit: 50, returned: 0 } }));
+
+    vi.stubGlobal("fetch", fetcher);
+
+    await listCiFailures(new Request("http://localhost/api/ci-failures?repository=openclaw%2Ffirmcode"));
+    await readCiFailure(new Request("http://localhost/api/ci-failures/failure-1"), {
+      params: { id: "failure-1" }
+    });
+
+    const listUrl = new URL(String(fetcher.mock.calls[0]?.[0]));
+    const detailUrl = new URL(String(fetcher.mock.calls[1]?.[0]));
+    const listHeaders = new Headers((fetcher.mock.calls[0]?.[1] as RequestInit | undefined)?.headers);
+
+    expect(listUrl.pathname).toBe("/api/ci-failures");
+    expect(listUrl.searchParams.get("repository")).toBe("openclaw/firmcode");
+    expect(detailUrl.pathname).toBe("/api/ci-failures/failure-1");
+    expect(listHeaders.get("x-firmcode-workspace-id")).toBe("workspace-1");
+    expect(listHeaders.get("x-firmcode-user-id")).toBe("user-1");
   });
 });
 

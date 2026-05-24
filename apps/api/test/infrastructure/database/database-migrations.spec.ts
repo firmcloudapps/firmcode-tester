@@ -165,7 +165,8 @@ ORDER BY table_name
       "003_dashboard_auth_retry_state",
       "004_repository_review_configuration",
       "005_github_oauth_and_sync",
-      "006_review_policies"
+      "006_review_policies",
+      "007_ci_failure_artifacts"
     ]);
     expect(secondRunMigrationIds).toEqual([]);
     expect(tables.rows.map((row) => row.table_name)).toEqual(EXPECTED_TABLES);
@@ -175,7 +176,8 @@ ORDER BY table_name
       { id: "003_dashboard_auth_retry_state" },
       { id: "004_repository_review_configuration" },
       { id: "005_github_oauth_and_sync" },
-      { id: "006_review_policies" }
+      { id: "006_review_policies" },
+      { id: "007_ci_failure_artifacts" }
     ]);
   });
 
