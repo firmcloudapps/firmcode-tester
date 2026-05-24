@@ -32,6 +32,19 @@ describe("dashboard navigation", () => {
     expect(html).toContain(">Configure</a>");
     expect(html).not.toContain("Repository detail configuration is planned");
   });
+
+  it("routes Rules / Policies to the implemented dashboard page", () => {
+    const html = renderToString(
+      <DashboardShell activeItem="Rules">
+        <main>Rules body</main>
+      </DashboardShell>
+    );
+
+    expect(html).toContain('href="/rules"');
+    expect(html).toContain(">Rules / Policies</a>");
+    expect(html).toContain('aria-current="page"');
+    expect(html).not.toContain("Rules / Policies</span>");
+  });
 });
 
 const settings = {

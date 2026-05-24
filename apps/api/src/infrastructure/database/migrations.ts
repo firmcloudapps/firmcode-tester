@@ -3,6 +3,7 @@ import { dryRunPublishedCommentsMigration } from "./migrations/002_dry_run_publi
 import { dashboardAuthRetryStateMigration } from "./migrations/003_dashboard_auth_retry_state";
 import { repositoryReviewConfigurationMigration } from "./migrations/004_repository_review_configuration";
 import { githubOAuthAndSyncMigration } from "./migrations/005_github_oauth_and_sync";
+import { reviewPoliciesMigration } from "./migrations/006_review_policies";
 
 export interface DatabaseQueryResult<Row = unknown> {
   readonly rows: Row[];
@@ -23,7 +24,8 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigration[] = [
   dryRunPublishedCommentsMigration,
   dashboardAuthRetryStateMigration,
   repositoryReviewConfigurationMigration,
-  githubOAuthAndSyncMigration
+  githubOAuthAndSyncMigration,
+  reviewPoliciesMigration
 ];
 
 interface AppliedMigrationRow {

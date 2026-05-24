@@ -6,6 +6,7 @@ export type DashboardRole = "owner" | "admin" | "developer" | "viewer";
 export type DashboardCapability =
   | "retry_review_run"
   | "manage_repository_configuration"
+  | "manage_review_policies"
   | "manage_sensitive_settings"
   | "access_raw_artifacts"
   | "manage_billing"
@@ -36,6 +37,8 @@ export function roleHasDashboardCapability(
     case "retry_review_run":
       return role === "owner" || role === "admin" || role === "developer";
     case "manage_repository_configuration":
+      return role === "owner" || role === "admin";
+    case "manage_review_policies":
       return role === "owner" || role === "admin";
     case "manage_sensitive_settings":
       return role === "owner" || role === "admin";

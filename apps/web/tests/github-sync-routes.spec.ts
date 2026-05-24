@@ -1,5 +1,6 @@
 import { GET as startGitHubOAuth } from "../app/auth/github/route";
 import { POST as syncInstallations } from "../app/api/github/installations/sync/route";
+import { GET as readRules, PATCH as saveRules } from "../app/api/rules/route";
 import { POST as syncRepository } from "../app/api/repositories/[id]/sync/route";
 
 describe("GitHub sync routes", () => {
@@ -78,6 +79,55 @@ describe("GitHub sync routes", () => {
     expect(response.status).toBe(200);
     const calls = fetcher.mock.calls as unknown as Array<[RequestInfo | URL, RequestInit | undefined]>;
     expect(new URL(String(calls[0]?.[0])).pathname).toBe("/api/repositories/repo-1/sync");
+  });
+
+  it("routes Rules / Policies reads to the role-aware API endpoint", async () => {
+    process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
+    process.env.FIRMCODE_DASHBOARD_WORKSPACE_ID = "workspace-1";
+    process.env.FIRMCODE_DASHBOARD_CLERK_USER_ID = "user-1";
+    const fetcher = vi.fn(async () => jsonResponse({ workspacePolicy: {}, repositoryPolicies: [], selectedRepositoryPolicy: null }));
+
+    vi.stubGlobal("fetch", fetcher);
+
+    const response = await readRules(new Request("http://localhost/api/rules?repositoryId=repo-1"));
+    const calls = fetcher.mock.calls as unknown as Array<[RequestInfo | URL, RequestInit | undefined]>;
+    const init = calls[0]?.[1] ?? {};
+    const headers = new Headers(init.headers);
+    const url = new URL(String(calls[0]?.[0]));
+
+    expect(response.status).toBe(200);
+    expect(url.pathname).toBe("/api/rules");
+    expect(url.searchParams.get("repositoryId")).toBe("repo-1");
+    expect(init.method).toBe("GET");
+    expect(headers.get("x-firmcode-workspace-id")).toBe("workspace-1");
+    expect(headers.get("x-firmcode-user-id")).toBe("user-1");
+  });
+
+  it("routes Rules / Policies saves to the role-gated API endpoint", async () => {
+    process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
+    process.env.FIRMCODE_DASHBOARD_WORKSPACE_ID = "workspace-1";
+    process.env.FIRMCODE_DASHBOARD_CLERK_USER_ID = "user-1";
+    const fetcher = vi.fn(async () => jsonResponse({ workspacePolicy: {}, repositoryPolicies: [], selectedRepositoryPolicy: null }));
+
+    vi.stubGlobal("fetch", fetcher);
+
+    const response = await saveRules(
+      new Request("http://localhost/api/rules", {
+        method: "PATCH",
+        body: JSON.stringify({ commentPolicy: { maxInlineComments: 4 } })
+      })
+    );
+    const calls = fetcher.mock.calls as unknown as Array<[RequestInfo | URL, RequestInit | undefined]>;
+    const init = calls[0]?.[1] ?? {};
+    const headers = new Headers(init.headers);
+
+    expect(response.status).toBe(200);
+    expect(new URL(String(calls[0]?.[0])).pathname).toBe("/api/rules");
+    expect(init.method).toBe("PATCH");
+    expect(init.body).toBe(JSON.stringify({ commentPolicy: { maxInlineComments: 4 } }));
+    expect(headers.get("content-type")).toBe("application/json");
+    expect(headers.get("x-firmcode-workspace-id")).toBe("workspace-1");
+    expect(headers.get("x-firmcode-user-id")).toBe("user-1");
   });
 });
 

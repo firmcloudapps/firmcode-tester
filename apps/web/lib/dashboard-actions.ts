@@ -2,8 +2,10 @@ import type {
   GitHubInstallationSyncResponse,
   GitHubRepositorySyncResponse,
   RepositoryReviewConfiguration,
+  RulesPolicyResponse,
   ReviewRunRetryResponse,
-  ReviewRunStatus
+  ReviewRunStatus,
+  UpdateReviewPolicyRequest
 } from "@firmcode/shared";
 
 export type DashboardMutationFetcher = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
@@ -118,6 +120,22 @@ export async function updateRepositoryAutomation(
   return readMutationResponse<RepositoryReviewConfiguration>(response, "Repository automation could not be updated.");
 }
 
+export async function updateReviewPolicy(
+  policy: UpdateReviewPolicyRequest,
+  fetcher: DashboardMutationFetcher = fetch
+): Promise<RulesPolicyResponse> {
+  const response = await fetcher("/api/rules", {
+    method: "PATCH",
+    headers: {
+      accept: "application/json",
+      "content-type": "application/json"
+    },
+    body: JSON.stringify(policy)
+  });
+
+  return readMutationResponse<RulesPolicyResponse>(response, "Rules policy could not be updated.");
+}
+
 export function toRetryFeedbackMessage(response: ReviewRunRetryResponse): string {
   if (response.reason === "duplicate_retry") {
     return "A retry is already queued for this failed run.";
@@ -136,6 +154,11 @@ export function toGitHubInstallationSyncFeedbackMessage(response: GitHubInstalla
 
 export function toGitHubRepositorySyncFeedbackMessage(response: GitHubRepositorySyncResponse): string {
   return `Synced ${response.repository.fullName}.`;
+}
+
+export function toReviewPolicyFeedbackMessage(response: RulesPolicyResponse): string {
+  const policy = response.selectedRepositoryPolicy ?? response.workspacePolicy;
+  return policy.repositoryId === null ? "Workspace policy saved." : "Repository policy saved.";
 }
 
 async function readMutationResponse<T>(response: Response, fallbackMessage: string): Promise<T> {

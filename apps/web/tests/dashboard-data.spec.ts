@@ -5,6 +5,7 @@ import {
   loadGitHubInstallationsState,
   loadGitHubRepositoryControlsState,
   loadRepositoryDetailState,
+  loadRulesState,
   loadReviewRunDetailState,
   loadSettingsState
 } from "../lib/dashboard-data";
@@ -91,6 +92,26 @@ describe("dashboard findings data loader", () => {
     vi.stubGlobal("fetch", fetcher);
 
     await expect(loadSettingsState()).resolves.toMatchObject({ status: "empty" });
+  });
+
+  it("fetches rules policies with dashboard auth headers and repository selection", async () => {
+    process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
+    process.env.FIRMCODE_DASHBOARD_WORKSPACE_ID = "workspace-1";
+    process.env.FIRMCODE_DASHBOARD_CLERK_USER_ID = "user-1";
+    const fetcher = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => jsonResponse(rulesPolicyResponse));
+
+    vi.stubGlobal("fetch", fetcher);
+
+    await expect(loadRulesState({ repositoryId: "repo-1" })).resolves.toMatchObject({ status: "populated" });
+
+    const url = new URL(String(fetcher.mock.calls[0]?.[0]));
+    const init = fetcher.mock.calls[0]?.[1] as RequestInit;
+    const headers = new Headers(init.headers);
+
+    expect(url.pathname).toBe("/api/rules");
+    expect(url.searchParams.get("repositoryId")).toBe("repo-1");
+    expect(headers.get("x-firmcode-workspace-id")).toBe("workspace-1");
+    expect(headers.get("x-firmcode-user-id")).toBe("user-1");
   });
 
   it("maps GitHub installation entrypoint 401 responses to signed-out state", async () => {
@@ -360,6 +381,77 @@ const repositoryDetailResponse = {
     canManageConfiguration: true,
     canRetryReviewRuns: true,
     canAccessRawArtifacts: true
+  }
+};
+
+const rulesPolicy = {
+  workspaceId: "workspace-1",
+  repositoryId: null,
+  scope: "workspace",
+  reviewPreferences: {
+    reviewDraftPullRequests: false,
+    requireTestsForRiskyChanges: true,
+    suggestMissingTests: true
+  },
+  commentPolicy: {
+    maxInlineComments: 8,
+    severityThreshold: "medium"
+  },
+  categories: {
+    bug: true,
+    security: true,
+    performance: true,
+    maintainability: true,
+    test: true,
+    infra: true,
+    ci: true
+  },
+  promptInstructions: "Prefer concise comments.",
+  ignoredPaths: ["dist/**"],
+  generatedFileIgnorePatterns: ["**/*.generated.ts"],
+  semgrep: {
+    enabled: true,
+    includeInfrastructureRules: true,
+    scanGeneratedFilesForSecrets: true
+  },
+  analysis: {
+    treeSitterEnabled: true,
+    llmReviewEnabled: true,
+    ciExplanationEnabled: true
+  },
+  infrastructureSecurity: {
+    infrastructureReviewEnabled: true,
+    securityReviewEnabled: true,
+    dependencyReviewEnabled: true,
+    ciWorkflowReviewEnabled: true
+  },
+  updatedByClerkUserId: "user_admin",
+  createdAt: "2026-05-22T09:00:00.000Z",
+  updatedAt: "2026-05-22T09:00:00.000Z"
+};
+
+const rulesPolicyResponse = {
+  workspacePolicy: rulesPolicy,
+  repositoryPolicies: [
+    {
+      repositoryId: "repo-1",
+      fullName: "openclaw/firmcode",
+      policy: {
+        ...rulesPolicy,
+        repositoryId: "repo-1",
+        scope: "repository",
+        promptInstructions: "Repository override."
+      }
+    }
+  ],
+  selectedRepositoryPolicy: {
+    ...rulesPolicy,
+    repositoryId: "repo-1",
+    scope: "repository",
+    promptInstructions: "Repository override."
+  },
+  permissions: {
+    canManagePolicies: true
   }
 };
 
