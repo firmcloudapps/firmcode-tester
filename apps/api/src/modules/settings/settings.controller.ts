@@ -1,4 +1,4 @@
-import { Controller, Get, Headers } from "@nestjs/common";
+import { Body, Controller, Get, Headers, Patch, Post } from "@nestjs/common";
 import type { WorkspaceSettingsResponse } from "@firmcode/shared";
 import { SettingsService } from "./settings.service";
 
@@ -14,6 +14,32 @@ export class SettingsController {
     return this.settingsService.getWorkspaceSettings({
       workspaceId: readSingleValue(workspaceIdHeader) ?? null,
       clerkUserId: readSingleValue(userIdHeader) ?? null
+    });
+  }
+
+  @Patch("retention")
+  async updateRetentionPolicy(
+    @Body() body: unknown,
+    @Headers("x-firmcode-workspace-id") workspaceIdHeader: string | string[] | undefined,
+    @Headers("x-firmcode-user-id") userIdHeader: string | string[] | undefined
+  ): Promise<never> {
+    return this.settingsService.updateRetentionPolicy({
+      workspaceId: readSingleValue(workspaceIdHeader) ?? null,
+      clerkUserId: readSingleValue(userIdHeader) ?? null,
+      body
+    });
+  }
+
+  @Post("api-keys")
+  async createApiKey(
+    @Body() body: unknown,
+    @Headers("x-firmcode-workspace-id") workspaceIdHeader: string | string[] | undefined,
+    @Headers("x-firmcode-user-id") userIdHeader: string | string[] | undefined
+  ): Promise<never> {
+    return this.settingsService.createApiKey({
+      workspaceId: readSingleValue(workspaceIdHeader) ?? null,
+      clerkUserId: readSingleValue(userIdHeader) ?? null,
+      body
     });
   }
 }

@@ -1,15 +1,17 @@
 import type { FindingsListResponse } from "@firmcode/shared";
-import { loadFindingsState, loadSettingsState } from "../lib/dashboard-data";
+import { loadBillingState, loadFindingsState, loadReviewRunDetailState, loadSettingsState } from "../lib/dashboard-data";
 
 describe("dashboard findings data loader", () => {
   const originalApiUrl = process.env.NEXT_PUBLIC_API_URL;
   const originalWorkspaceId = process.env.FIRMCODE_DASHBOARD_WORKSPACE_ID;
   const originalClerkUserId = process.env.FIRMCODE_DASHBOARD_CLERK_USER_ID;
+  const originalBillingCapability = process.env.FIRMCODE_DASHBOARD_CLERK_BILLING_CAPABILITY;
 
   afterEach(() => {
     process.env.NEXT_PUBLIC_API_URL = originalApiUrl;
     process.env.FIRMCODE_DASHBOARD_WORKSPACE_ID = originalWorkspaceId;
     process.env.FIRMCODE_DASHBOARD_CLERK_USER_ID = originalClerkUserId;
+    process.env.FIRMCODE_DASHBOARD_CLERK_BILLING_CAPABILITY = originalBillingCapability;
     vi.unstubAllGlobals();
   });
 
@@ -81,6 +83,44 @@ describe("dashboard findings data loader", () => {
     vi.stubGlobal("fetch", fetcher);
 
     await expect(loadSettingsState()).resolves.toMatchObject({ status: "empty" });
+  });
+
+  it("fetches review run detail with dashboard auth headers for artifact role gating", async () => {
+    process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
+    process.env.FIRMCODE_DASHBOARD_WORKSPACE_ID = "workspace-1";
+    process.env.FIRMCODE_DASHBOARD_CLERK_USER_ID = "user-1";
+    const fetcher = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => jsonResponse(reviewRunDetailResponse));
+
+    vi.stubGlobal("fetch", fetcher);
+
+    await expect(loadReviewRunDetailState("run-1")).resolves.toMatchObject({ status: "populated" });
+
+    const url = new URL(String(fetcher.mock.calls[0]?.[0]));
+    const init = fetcher.mock.calls[0]?.[1] as RequestInit;
+    const headers = new Headers(init.headers);
+
+    expect(url.pathname).toBe("/api/review-runs/run-1");
+    expect(headers.get("x-firmcode-workspace-id")).toBe("workspace-1");
+    expect(headers.get("x-firmcode-user-id")).toBe("user-1");
+  });
+
+  it("fetches billing with Clerk-managed billing capability forwarded when present", async () => {
+    process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
+    process.env.FIRMCODE_DASHBOARD_WORKSPACE_ID = "workspace-1";
+    process.env.FIRMCODE_DASHBOARD_CLERK_USER_ID = "user-1";
+    process.env.FIRMCODE_DASHBOARD_CLERK_BILLING_CAPABILITY = "manage_billing";
+    const fetcher = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => jsonResponse(billingResponse));
+
+    vi.stubGlobal("fetch", fetcher);
+
+    await expect(loadBillingState()).resolves.toMatchObject({ status: "populated" });
+
+    const url = new URL(String(fetcher.mock.calls[0]?.[0]));
+    const init = fetcher.mock.calls[0]?.[1] as RequestInit;
+    const headers = new Headers(init.headers);
+
+    expect(url.pathname).toBe("/api/billing");
+    expect(headers.get("x-firmcode-clerk-billing-capability")).toBe("manage_billing");
   });
 });
 
@@ -165,6 +205,63 @@ const settingsResponse = {
   notifications: {
     enabled: false,
     message: "Email and Slack notification routing is planned after review delivery stabilizes."
+  }
+};
+
+const reviewRunDetailResponse = {
+  id: "run-1",
+  repositoryId: "repo-1",
+  pullRequestId: "pr-1",
+  repositoryFullName: "openclaw/firmcode",
+  pullRequestNumber: 7,
+  pullRequestTitle: "Add details",
+  headSha: "abc123",
+  status: "succeeded",
+  findingsCount: 0,
+  startedAt: null,
+  finishedAt: null,
+  createdAt: "2026-05-22T10:00:00.000Z",
+  updatedAt: "2026-05-22T10:00:00.000Z",
+  triggerEvent: "pull_request.opened",
+  errorCode: null,
+  errorMessage: null,
+  metrics: {},
+  durationMs: null,
+  filesAnalyzedCount: 0,
+  semgrepFindingsCount: 0,
+  aiFindingsCount: 0,
+  inlineCommentsPostedCount: 0,
+  tokenUsage: null,
+  estimatedCostUsd: null,
+  riskLevel: "unknown",
+  pipelineStages: [],
+  changedFiles: [],
+  findings: [],
+  artifacts: [],
+  logExcerpts: [],
+  publishedComments: [],
+  permissions: {
+    canRetryReviewRun: true,
+    canAccessRawArtifacts: true
+  }
+};
+
+const billingResponse = {
+  workspace: {
+    id: "workspace-1",
+    role: "developer",
+    canManageBilling: true,
+    source: "clerk"
+  },
+  plan: {
+    name: "Clerk managed",
+    status: "managed_by_clerk"
+  },
+  usage: {
+    reviewRunsThisMonth: null,
+    aiTokensThisMonth: null,
+    repositoriesMonitored: null,
+    seats: null
   }
 };
 

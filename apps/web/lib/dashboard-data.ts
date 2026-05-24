@@ -7,6 +7,7 @@ import type {
   ReviewRunDetail,
   ReviewRunListFilters,
   ReviewRunListResponse,
+  WorkspaceBillingResponse,
   WorkspaceSettingsResponse
 } from "@firmcode/shared";
 import { createDashboardApiHeaders } from "./dashboard-api-proxy";
@@ -87,9 +88,19 @@ export async function loadSettingsState(): Promise<ViewState<WorkspaceSettingsRe
   }
 }
 
+export async function loadBillingState(): Promise<ViewState<WorkspaceBillingResponse>> {
+  try {
+    const data = await requestAuthenticatedJson<WorkspaceBillingResponse>("/api/billing");
+
+    return { status: "populated", data };
+  } catch (error) {
+    return { status: "error", message: toErrorMessage(error) };
+  }
+}
+
 export async function loadReviewRunDetailState(reviewRunId: string): Promise<ViewState<ReviewRunDetail>> {
   try {
-    const data = await requestJson<ReviewRunDetail>(`/api/review-runs/${encodeURIComponent(reviewRunId)}`, {});
+    const data = await requestAuthenticatedJson<ReviewRunDetail>(`/api/review-runs/${encodeURIComponent(reviewRunId)}`);
 
     return { status: "populated", data };
   } catch (error) {

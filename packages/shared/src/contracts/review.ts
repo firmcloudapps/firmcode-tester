@@ -61,6 +61,22 @@ export function canManageSensitiveWorkspaceSettings(role: DashboardWorkspaceRole
   return role === "owner" || role === "admin";
 }
 
+export function canRetryReviewRuns(role: DashboardWorkspaceRole): boolean {
+  return role === "owner" || role === "admin" || role === "developer";
+}
+
+export function canManageRepositoryConfiguration(role: DashboardWorkspaceRole): boolean {
+  return role === "owner" || role === "admin";
+}
+
+export function canAccessRawReviewArtifacts(role: DashboardWorkspaceRole): boolean {
+  return role === "owner" || role === "admin" || role === "developer";
+}
+
+export function canManageBilling(role: DashboardWorkspaceRole, hasClerkBillingCapability = false): boolean {
+  return role === "owner" || role === "admin" || hasClerkBillingCapability;
+}
+
 export const REPOSITORY_REVIEW_SEVERITY_THRESHOLDS = ["info", "low", "medium", "high", "critical"] as const;
 
 export type RepositoryReviewSeverityThreshold = (typeof REPOSITORY_REVIEW_SEVERITY_THRESHOLDS)[number];
@@ -296,8 +312,21 @@ export type ReviewRunArtifactType = "diff" | "treesitter" | "semgrep" | "context
 export interface ReviewRunArtifact {
   id: string;
   artifactType: ReviewRunArtifactType;
+  storageKey: string | null;
+  metadata: Record<string, unknown>;
+  rawAccessAllowed: boolean;
+  rawAccessRequiredRole: "developer";
+  rawAccessUrl: string | null;
+  createdAt: string;
+}
+
+export interface RawReviewRunArtifactAccess {
+  reviewRunId: string;
+  artifactId: string;
+  artifactType: ReviewRunArtifactType;
   storageKey: string;
   metadata: Record<string, unknown>;
+  rawAccessAllowed: true;
   createdAt: string;
 }
 
@@ -343,6 +372,29 @@ export interface ReviewRunDetail extends ReviewRunSummary {
   artifacts: ReviewRunArtifact[];
   logExcerpts: ReviewRunLogExcerpt[];
   publishedComments: ReviewRunPublishedComment[];
+  permissions: {
+    canRetryReviewRun: boolean;
+    canAccessRawArtifacts: boolean;
+  };
+}
+
+export interface WorkspaceBillingResponse {
+  workspace: {
+    id: string;
+    role: DashboardWorkspaceRole;
+    canManageBilling: boolean;
+    source: "clerk";
+  };
+  plan: {
+    name: string;
+    status: "managed_by_clerk";
+  };
+  usage: {
+    reviewRunsThisMonth: number | null;
+    aiTokensThisMonth: number | null;
+    repositoriesMonitored: number | null;
+    seats: number | null;
+  };
 }
 
 export type OverviewMetricId = "review_activity" | "security_findings" | "ci_failures" | "repositories_monitored";

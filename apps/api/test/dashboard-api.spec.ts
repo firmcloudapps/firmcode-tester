@@ -5,6 +5,7 @@ import { RepositoriesController } from "../src/modules/repositories/repositories
 import { PostgresRepositoriesStore } from "../src/modules/repositories/repositories.store";
 import { FindingsController } from "../src/modules/review-runs/findings.controller";
 import { PostgresFindingsStore } from "../src/modules/review-runs/findings.store";
+import { PostgresDashboardAuthStore } from "../src/modules/review-runs/dashboard-auth.store";
 import { ReviewRunsController } from "../src/modules/review-runs/review-runs.controller";
 import { PostgresReviewRunsStore } from "../src/modules/review-runs/review-runs.store";
 
@@ -20,6 +21,10 @@ function createTestPool(): PgPoolLike {
   return new adapters.Pool();
 }
 
+const WORKSPACE_ID = "00000000-0000-4000-8000-000000000101";
+const DEVELOPER_USER_ID = "user_developer";
+const VIEWER_USER_ID = "user_viewer";
+
 describe("dashboard API controllers", () => {
   let pool: PgPoolLike;
   let repositoriesController: RepositoriesController;
@@ -32,7 +37,10 @@ describe("dashboard API controllers", () => {
     await seedDashboardData(pool);
     repositoriesController = new RepositoriesController(new PostgresRepositoriesStore(pool));
     findingsController = new FindingsController(new PostgresFindingsStore(pool));
-    reviewRunsController = new ReviewRunsController(new PostgresReviewRunsStore(pool));
+    reviewRunsController = new ReviewRunsController(
+      new PostgresReviewRunsStore(pool),
+      new PostgresDashboardAuthStore(pool)
+    );
   });
 
   afterEach(async () => {
@@ -90,7 +98,11 @@ describe("dashboard API controllers", () => {
   });
 
   it("returns review run detail with files, findings, artifacts, logs, and published comments", async () => {
-    const detail = await reviewRunsController.getReviewRunDetail("00000000-0000-4000-8000-000000000006");
+    const detail = await reviewRunsController.getReviewRunDetail(
+      "00000000-0000-4000-8000-000000000006",
+      WORKSPACE_ID,
+      DEVELOPER_USER_ID
+    );
 
     expect(detail).toMatchObject({
       repositoryFullName: "openclaw/firmcode",
@@ -131,7 +143,8 @@ describe("dashboard API controllers", () => {
       artifacts: [
         {
           artifactType: "ci_log",
-          storageKey: "artifacts/run-6/ci-log.json"
+          storageKey: "artifacts/run-6/ci-log.json",
+          rawAccessAllowed: true
         },
         {
           artifactType: "diff",
@@ -160,7 +173,52 @@ describe("dashboard API controllers", () => {
           line: 42,
           body: "Inline body"
         }
-      ]
+      ],
+      permissions: {
+        canAccessRawArtifacts: true,
+        canRetryReviewRun: true
+      }
+    });
+  });
+
+  it("redacts raw artifact locators for viewers and denies raw artifact access", async () => {
+    const detail = await reviewRunsController.getReviewRunDetail(
+      "00000000-0000-4000-8000-000000000006",
+      WORKSPACE_ID,
+      VIEWER_USER_ID
+    );
+
+    expect(detail.artifacts[0]).toMatchObject({
+      artifactType: "ci_log",
+      storageKey: null,
+      rawAccessAllowed: false,
+      rawAccessUrl: null
+    });
+    expect(detail.logExcerpts[0]?.storageKey).toBeNull();
+    await expect(
+      reviewRunsController.getRawArtifactAccess(
+        "00000000-0000-4000-8000-000000000006",
+        "00000000-0000-4000-8000-000000000040",
+        WORKSPACE_ID,
+        VIEWER_USER_ID
+      )
+    ).rejects.toMatchObject({ status: 403 });
+  });
+
+  it("allows developer and elevated roles to request raw artifact access metadata", async () => {
+    const artifact = await reviewRunsController.getRawArtifactAccess(
+      "00000000-0000-4000-8000-000000000006",
+      "00000000-0000-4000-8000-000000000041",
+      WORKSPACE_ID,
+      DEVELOPER_USER_ID
+    );
+
+    expect(artifact).toMatchObject({
+      reviewRunId: "00000000-0000-4000-8000-000000000006",
+      artifactId: "00000000-0000-4000-8000-000000000041",
+      artifactType: "diff",
+      storageKey: "artifacts/run-6/diff.json",
+      rawAccessAllowed: true
     });
   });
 
@@ -202,21 +260,30 @@ describe("dashboard API controllers", () => {
     await expect(reviewRunsController.listReviewRuns({ status: "done" })).rejects.toThrow(BadRequestException);
     await expect(findingsController.listFindings({ severity: "urgent" })).rejects.toThrow(BadRequestException);
     await expect(findingsController.listFindings({ postedInline: "sometimes" })).rejects.toThrow(BadRequestException);
-    await expect(reviewRunsController.getReviewRunDetail("00000000-0000-4000-8000-000000999999")).rejects.toThrow(
-      NotFoundException
-    );
+    await expect(
+      reviewRunsController.getReviewRunDetail("00000000-0000-4000-8000-000000999999", WORKSPACE_ID, DEVELOPER_USER_ID)
+    ).rejects.toThrow(NotFoundException);
   });
 });
 
 async function seedDashboardData(pool: PgPoolLike): Promise<void> {
   await pool.query(
     `
+INSERT INTO workspaces (id, clerk_org_id, name) VALUES
+('${WORKSPACE_ID}', 'org_firmcode', 'Firmcode');
+
+INSERT INTO workspace_memberships (workspace_id, clerk_user_id, role, active) VALUES
+('${WORKSPACE_ID}', '${DEVELOPER_USER_ID}', 'developer', true),
+('${WORKSPACE_ID}', '${VIEWER_USER_ID}', 'viewer', true);
+
 INSERT INTO github_installations (
   id,
+  workspace_id,
   installation_id,
   permissions_json
 ) VALUES (
   '00000000-0000-4000-8000-000000000001',
+  '${WORKSPACE_ID}',
   101,
   '{"pull_requests":"write"}'
 );

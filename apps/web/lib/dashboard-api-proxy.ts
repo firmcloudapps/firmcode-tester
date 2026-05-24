@@ -1,5 +1,5 @@
 export interface DashboardApiProxyInput {
-  readonly method: "PATCH" | "POST";
+  readonly method: "GET" | "PATCH" | "POST";
   readonly path: string;
   readonly body?: unknown;
   readonly env?: DashboardProxyEnvironment;
@@ -8,6 +8,7 @@ export interface DashboardApiProxyInput {
 
 const WORKSPACE_HEADER = "x-firmcode-workspace-id";
 const USER_HEADER = "x-firmcode-user-id";
+const BILLING_CAPABILITY_HEADER = "x-firmcode-clerk-billing-capability";
 
 type DashboardProxyEnvironment = Record<string, string | undefined>;
 
@@ -54,6 +55,10 @@ export function createDashboardApiHeaders(env: DashboardProxyEnvironment, hasBod
 
   if (clerkUserId !== undefined && clerkUserId !== "") {
     headers.set(USER_HEADER, clerkUserId);
+  }
+
+  if (env.FIRMCODE_DASHBOARD_CLERK_BILLING_CAPABILITY !== undefined && env.FIRMCODE_DASHBOARD_CLERK_BILLING_CAPABILITY !== "") {
+    headers.set(BILLING_CAPABILITY_HEADER, env.FIRMCODE_DASHBOARD_CLERK_BILLING_CAPABILITY);
   }
 
   return headers;

@@ -3,7 +3,12 @@ import type { DatabaseExecutor } from "../../infrastructure/database/migrations"
 export const DASHBOARD_AUTH_STORE = Symbol("DASHBOARD_AUTH_STORE");
 
 export type DashboardRole = "owner" | "admin" | "developer" | "viewer";
-export type DashboardCapability = "retry_review_run" | "manage_repository_configuration";
+export type DashboardCapability =
+  | "retry_review_run"
+  | "manage_repository_configuration"
+  | "manage_sensitive_settings"
+  | "access_raw_artifacts"
+  | "manage_billing";
 
 export interface DashboardMembership {
   workspaceId: string;
@@ -15,21 +20,39 @@ export interface DashboardAuthStore {
   findActiveMembership(input: { workspaceId: string; clerkUserId: string }): Promise<DashboardMembership | null>;
 }
 
-const ROLE_CAPABILITIES: Readonly<Record<DashboardRole, readonly DashboardCapability[]>> = {
-  owner: ["retry_review_run", "manage_repository_configuration"],
-  admin: ["retry_review_run", "manage_repository_configuration"],
-  developer: ["retry_review_run"],
-  viewer: []
-};
-
 interface DashboardMembershipRow {
   readonly workspace_id: string;
   readonly clerk_user_id: string;
   readonly role: DashboardRole;
 }
 
-export function roleHasDashboardCapability(role: DashboardRole, capability: DashboardCapability): boolean {
-  return ROLE_CAPABILITIES[role].includes(capability);
+export function roleHasDashboardCapability(
+  role: DashboardRole,
+  capability: DashboardCapability,
+  options: { hasClerkBillingCapability?: boolean } = {}
+): boolean {
+  switch (capability) {
+    case "retry_review_run":
+      return role === "owner" || role === "admin" || role === "developer";
+    case "manage_repository_configuration":
+      return role === "owner" || role === "admin";
+    case "manage_sensitive_settings":
+      return role === "owner" || role === "admin";
+    case "access_raw_artifacts":
+      return role === "owner" || role === "admin" || role === "developer";
+    case "manage_billing":
+      return role === "owner" || role === "admin" || options.hasClerkBillingCapability === true;
+  }
+}
+
+export function hasClerkManagedBillingCapability(value: string | string[] | undefined): boolean {
+  const candidate = Array.isArray(value) ? value[0] : value;
+
+  if (candidate === undefined || candidate === "") {
+    return false;
+  }
+
+  return ["manage_billing", "billing_admin", "org:billing:manage", "true"].includes(candidate);
 }
 
 export class EmptyDashboardAuthStore implements DashboardAuthStore {

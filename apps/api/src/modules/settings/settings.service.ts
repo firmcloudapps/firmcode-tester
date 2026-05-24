@@ -1,11 +1,19 @@
-import { Inject, Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
+import { ForbiddenException, Inject, Injectable, NotFoundException, NotImplementedException, UnauthorizedException } from "@nestjs/common";
 import type { WorkspaceSettingsResponse } from "@firmcode/shared";
-import { DASHBOARD_AUTH_STORE, type DashboardAuthStore } from "../review-runs/dashboard-auth.store";
+import {
+  DASHBOARD_AUTH_STORE,
+  roleHasDashboardCapability,
+  type DashboardAuthStore
+} from "../review-runs/dashboard-auth.store";
 import { SETTINGS_STORE, type SettingsStore } from "./settings.store";
 
 export interface WorkspaceSettingsRequestContext {
   readonly workspaceId: string | null;
   readonly clerkUserId: string | null;
+}
+
+export interface SensitiveWorkspaceSettingsRequestContext extends WorkspaceSettingsRequestContext {
+  readonly body: unknown;
 }
 
 @Injectable()
@@ -38,6 +46,33 @@ export class SettingsService {
     }
 
     return settings;
+  }
+
+  async updateRetentionPolicy(input: SensitiveWorkspaceSettingsRequestContext): Promise<never> {
+    await this.authorizeSensitiveSettings(input);
+    throw new NotImplementedException("Workspace retention changes are not enabled in the MVP");
+  }
+
+  async createApiKey(input: SensitiveWorkspaceSettingsRequestContext): Promise<never> {
+    await this.authorizeSensitiveSettings(input);
+    throw new NotImplementedException("Workspace API key creation is not enabled in the MVP");
+  }
+
+  private async authorizeSensitiveSettings(input: WorkspaceSettingsRequestContext): Promise<void> {
+    assertAuthenticated(input);
+
+    const membership = await this.dashboardAuthStore.findActiveMembership({
+      workspaceId: input.workspaceId,
+      clerkUserId: input.clerkUserId
+    });
+
+    if (membership === null) {
+      throw new UnauthorizedException("Dashboard authentication is required");
+    }
+
+    if (!roleHasDashboardCapability(membership.role, "manage_sensitive_settings")) {
+      throw new ForbiddenException("Workspace role cannot manage sensitive settings");
+    }
   }
 }
 
