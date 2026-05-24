@@ -13,6 +13,7 @@ from firmcode_worker.pipeline import (
     _inline_review_body,
     _partition_existing_inline_comments,
     _render_resolution_bullets,
+    _render_semgrep_fix_diff,
     normalize_private_key,
     parse_patch_hunks,
 )
@@ -224,6 +225,16 @@ def test_render_resolution_bullets_splits_major_points() -> None:
         "- Replace the tag or branch after @ with the action commit SHA.",
         "- Update it through a dependency update workflow.",
     ]
+
+
+def test_render_semgrep_fix_diff_marks_removed_and_replacement_lines() -> None:
+    diff = _render_semgrep_fix_diff(
+        "const value = eval(input);",
+        "const value = JSON.parse(input);",
+    )
+
+    assert diff == "- const value = eval(input);\n! const value = JSON.parse(input);"
+    assert "+ const value = JSON.parse(input);" not in diff
 
 
 def test_inline_review_body_omits_internal_run_ids() -> None:
