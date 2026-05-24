@@ -9,7 +9,7 @@ describe("FirmcodeAI GitHub activity Markdown", () => {
   it("renders a branded summary activity comment", () => {
     const markdown = renderFirmcodeAiSummaryActivity({
       reviewRunId: "run-1",
-      repositoryFullName: "kelly-oriabure/firmcode-tester",
+      repositoryFullName: "kelly-oriabure/firmcode-web",
       pullRequestNumber: 13,
       headSha: "5ccce2d5f1b0e7bedd6239418c39bb28740b741e",
       summaryBody: "This PR changes Semgrep scan workspace behavior.",
@@ -46,7 +46,7 @@ describe("FirmcodeAI GitHub activity Markdown", () => {
   it("matches the summary Markdown snapshot", () => {
     const markdown = renderFirmcodeAiSummaryActivity({
       reviewRunId: "run-snapshot",
-      repositoryFullName: "kelly-oriabure/firmcode-tester",
+      repositoryFullName: "kelly-oriabure/firmcode-web",
       pullRequestNumber: 21,
       headSha: "5ccce2d5f1b0e7bedd6239418c39bb28740b741e",
       summaryBody: "This PR updates webhook ingestion and review publishing.",

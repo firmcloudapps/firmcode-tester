@@ -37,7 +37,7 @@ The lint job failed before tests because the publisher type contract changed.
 
 ### Review activity
 
-- Repository: \`kelly-oriabure/firmcode-tester\`
+- Repository: \`kelly-oriabure/firmcode-web\`
 - Pull request: #21
 - Head SHA: \`5ccce2d5f1b0\`
 - Review run: \`run-snapshot\`
