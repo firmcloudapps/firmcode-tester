@@ -141,17 +141,18 @@ describe("GitHub sync routes", () => {
     vi.stubGlobal("fetch", fetcher);
 
     await listCiFailures(new Request("http://localhost/api/ci-failures?repository=openclaw%2Ffirmcode"));
-    await readCiFailure(new Request("http://localhost/api/ci-failures/failure-1"), {
-      params: { id: "failure-1" }
+    await readCiFailure(new Request("http://localhost/api/ci-failures/00000000-0000-4000-8000-000000000501%3Aunit-tests"), {
+      params: { id: "00000000-0000-4000-8000-000000000501%3Aunit-tests" }
     });
 
-    const listUrl = new URL(String(fetcher.mock.calls[0]?.[0]));
-    const detailUrl = new URL(String(fetcher.mock.calls[1]?.[0]));
-    const listHeaders = new Headers((fetcher.mock.calls[0]?.[1] as RequestInit | undefined)?.headers);
+    const calls = fetcher.mock.calls as unknown as Array<[RequestInfo | URL, RequestInit | undefined]>;
+    const listUrl = new URL(String(calls[0]?.[0]));
+    const detailUrl = new URL(String(calls[1]?.[0]));
+    const listHeaders = new Headers(calls[0]?.[1]?.headers);
 
     expect(listUrl.pathname).toBe("/api/ci-failures");
     expect(listUrl.searchParams.get("repository")).toBe("openclaw/firmcode");
-    expect(detailUrl.pathname).toBe("/api/ci-failures/failure-1");
+    expect(detailUrl.pathname).toBe("/api/ci-failures/00000000-0000-4000-8000-000000000501%3Aunit-tests");
     expect(listHeaders.get("x-firmcode-workspace-id")).toBe("workspace-1");
     expect(listHeaders.get("x-firmcode-user-id")).toBe("user-1");
   });

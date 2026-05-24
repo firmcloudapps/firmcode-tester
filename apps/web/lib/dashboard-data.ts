@@ -1,4 +1,7 @@
 import type {
+  CiFailureDetailResponse,
+  CiFailureListFilters,
+  CiFailureListResponse,
   DashboardRepositoryListFilters,
   FindingsListFilters,
   FindingsListResponse,
@@ -141,6 +144,33 @@ export async function loadPullRequestDetailState(pullRequestId: string): Promise
   }
 }
 
+export async function loadCiFailuresState(searchParams: SearchParams): Promise<ViewState<CiFailureListResponse>> {
+  try {
+    const filters = pickCiFailureFilters(searchParams);
+    const data = await requestAuthenticatedJsonWithQuery<CiFailureListResponse>("/api/ci-failures", filters);
+
+    return data.ciFailures.length === 0 ? { status: "empty", data } : { status: "populated", data };
+  } catch (error) {
+    return { status: "error", message: toErrorMessage(error) };
+  }
+}
+
+export async function loadCiFailureDetailState(ciFailureId: string): Promise<ViewState<CiFailureDetailResponse>> {
+  try {
+    const data = await requestAuthenticatedJson<CiFailureDetailResponse>(
+      `/api/ci-failures/${encodeURIComponent(decodeRouteSegment(ciFailureId))}`
+    );
+
+    return { status: "populated", data };
+  } catch (error) {
+    if (error instanceof DashboardApiError && error.status === 404) {
+      return { status: "empty" };
+    }
+
+    return { status: "error", message: toErrorMessage(error) };
+  }
+}
+
 export async function loadSettingsState(): Promise<ViewState<WorkspaceSettingsResponse>> {
   try {
     const data = await requestAuthenticatedJson<WorkspaceSettingsResponse>("/api/settings");
@@ -270,6 +300,20 @@ function pickPullRequestFilters(searchParams: SearchParams): PullRequestListFilt
   });
 }
 
+function pickCiFailureFilters(searchParams: SearchParams): CiFailureListFilters {
+  const limit = parsePositiveInteger(readSingleValue(searchParams.limit));
+
+  return removeUndefinedValues({
+    repositoryId: readSingleValue(searchParams.repositoryId),
+    repository: readSingleValue(searchParams.repository),
+    status: readSingleValue(searchParams.status) as CiFailureListFilters["status"],
+    flaky: parseBoolean(readSingleValue(searchParams.flaky)),
+    dateFrom: readSingleValue(searchParams.dateFrom),
+    dateTo: readSingleValue(searchParams.dateTo),
+    limit
+  });
+}
+
 async function requestJson<T>(path: string, query: object): Promise<T> {
   const url = new URL(path, getApiBaseUrl());
 
@@ -360,6 +404,14 @@ function readSingleValue(value: string | string[] | undefined): string | undefin
   }
 
   return value === "" ? undefined : value;
+}
+
+function decodeRouteSegment(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
 }
 
 function removeUndefinedValues<T extends Record<string, unknown>>(value: T): T {

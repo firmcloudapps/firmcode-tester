@@ -22,7 +22,7 @@ const navItems = [
   { label: "Pull Requests", href: "/pull-requests", enabled: true },
   { label: "Review Runs", href: "/review-runs", enabled: true },
   { label: "Findings", href: "/findings", enabled: true },
-  { label: "CI Failures", href: "/ci-failures", enabled: false },
+  { label: "CI Failures", href: "/ci-failures", enabled: true },
   { label: "Rules / Policies", href: "/rules", enabled: true },
   { label: "Settings", href: "/settings", enabled: true },
   { label: "Billing", href: "/billing", enabled: true }
