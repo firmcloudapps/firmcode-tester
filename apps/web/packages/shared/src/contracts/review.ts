@@ -310,6 +310,105 @@ export interface ReviewRunListResponse {
   filters: ReviewRunListFilters;
 }
 
+export const PULL_REQUEST_DASHBOARD_STATUSES = ["open", "closed", "merged", "draft"] as const;
+
+export type PullRequestDashboardStatus = (typeof PULL_REQUEST_DASHBOARD_STATUSES)[number];
+
+export interface PullRequestListFilters {
+  repositoryId?: string;
+  repository?: string;
+  status?: PullRequestDashboardStatus;
+  riskLevel?: ReviewRunRiskLevel;
+  reviewStatus?: ReviewRunStatus;
+  author?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  limit?: number;
+}
+
+export interface PullRequestLatestReview {
+  reviewRunId: string;
+  status: ReviewRunStatus;
+  riskLevel: ReviewRunRiskLevel;
+  findingsCount: number;
+  changedFilesCount: number;
+  durationMs: number | null;
+  headSha: string;
+  createdAt: string;
+  finishedAt: string | null;
+}
+
+export interface PullRequestListItem {
+  id: string;
+  repositoryId: string;
+  repositoryFullName: string;
+  repositoryPrivate: boolean;
+  number: number;
+  title: string;
+  authorLogin: string;
+  status: PullRequestDashboardStatus;
+  state: string;
+  draft: boolean;
+  baseRef: string;
+  headRef: string;
+  headSha: string;
+  latestReview: PullRequestLatestReview | null;
+  riskLevel: ReviewRunRiskLevel;
+  reviewStatus: ReviewRunStatus | null;
+  githubUrl: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PullRequestListResponse {
+  pullRequests: PullRequestListItem[];
+  filters: PullRequestListFilters;
+  pagination: {
+    limit: number;
+    returned: number;
+  };
+}
+
+export interface PullRequestRiskAnalysis {
+  riskLevel: ReviewRunRiskLevel;
+  riskFlags: string[];
+  summary: string | null;
+}
+
+export interface PullRequestBranches {
+  baseRef: string;
+  headRef: string;
+  baseSha: string;
+  headSha: string;
+}
+
+export interface PullRequestDashboardFinding extends ReviewRunFinding {
+  reviewRunId: string;
+}
+
+export interface PullRequestMetadata {
+  repositoryId: string;
+  repositoryFullName: string;
+  repositoryPrivate: boolean;
+  reviewRunsCount: number;
+  findingsCount: number;
+  changedFilesCount: number;
+  latestReviewStatus: ReviewRunStatus | null;
+}
+
+export interface PullRequestDetailResponse extends PullRequestListItem {
+  summary: string | null;
+  changedComponents: string[];
+  riskAnalysis: PullRequestRiskAnalysis;
+  reviewTimeline: ReviewRunListItem[];
+  findings: PullRequestDashboardFinding[];
+  metadata: PullRequestMetadata;
+  branches: PullRequestBranches;
+  commitSha: string;
+  changedFiles: ReviewRunChangedFile[];
+  durationMs: number | null;
+}
+
 export type ReviewRunRetryReason =
   | "retry_queued"
   | "duplicate_retry"

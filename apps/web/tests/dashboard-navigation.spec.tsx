@@ -1,6 +1,8 @@
 import React from "react";
 import { renderToString } from "react-dom/server";
+import { buildOverviewDashboardData } from "../lib/overview-data";
 import { DashboardShell } from "../components/dashboard/dashboard-shell";
+import { OverviewView } from "../components/dashboard/overview-view";
 import { RepositoriesView } from "../components/dashboard/repositories-view";
 import { SettingsView } from "../components/dashboard/settings-view";
 
@@ -44,6 +46,31 @@ describe("dashboard navigation", () => {
     expect(html).toContain(">Rules / Policies</a>");
     expect(html).toContain('aria-current="page"');
     expect(html).not.toContain("Rules / Policies</span>");
+  });
+
+  it("enables Pull Requests sidebar navigation once the route exists", () => {
+    const html = renderToString(
+      <DashboardShell activeItem="Pull Requests">
+        <main>Pull requests body</main>
+      </DashboardShell>
+    );
+
+    expect(html).toContain('href="/pull-requests"');
+    expect(html).toContain(">Pull Requests</a>");
+    expect(html).toContain('aria-current="page"');
+    expect(html).not.toContain("Pull Requests</span>");
+  });
+
+  it("routes overview pull request links to the implemented queue", () => {
+    const data = buildOverviewDashboardData({
+      repositories: repositoryList.repositories,
+      reviewRuns: [],
+      now: new Date("2026-05-24T12:00:00.000Z")
+    });
+    const html = renderToString(<OverviewView state={{ status: "populated", data }} />);
+
+    expect(html).toContain('href="/pull-requests"');
+    expect(html).toContain(">Pull requests</a>");
   });
 });
 
