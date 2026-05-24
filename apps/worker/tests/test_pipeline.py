@@ -294,6 +294,11 @@ def test_deterministic_pipeline_publishes_actual_analysis_summary() -> None:
     assert "- Validate and parse trusted input instead of evaluating it." in store.summary_body
     assert "<summary>Risk</summary>" in store.summary_body
     assert "<summary>Changed Components</summary>" in store.summary_body
+    assert "**Changed code**" in store.summary_body
+    assert "**`src/widget.ts`** (+2/-0)" in store.summary_body
+    assert "@@ -1,2 +1,4 @@" in store.summary_body
+    assert "!   const value = eval(input);" in store.summary_body
+    assert "!   return value;" in store.summary_body
     assert "<summary>Suggested Tests</summary>" in store.summary_body
     assert "<summary>Analysis Coverage</summary>" not in store.summary_body
     assert "<summary>Review Activity</summary>" not in store.summary_body
