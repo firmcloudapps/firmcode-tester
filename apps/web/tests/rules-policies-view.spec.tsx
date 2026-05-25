@@ -28,7 +28,8 @@ describe("RulesPoliciesView", () => {
     expect(html).toContain("Ignored Paths");
     expect(html).toContain("Semgrep And Analysis");
     expect(html).toContain("Infrastructure And Security");
-    expect(html).toContain("Admin editing");
+    expect(html).toContain("Workspace Administration");
+    expect(html).toContain("Policy editing");
     expect(html).toContain("No repository overrides");
     expect(html).toContain("No unsaved changes");
   });
@@ -88,14 +89,37 @@ describe("RulesPoliciesView", () => {
     draft.commentPolicy.maxInlineComments = "4";
     draft.categories.security = false;
     draft.ignoredPathsText = "dist/**\ncoverage/**";
+    draft.workspaceControls.retentionDays = "45";
 
     expect(hasReviewPolicyDraftChanges(basePolicy, draft)).toBe(true);
     expect(toReviewPolicyUpdateRequest(draft)).toMatchObject({
       repositoryId: null,
       commentPolicy: { maxInlineComments: 4, severityThreshold: "medium" },
       categories: { security: false },
-      ignoredPaths: ["dist/**", "coverage/**"]
+      ignoredPaths: ["dist/**", "coverage/**"],
+      workspaceControls: { retentionDays: 45 }
     });
+  });
+
+  it("keeps Developer repository policies editable while locking global workspace controls", () => {
+    const html = renderToString(
+      <RulesPoliciesView
+        state={{
+          status: "populated",
+          data: rulesResponse({
+            canManagePolicies: true,
+            canManageWorkspacePolicies: false,
+            canManageRepositoryPolicies: true,
+            canManageSensitiveWorkspacePolicies: false,
+            includeRepositoryPolicy: true
+          })
+        }}
+      />
+    );
+
+    expect(html).toContain("Repository override");
+    expect(html).toContain("Repository policies inherit workspace administration controls.");
+    expect(html).toContain("Save policy");
   });
 
   it("saves through the role-gated Rules API and reports success", async () => {
@@ -134,7 +158,7 @@ describe("RulesPoliciesView", () => {
     );
 
     expect(developerHtml).toContain("Read-only policy");
-    expect(developerHtml).toContain("This workspace role can view policies but cannot save changes.");
+    expect(developerHtml).toContain("Admin is required to save workspace policies.");
     expect(developerHtml).toContain("disabled=\"\"");
     expect(viewerHtml).toContain("Read-only policy");
     expect(viewerHtml).toContain("disabled=\"\"");
@@ -145,6 +169,9 @@ function rulesResponse(
   options: {
     workspacePolicy?: ReviewPolicy;
     canManagePolicies?: boolean;
+    canManageWorkspacePolicies?: boolean;
+    canManageRepositoryPolicies?: boolean;
+    canManageSensitiveWorkspacePolicies?: boolean;
     includeRepositoryPolicy?: boolean;
   } = {}
 ): RulesPolicyResponse {
@@ -168,7 +195,10 @@ function rulesResponse(
       : [],
     selectedRepositoryPolicy: options.includeRepositoryPolicy ? repositoryPolicy : null,
     permissions: {
-      canManagePolicies: options.canManagePolicies ?? true
+      canManagePolicies: options.canManagePolicies ?? true,
+      canManageWorkspacePolicies: options.canManageWorkspacePolicies ?? options.canManagePolicies ?? true,
+      canManageRepositoryPolicies: options.canManageRepositoryPolicies ?? options.canManagePolicies ?? true,
+      canManageSensitiveWorkspacePolicies: options.canManageSensitiveWorkspacePolicies ?? options.canManagePolicies ?? true
     }
   };
 }
@@ -214,6 +244,13 @@ function policy(overrides: Partial<ReviewPolicy> = {}): ReviewPolicy {
       securityReviewEnabled: true,
       dependencyReviewEnabled: true,
       ciWorkflowReviewEnabled: true
+    },
+    workspaceControls: {
+      globalWorkspacePolicyEnabled: true,
+      retentionDays: 30,
+      apiKeyCreationEnabled: false,
+      billingChangesRequireAdmin: true,
+      supportSafetyOverridesEnabled: false
     },
     updatedByClerkUserId: "user_admin",
     createdAt: "2026-05-23T10:00:00.000Z",

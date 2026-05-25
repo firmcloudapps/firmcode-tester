@@ -8,6 +8,7 @@ import { ciFailureArtifactsMigration } from "./migrations/007_ci_failure_artifac
 import { codebaseScanPersistenceMigration } from "./migrations/008_codebase_scan_persistence";
 import { codebaseScanDashboardConfigurationMigration } from "./migrations/009_codebase_scan_dashboard_configuration";
 import { workspaceMembershipAuditMigration } from "./migrations/010_workspace_membership_audit";
+import { reviewPolicyWorkspaceControlsMigration } from "./migrations/011_review_policy_workspace_controls";
 
 export interface DatabaseQueryResult<Row = unknown> {
   readonly rows: Row[];
@@ -33,7 +34,8 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigration[] = [
   ciFailureArtifactsMigration,
   codebaseScanPersistenceMigration,
   codebaseScanDashboardConfigurationMigration,
-  workspaceMembershipAuditMigration
+  workspaceMembershipAuditMigration,
+  reviewPolicyWorkspaceControlsMigration
 ];
 
 interface AppliedMigrationRow {
