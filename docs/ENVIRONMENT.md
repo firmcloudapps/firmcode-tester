@@ -60,8 +60,8 @@ REDIS_URL=redis://redis:6379
 | `CLERK_BILLING_PORTAL_URL` | web | Clerk-managed subscription portal or account billing entry point shown from the dashboard Billing page. |
 | `NEXT_PUBLIC_CLERK_SIGN_IN_URL` | web | Clerk sign-in route. Use `/sign-in` locally and in production unless Clerk hosted pages require a different URL. |
 | `NEXT_PUBLIC_CLERK_SIGN_UP_URL` | web | Clerk sign-up route. Use `/sign-up` locally and in production unless Clerk hosted pages require a different URL. |
-| `NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL` | web | Post sign-in dashboard destination. Default `/`. |
-| `NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL` | web | Post sign-up onboarding/dashboard destination. Default `/`. |
+| `NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL` | web | Post sign-in fallback destination. Use `/auth/redirect` so role-based routing can send Admins to `/admin` and Developers to `/developer`. |
+| `NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL` | web | Post sign-up fallback destination. Use `/auth/redirect` so role-based routing can send Admins to `/admin` and Developers to `/developer`. |
 | `CLERK_JWT_AUDIENCE` | api/web server | Audience/template used for Clerk session tokens sent from Vercel web to the Coolify API. Required for production API token verification. |
 | `CLERK_ISSUER` | api | Optional expected Clerk issuer when not inferred by the Clerk backend SDK. |
 
@@ -73,7 +73,8 @@ The production dashboard authentication flow is:
 2. Web server code reads Clerk auth state with `auth()` and obtains a Clerk session token for `CLERK_JWT_AUDIENCE`.
 3. Web-to-API calls send `Authorization: Bearer <Clerk session token>`.
 4. The NestJS API verifies the token with Clerk, derives the Clerk user and organization claims, resolves the Firmcode workspace/membership, and then applies role/capability checks.
-5. The API must ignore client-provided user identity headers. Web tests may use `FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN` as an isolated bearer-token fixture, but production and normal local development must use Clerk sessions. Any legacy workspace/user shortcut is gated to `NODE_ENV=test` for direct controller tests only; setting `FIRMCODE_DASHBOARD_*` or sending `x-firmcode-user-id` is not a supported runtime authentication path.
+5. After successful sign-in or sign-up, Clerk sends the browser to `/auth/redirect`, which resolves the verified workspace role through the dashboard API and routes Admins to `/admin` and Developers to `/developer`.
+6. The API must ignore client-provided user identity headers. Web tests may use `FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN` as an isolated bearer-token fixture, but production and normal local development must use Clerk sessions. Any legacy workspace/user shortcut is gated to `NODE_ENV=test` for direct controller tests only; setting `FIRMCODE_DASHBOARD_*` or sending `x-firmcode-user-id` is not a supported runtime authentication path.
 
 Required Clerk dashboard configuration:
 
@@ -83,8 +84,8 @@ Required Clerk dashboard configuration:
   - Vercel preview URLs if previews are enabled
 - Sign-in URL: `/sign-in`
 - Sign-up URL: `/sign-up`
-- After sign-in URL: `/`
-- After sign-up URL: `/`
+- After sign-in URL: `/auth/redirect`
+- After sign-up URL: `/auth/redirect`
 - Organization settings enabled if team workspaces are supported in the environment.
 - Clerk webhook endpoint configured only after the API endpoint exists and `CLERK_WEBHOOK_SECRET` is set.
 - Optional trusted JWT role metadata for organization memberships can be exposed as `firmcode_role`, `org_firmcode_role`, `firmcode.role`, `organization_metadata.firmcode_role`, `public_metadata.firmcode_role`, or `metadata.firmcode_role`. Firmcode maps `admin`/legacy `owner` to Admin and `developer`/`member` to Developer; if absent, Clerk org admin/owner maps to Admin and org member maps to Developer.

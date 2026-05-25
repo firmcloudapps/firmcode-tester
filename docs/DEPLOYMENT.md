@@ -129,7 +129,7 @@ Neither Compose file runs PostgreSQL or the Next.js dashboard. PostgreSQL is Neo
 | GitHub webhook URL | `https://firmcodeapi.firmoncloud.com/webhooks/github` | GitHub App |
 | Clerk sign-in URL | `https://firmcode.example.com/sign-in` | Clerk |
 | Clerk sign-up URL | `https://firmcode.example.com/sign-up` | Clerk |
-| Clerk after-auth URL | `https://firmcode.example.com/` | Clerk |
+| Clerk after-auth URL | `https://firmcode.example.com/auth/redirect` | Clerk |
 | Clerk callback URLs | Vercel production and preview URLs | Clerk |
 | GitHub OAuth callback URL | `https://firmcode.example.com/api/auth/github/callback` | GitHub App OAuth |
 
@@ -143,8 +143,8 @@ Neither Compose file runs PostgreSQL or the Next.js dashboard. PostgreSQL is Neo
    - `CLERK_JWT_AUDIENCE`
    - `NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in`
    - `NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up`
-   - `NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/`
-   - `NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/`
+   - `NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/auth/redirect`
+   - `NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/auth/redirect`
    - `NEXT_PUBLIC_API_URL=<Coolify API URL>`
    - `CLERK_BILLING_PORTAL_URL`
 4. Set Coolify API env vars:

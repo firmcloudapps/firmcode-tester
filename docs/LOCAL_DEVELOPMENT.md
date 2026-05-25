@@ -35,8 +35,8 @@ Create a Clerk development application and configure:
 
 - Sign-in URL: `http://localhost:3000/sign-in`
 - Sign-up URL: `http://localhost:3000/sign-up`
-- After sign-in URL: `http://localhost:3000/`
-- After sign-up URL: `http://localhost:3000/`
+- After sign-in URL: `http://localhost:3000/auth/redirect`
+- After sign-up URL: `http://localhost:3000/auth/redirect`
 - Allowed redirect origin: `http://localhost:3000`
 - Organizations enabled if testing team workspaces.
 - A JWT template or audience matching `CLERK_JWT_AUDIENCE` for API calls.
@@ -49,8 +49,8 @@ CLERK_SECRET_KEY=sk_test_...
 CLERK_JWT_AUDIENCE=firmcode-api
 NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
 NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
-NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/
-NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/
+NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/auth/redirect
+NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/auth/redirect
 ```
 
 The expected local auth flow is:
@@ -58,10 +58,12 @@ The expected local auth flow is:
 1. Visit `http://localhost:3000`.
 2. Unauthenticated users are redirected to `/sign-in`.
 3. Sign in or sign up through Clerk.
-4. The dashboard creates or resolves the active personal or organization workspace.
-5. Web server requests to the API include a Clerk bearer token.
-6. API dashboard endpoints reject requests without a valid Clerk token.
-7. Connect GitHub OAuth from `/github/installations` before using GitHub-backed workflows.
+4. Clerk sends the browser to `/auth/redirect`.
+5. The dashboard creates or resolves the active personal or organization workspace.
+6. `/auth/redirect` sends Admins to `/admin` and Developers to `/developer`.
+7. Web server requests to the API include a Clerk bearer token.
+8. API dashboard endpoints reject requests without a valid Clerk token.
+9. Connect GitHub OAuth from `/developer` or `/github/installations` before using GitHub-backed workflows.
 
 Do not use dashboard user or workspace environment shims for normal local development once Task 9.0 is implemented. Web-to-API calls should use Clerk sessions. `FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN` and `FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID` are reserved for isolated web unit tests only.
 

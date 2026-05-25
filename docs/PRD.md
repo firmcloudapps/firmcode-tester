@@ -16,6 +16,7 @@ Firmcode must be designed as a multi-tenant SaaS product, not a single-user loca
 
 - Clerk owns sign-up, sign-in, sessions, user profile, organization/workspace switching, member invitations where enabled, and Billing.
 - Every user must authenticate to Firmcode through Clerk and connect GitHub OAuth before using GitHub-backed workflows.
+- Successful Clerk sign-in/sign-up must route through a protected Firmcode post-auth redirect that resolves the workspace role and sends Admins to `/admin` and Developers to `/developer`; users must never remain stranded on `/sign-in` after authentication.
 - Workspaces are the tenant boundary. Every repository, installation, review run, finding, artifact, policy, usage counter, and audit event must be scoped to one workspace.
 - Admins manage billing, plans, member access where Clerk permits, global workspace settings, retention, API keys, and support/safety controls.
 - Developers are the primary customer users: they connect GitHub accounts, add/sync repositories, enable PR review automation, run/retry analysis, and track reports, findings, and CI explanations for their workspace.
@@ -105,6 +106,7 @@ Supporting production-planning docs:
 - Inline review comment posting through GitHub Reviews API.
 - PR summary as a normal issue comment or review body.
 - Light-mode TypeScript/Tailwind dashboard with repositories, repository detail/configuration, pull requests, review runs, findings, CI failures, rules/policies, settings, billing, GitHub App setup, and raw/redacted artifacts.
+- Explicit Admin and Developer dashboard entry routes: `/admin` focuses Admins on workspace settings, billing, members, and global controls, while `/developer` focuses Developers on PR Review, GitHub setup, repository automation, and review activity.
 - GitHub App install entry point, installation status, and repository metadata sync controls that are functional or explicitly disabled until backend support exists.
 - Clerk-backed sign-in, user menu, organizations/workspaces where enabled, and billing portal.
 - Clerk session-token verification for every dashboard API; production APIs must never trust client-provided user identity headers or environment-provided dashboard user IDs as authentication.

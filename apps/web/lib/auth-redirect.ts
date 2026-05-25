@@ -1,0 +1,62 @@
+import type { WorkspaceSettingsResponse } from "@firmcode/shared";
+import { createDashboardApiHeaders } from "./dashboard-api-proxy";
+
+export const ROLE_BASED_AUTH_REDIRECT_PATH = "/auth/redirect";
+
+type RoleBasedDashboardPath = "/admin" | "/developer";
+
+interface RoleBasedDashboardRedirectInput {
+  readonly requestUrl: string;
+  readonly env?: Record<string, string | undefined>;
+  readonly fetcher?: typeof fetch;
+}
+
+export async function resolveRoleBasedDashboardRedirect({
+  requestUrl,
+  env = process.env,
+  fetcher = fetch
+}: RoleBasedDashboardRedirectInput): Promise<URL> {
+  const requestBaseUrl = new URL(requestUrl);
+  const headers = await createDashboardApiHeaders(env, false);
+
+  if (headers === null) {
+    return new URL("/sign-in", requestBaseUrl);
+  }
+
+  try {
+    const response = await fetcher(new URL("/api/settings", getApiBaseUrl(env)), {
+      cache: "no-store",
+      headers
+    });
+
+    if (response.status === 401) {
+      return new URL("/sign-in", requestBaseUrl);
+    }
+
+    if (!response.ok) {
+      return new URL("/developer", requestBaseUrl);
+    }
+
+    const settings = (await response.json()) as Partial<WorkspaceSettingsResponse>;
+
+    return new URL(landingPathForDashboardRole(settings.workspace?.role), requestBaseUrl);
+  } catch {
+    return new URL("/developer", requestBaseUrl);
+  }
+}
+
+export function landingPathForDashboardRole(role: string | null | undefined): RoleBasedDashboardPath {
+  switch (role?.toLowerCase()) {
+    case "admin":
+    case "owner":
+      return "/admin";
+    case "developer":
+    case "member":
+    default:
+      return "/developer";
+  }
+}
+
+function getApiBaseUrl(env: Record<string, string | undefined>): string {
+  return env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+}
