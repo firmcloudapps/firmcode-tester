@@ -8,10 +8,12 @@ import {
   NotFoundException,
   Param,
   Patch,
+  Post,
   Query,
   UnauthorizedException
 } from "@nestjs/common";
 import type {
+  CodebaseScanEnqueueResponse,
   DashboardRepositoryListFilters,
   RepositoryActivityResponse,
   RepositoryDetailResponse,
@@ -25,6 +27,7 @@ import {
   type DashboardAuthStore,
   type DashboardMembership
 } from "../review-runs/dashboard-auth.store";
+import { CodebaseScanEnqueueService } from "../codebase-scans/codebase-scan-enqueue.service";
 import { RepositoryConfigurationService } from "./repository-configuration.service";
 import { REPOSITORIES_STORE, type RepositoriesStore } from "./repositories.store";
 
@@ -36,16 +39,20 @@ export class RepositoriesController {
   constructor(
     @Inject(REPOSITORIES_STORE) private readonly repositoriesStore: RepositoriesStore,
     @Inject(DASHBOARD_AUTH_STORE) dashboardAuthOrConfiguration: DashboardAuthStore | RepositoryConfigurationService = new EmptyDashboardAuthStore(),
-    configurationService?: RepositoryConfigurationService
+    configurationService?: RepositoryConfigurationService | CodebaseScanEnqueueService,
+    private readonly codebaseScanEnqueueService?: CodebaseScanEnqueueService
   ) {
     if (dashboardAuthOrConfiguration instanceof RepositoryConfigurationService) {
       this.dashboardAuthStore = new EmptyDashboardAuthStore();
       this.configurationService = dashboardAuthOrConfiguration;
+      this.codebaseScanEnqueueService =
+        configurationService instanceof CodebaseScanEnqueueService ? configurationService : undefined;
       return;
     }
 
     this.dashboardAuthStore = dashboardAuthOrConfiguration;
-    this.configurationService = configurationService;
+    this.configurationService =
+      configurationService instanceof RepositoryConfigurationService ? configurationService : undefined;
   }
 
   @Get()
@@ -131,6 +138,23 @@ export class RepositoriesController {
       workspaceId: readSingleValue(workspaceIdHeader) ?? null,
       clerkUserId: readSingleValue(userIdHeader) ?? null,
       body
+    });
+  }
+
+  @Post(":id/codebase-scans")
+  async enqueueCodebaseScan(
+    @Param("id") id: string,
+    @Headers("x-firmcode-workspace-id") workspaceIdHeader: string | string[] | undefined,
+    @Headers("x-firmcode-user-id") userIdHeader: string | string[] | undefined
+  ): Promise<CodebaseScanEnqueueResponse> {
+    if (this.codebaseScanEnqueueService === undefined) {
+      throw new NotFoundException("Repository not found");
+    }
+
+    return this.codebaseScanEnqueueService.enqueueManualScan({
+      repositoryId: id,
+      workspaceId: readSingleValue(workspaceIdHeader) ?? null,
+      clerkUserId: readSingleValue(userIdHeader) ?? null
     });
   }
 

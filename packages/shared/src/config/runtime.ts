@@ -79,6 +79,7 @@ export interface ApiRuntimeConfig {
   clerk: ClerkApiConfig;
   github: GitHubAppConfig | null;
   review: ReviewConfig;
+  codebaseScan: CodebaseScanConfig;
 }
 
 export interface ReviewConfig {
@@ -89,7 +90,12 @@ export interface ReviewConfig {
   largePullRequest: LargePullRequestThresholds;
 }
 
+export interface CodebaseScanConfig {
+  defaultCadenceHours: number;
+}
+
 export const DEFAULT_CI_LOG_MAX_BYTES = 20_000;
+export const DEFAULT_CODEBASE_SCAN_CADENCE_HOURS = 24;
 
 const BOOLEAN_VALUES = new Map<string, boolean>([
   ["true", true],
@@ -106,6 +112,7 @@ export function createApiRuntimeConfig(env: EnvironmentVariables): ApiRuntimeCon
   const clerk = readClerkApiConfig(env, issues);
   const github = readGitHubAppConfig(env, nodeEnv, issues);
   const review = readReviewConfig(env, issues);
+  const codebaseScan = readCodebaseScanConfig(env, issues);
   const port = readPort(env.PORT, 3001, issues);
   const publicApiUrl = readOptionalHttpUrl(env, "API_URL", issues);
 
@@ -122,7 +129,8 @@ export function createApiRuntimeConfig(env: EnvironmentVariables): ApiRuntimeCon
     queue,
     clerk,
     github,
-    review
+    review,
+    codebaseScan
   };
 }
 
@@ -438,6 +446,17 @@ function readReviewConfig(env: EnvironmentVariables, issues: ConfigValidationIss
         issues
       )
     }
+  };
+}
+
+function readCodebaseScanConfig(env: EnvironmentVariables, issues: ConfigValidationIssue[]): CodebaseScanConfig {
+  return {
+    defaultCadenceHours: readOptionalPositiveInteger(
+      env,
+      "CODEBASE_SCAN_DEFAULT_CADENCE_HOURS",
+      DEFAULT_CODEBASE_SCAN_CADENCE_HOURS,
+      issues
+    )
   };
 }
 

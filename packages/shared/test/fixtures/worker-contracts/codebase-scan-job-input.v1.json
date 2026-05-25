@@ -5,7 +5,8 @@
   "installationId": 101,
   "repositoryFullName": "openclaw/firmcode",
   "defaultBranch": "main",
-  "commitSha": "7f1c2a3b4d5e6f7890abcdef1234567890abcdef",
+  "commitSha": null,
   "trigger": "scheduled",
+  "correlationId": "scan-correlation-001",
   "requestedByClerkUserId": null
 }

@@ -4,6 +4,7 @@ import {
   Inject,
   Injectable,
   NotFoundException,
+  Optional,
   ServiceUnavailableException,
   UnauthorizedException
 } from "@nestjs/common";
@@ -32,6 +33,7 @@ import {
   type DashboardAuthStore,
   type DashboardMembership
 } from "../review-runs/dashboard-auth.store";
+import { CodebaseScanEnqueueService } from "../codebase-scans/codebase-scan-enqueue.service";
 import {
   GITHUB_DASHBOARD_STORE,
   toRepositorySyncResponse,
@@ -72,7 +74,8 @@ export class GitHubDashboardService {
     @Inject(DASHBOARD_AUTH_STORE) private readonly dashboardAuthStore: DashboardAuthStore,
     @Inject(GITHUB_ACCOUNT_CLIENT) private readonly accountClient: GitHubAccountClient,
     @Inject(GITHUB_INSTALLATION_SYNC_CLIENT) private readonly installationClient: GitHubInstallationSyncClient,
-    @Inject(API_RUNTIME_CONFIG) private readonly config: ApiRuntimeConfig
+    @Inject(API_RUNTIME_CONFIG) private readonly config: ApiRuntimeConfig,
+    @Optional() private readonly codebaseScanEnqueueService?: CodebaseScanEnqueueService
   ) {}
 
   async getOAuthStatus(input: GitHubDashboardContext): Promise<GitHubOAuthStatusResponse> {
@@ -220,6 +223,13 @@ export class GitHubDashboardService {
       preserveExistingEnabled: true
     });
 
+    if (synced.enabled) {
+      await this.codebaseScanEnqueueService?.enqueueInitialScanForRepository({
+        repositoryId: synced.id,
+        requestedByClerkUserId: membership.clerkUserId
+      });
+    }
+
     return toRepositorySyncResponse(synced);
   }
 
@@ -227,11 +237,17 @@ export class GitHubDashboardService {
     const repositories = await this.installationClient.fetchInstallationRepositories(installationId);
 
     for (const repository of repositories) {
-      await this.store.upsertInstallationRepository({
+      const synced = await this.store.upsertInstallationRepository({
         installationUuid,
         repository,
         preserveExistingEnabled: true
       });
+
+      if (synced.enabled) {
+        await this.codebaseScanEnqueueService?.enqueueInitialScanForRepository({
+          repositoryId: synced.id
+        });
+      }
     }
 
     return repositories.length;

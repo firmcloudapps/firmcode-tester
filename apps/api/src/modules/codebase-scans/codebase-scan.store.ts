@@ -16,6 +16,7 @@ export const CODEBASE_SCAN_STORE = Symbol("CODEBASE_SCAN_STORE");
 
 export interface CodebaseScanStore {
   createScanRun(input: CreateCodebaseScanRunInput): Promise<CodebaseScanRunRecord>;
+  createOrReuseActiveScanRun(input: CreateCodebaseScanRunInput): Promise<CodebaseScanRunCreationResult>;
   updateScanRun(input: UpdateCodebaseScanRunInput): Promise<CodebaseScanRunRecord | null>;
   upsertFinding(input: UpsertCodebaseScanFindingInput): Promise<CodebaseScanFindingRecord>;
   listOpenFindings(input: ListOpenCodebaseScanFindingsInput): Promise<CodebaseScanFindingRecord[]>;
@@ -26,10 +27,15 @@ export interface CreateCodebaseScanRunInput {
   readonly repositoryId: string;
   readonly trigger: WorkerCodebaseScanTrigger;
   readonly defaultBranch: string;
-  readonly commitSha: string;
+  readonly commitSha: string | null;
   readonly status?: WorkerCodebaseScanStatus;
   readonly metrics?: Record<string, unknown>;
   readonly artifacts?: readonly WorkerCodebaseScanArtifactMetadataItem[];
+}
+
+export interface CodebaseScanRunCreationResult {
+  readonly scanRun: CodebaseScanRunRecord;
+  readonly created: boolean;
 }
 
 export interface UpdateCodebaseScanRunInput {
@@ -78,7 +84,7 @@ export interface CodebaseScanRunRecord {
   readonly installationId: string;
   readonly trigger: WorkerCodebaseScanTrigger;
   readonly defaultBranch: string;
-  readonly commitSha: string;
+  readonly commitSha: string | null;
   readonly status: WorkerCodebaseScanStatus;
   readonly startedAt: string | null;
   readonly finishedAt: string | null;
@@ -119,7 +125,7 @@ interface CodebaseScanRunRow {
   readonly installation_id: string;
   readonly trigger: WorkerCodebaseScanTrigger;
   readonly default_branch: string;
-  readonly commit_sha: string;
+  readonly commit_sha: string | null;
   readonly status: WorkerCodebaseScanStatus;
   readonly started_at: Date | string | null;
   readonly finished_at: Date | string | null;
@@ -156,6 +162,10 @@ interface CodebaseScanFindingRow {
 
 export class EmptyCodebaseScanStore implements CodebaseScanStore {
   async createScanRun(_input: CreateCodebaseScanRunInput): Promise<CodebaseScanRunRecord> {
+    throw new Error("Codebase scan persistence is not configured.");
+  }
+
+  async createOrReuseActiveScanRun(_input: CreateCodebaseScanRunInput): Promise<CodebaseScanRunCreationResult> {
     throw new Error("Codebase scan persistence is not configured.");
   }
 
@@ -230,6 +240,26 @@ RETURNING *
     return toScanRun(row);
   }
 
+  async createOrReuseActiveScanRun(input: CreateCodebaseScanRunInput): Promise<CodebaseScanRunCreationResult> {
+    const existing = await this.findActiveScanRun(input);
+
+    if (existing !== null) {
+      return { scanRun: existing, created: false };
+    }
+
+    try {
+      return { scanRun: await this.createScanRun(input), created: true };
+    } catch (error) {
+      const raced = await this.findActiveScanRun(input);
+
+      if (raced !== null) {
+        return { scanRun: raced, created: false };
+      }
+
+      throw error;
+    }
+  }
+
   async updateScanRun(input: UpdateCodebaseScanRunInput): Promise<CodebaseScanRunRecord | null> {
     const assignments: string[] = ["updated_at = now()"];
     const values: unknown[] = [input.scanRunId];
@@ -269,6 +299,34 @@ WHERE id = $1
 RETURNING *
 `,
       values
+    );
+
+    return result.rows[0] === undefined ? null : toScanRun(result.rows[0]);
+  }
+
+  private async findActiveScanRun(input: CreateCodebaseScanRunInput): Promise<CodebaseScanRunRecord | null> {
+    const result = await this.database.query<CodebaseScanRunRow>(
+      input.commitSha === null
+        ? `
+SELECT *
+FROM codebase_scan_runs
+WHERE repository_id = $1
+  AND trigger = $2
+  AND commit_sha IS NULL
+  AND status IN ('queued', 'running')
+ORDER BY created_at ASC
+LIMIT 1
+`
+        : `
+SELECT *
+FROM codebase_scan_runs
+WHERE repository_id = $1
+  AND commit_sha = $2
+  AND status IN ('queued', 'running')
+ORDER BY created_at ASC
+LIMIT 1
+`,
+      input.commitSha === null ? [input.repositoryId, input.trigger] : [input.repositoryId, input.commitSha]
     );
 
     return result.rows[0] === undefined ? null : toScanRun(result.rows[0]);

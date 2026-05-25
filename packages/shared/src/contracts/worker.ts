@@ -377,13 +377,14 @@ export interface WorkerPublishPayload {
 
 export interface WorkerCodebaseScanJobInput {
   readonly schemaVersion: typeof WORKER_CODEBASE_SCAN_JOB_INPUT_SCHEMA_VERSION;
-  readonly scanRunId: string;
+  readonly scanRunId: string | null;
   readonly repositoryId: string;
   readonly installationId: number;
   readonly repositoryFullName: string;
   readonly defaultBranch: string;
-  readonly commitSha: string;
+  readonly commitSha: string | null;
   readonly trigger: WorkerCodebaseScanTrigger;
+  readonly correlationId: string;
   readonly requestedByClerkUserId: string | null;
 }
 
@@ -658,17 +659,19 @@ export const workerCodebaseScanJobInputJsonSchema = {
     "defaultBranch",
     "commitSha",
     "trigger",
+    "correlationId",
     "requestedByClerkUserId"
   ],
   properties: {
     schemaVersion: { const: WORKER_CODEBASE_SCAN_JOB_INPUT_SCHEMA_VERSION },
-    scanRunId: nonEmptyStringSchema,
+    scanRunId: nullableStringSchema,
     repositoryId: nonEmptyStringSchema,
     installationId: positiveIntegerSchema,
     repositoryFullName: nonEmptyStringSchema,
     defaultBranch: nonEmptyStringSchema,
-    commitSha: nonEmptyStringSchema,
+    commitSha: nullableStringSchema,
     trigger: codebaseScanTriggerSchema,
+    correlationId: nonEmptyStringSchema,
     requestedByClerkUserId: nullableStringSchema
   }
 } as const;

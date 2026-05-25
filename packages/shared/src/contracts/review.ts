@@ -102,6 +102,19 @@ export interface RepositoryActivityResponse {
   activity: RepositoryActivityItem[];
 }
 
+export interface CodebaseScanEnqueueResponse {
+  scanRunId: string;
+  jobId: string | null;
+  repositoryId: string;
+  repositoryFullName: string;
+  trigger: "install" | "scheduled" | "manual" | "push";
+  status: "queued" | "running" | "succeeded" | "failed" | "cancelled" | "superseded";
+  commitSha: string | null;
+  correlationId: string;
+  created: boolean;
+  duplicate: boolean;
+}
+
 export interface GitHubOAuthUserSummary {
   githubUserId: number;
   login: string;

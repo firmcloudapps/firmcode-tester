@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { Pool } from "pg";
 import type { ApiRuntimeConfig } from "@firmcode/shared";
 import { API_RUNTIME_CONFIG, apiRuntimeConfigProvider } from "../../config/api-config.provider";
+import { CodebaseScansModule } from "../codebase-scans/codebase-scans.module";
 import {
   GitHubApiAccountClient,
   GitHubAppInstallationSyncClient,
@@ -19,6 +20,7 @@ import { EmptyGitHubDashboardStore, GITHUB_DASHBOARD_STORE, PostgresGitHubDashbo
 import { GITHUB_ACCOUNT_CLIENT, GITHUB_INSTALLATION_SYNC_CLIENT } from "./github.tokens";
 
 @Module({
+  imports: [CodebaseScansModule],
   controllers: [GitHubDashboardController],
   providers: [
     apiRuntimeConfigProvider,

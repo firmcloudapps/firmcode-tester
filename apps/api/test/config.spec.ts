@@ -34,6 +34,7 @@ describe("API runtime config", () => {
     expect(config.review.dryRun).toBe(true);
     expect(config.review.ciLogMaxBytes).toBe(20_000);
     expect(config.review.largePullRequest.maxChangedFiles).toBe(100);
+    expect(config.codebaseScan.defaultCadenceHours).toBe(24);
   });
 
   it("accepts values copied with surrounding quotes from deployment UIs", () => {
@@ -162,6 +163,24 @@ describe("API runtime config", () => {
         REVIEW_CI_LOG_MAX_BYTES: "0"
       })
     ).toThrow(/REVIEW_CI_LOG_MAX_BYTES must be a positive integer/);
+  });
+
+  it("loads configurable codebase scan cadence", () => {
+    const config = createApiRuntimeConfig({
+      ...VALID_ENV,
+      CODEBASE_SCAN_DEFAULT_CADENCE_HOURS: "12"
+    });
+
+    expect(config.codebaseScan.defaultCadenceHours).toBe(12);
+  });
+
+  it("rejects invalid codebase scan cadence values", () => {
+    expect(() =>
+      createApiRuntimeConfig({
+        ...VALID_ENV,
+        CODEBASE_SCAN_DEFAULT_CADENCE_HOURS: "0"
+      })
+    ).toThrow(/CODEBASE_SCAN_DEFAULT_CADENCE_HOURS must be a positive integer/);
   });
 });
 

@@ -135,6 +135,9 @@ const testConfig: ApiRuntimeConfig = {
       summaryOnlyEstimatedTokens: 80_000,
       maxFullContextFiles: 8
     }
+  },
+  codebaseScan: {
+    defaultCadenceHours: 24
   }
 };
 

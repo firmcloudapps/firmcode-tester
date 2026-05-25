@@ -7,6 +7,11 @@ import {
 import { newDb } from "pg-mem";
 import type { ApiRuntimeConfig } from "@firmcode/shared";
 import { runDatabaseMigrations } from "../src/infrastructure/database/migrations";
+import {
+  CodebaseScanEnqueueService,
+  PostgresCodebaseScanTargetStore
+} from "../src/modules/codebase-scans/codebase-scan-enqueue.service";
+import { PostgresCodebaseScanStore } from "../src/modules/codebase-scans/codebase-scan.store";
 import type {
   GitHubAccountClient,
   GitHubInstallationMetadata,
@@ -18,6 +23,7 @@ import type {
 import { GitHubDashboardController } from "../src/modules/github/github.controller";
 import { GitHubDashboardService } from "../src/modules/github/github.service";
 import { PostgresGitHubDashboardStore } from "../src/modules/github/github.store";
+import { InMemoryCodebaseScanQueueProducer } from "../src/modules/queues/codebase-scan-queue";
 import { PostgresDashboardAuthStore } from "../src/modules/review-runs/dashboard-auth.store";
 
 interface PgPoolLike {
@@ -47,6 +53,7 @@ describe("GitHub OAuth, installation, and repository sync API", () => {
   let controller: GitHubDashboardController;
   let accountClient: FakeGitHubAccountClient;
   let installationClient: FakeGitHubInstallationSyncClient;
+  let scanQueue: InMemoryCodebaseScanQueueProducer;
 
   beforeEach(async () => {
     pool = createTestPool();
@@ -54,14 +61,25 @@ describe("GitHub OAuth, installation, and repository sync API", () => {
     await seedGitHubDashboardData(pool);
     accountClient = new FakeGitHubAccountClient();
     installationClient = new FakeGitHubInstallationSyncClient();
+    scanQueue = new InMemoryCodebaseScanQueueProducer();
+    const dashboardAuthStore = new PostgresDashboardAuthStore(pool);
+    const scanEnqueueService = new CodebaseScanEnqueueService(
+      new PostgresCodebaseScanStore(pool, deterministicScanId()),
+      new PostgresCodebaseScanTargetStore(pool),
+      scanQueue,
+      dashboardAuthStore,
+      testConfig,
+      deterministicCorrelationId()
+    );
 
     controller = new GitHubDashboardController(
       new GitHubDashboardService(
         new PostgresGitHubDashboardStore(pool, deterministicId()),
-        new PostgresDashboardAuthStore(pool),
+        dashboardAuthStore,
         accountClient,
         installationClient,
-        testConfig
+        testConfig,
+        scanEnqueueService
       )
     );
   });
@@ -169,6 +187,27 @@ ORDER BY full_name
       { full_name: "openclaw/new-service", enabled: true }
     ]);
     expect(installationClient.installationRepositoryFetches).toBe(2);
+    expect(scanQueue.jobs).toHaveLength(2);
+    expect(scanQueue.schedules).toHaveLength(2);
+
+    const scanRows = await pool.query<{ repository_id: string; trigger: string; status: string; commit_sha: string | null }>(
+      "SELECT repository_id, trigger, status, commit_sha FROM codebase_scan_runs ORDER BY repository_id"
+    );
+
+    expect(scanRows.rows).toEqual([
+      {
+        repository_id: REPOSITORY_ID,
+        trigger: "install",
+        status: "queued",
+        commit_sha: null
+      },
+      {
+        repository_id: "00000000-0000-4000-8000-000000000902",
+        trigger: "install",
+        status: "queued",
+        commit_sha: null
+      }
+    ]);
   });
 
   it("syncs a single workspace-owned repository and preserves automation state", async () => {
@@ -198,6 +237,8 @@ ORDER BY full_name
       enabled: false
     });
     expect(rows.rows).toEqual([{ full_name: "openclaw/firmcode-renamed", enabled: false, default_branch: "trunk" }]);
+    expect(scanQueue.jobs).toHaveLength(0);
+    expect(scanQueue.schedules).toHaveLength(0);
   });
 
   it("denies role, cross-workspace, and missing installation sync attempts", async () => {
@@ -424,6 +465,9 @@ const testConfig: ApiRuntimeConfig = {
       summaryOnlyEstimatedTokens: 80_000,
       maxFullContextFiles: 8
     }
+  },
+  codebaseScan: {
+    defaultCadenceHours: 24
   }
 };
 
@@ -431,6 +475,18 @@ function deterministicId(): () => string {
   let next = 900;
 
   return () => `00000000-0000-4000-8000-${String(next++).padStart(12, "0")}`;
+}
+
+function deterministicScanId(): () => string {
+  let next = 950;
+
+  return () => `00000000-0000-4000-8000-${String(next++).padStart(12, "0")}`;
+}
+
+function deterministicCorrelationId(): () => string {
+  let next = 1;
+
+  return () => `scan-correlation-${next++}`;
 }
 
 async function seedGitHubDashboardData(pool: PgPoolLike): Promise<void> {
