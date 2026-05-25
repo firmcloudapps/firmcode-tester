@@ -6,6 +6,7 @@ export type DashboardRole = "owner" | "admin" | "developer" | "viewer";
 export type DashboardCapability =
   | "retry_review_run"
   | "trigger_codebase_scan"
+  | "manage_codebase_scan_findings"
   | "manage_repository_configuration"
   | "manage_review_policies"
   | "manage_sensitive_settings"
@@ -39,6 +40,8 @@ export function roleHasDashboardCapability(
       return role === "owner" || role === "admin" || role === "developer";
     case "trigger_codebase_scan":
       return role === "owner" || role === "admin" || role === "developer";
+    case "manage_codebase_scan_findings":
+      return role === "owner" || role === "admin";
     case "manage_repository_configuration":
       return role === "owner" || role === "admin";
     case "manage_review_policies":

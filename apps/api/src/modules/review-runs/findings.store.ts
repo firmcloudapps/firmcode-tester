@@ -1,4 +1,6 @@
 import type {
+  CodebaseScanFindingInboxItem,
+  CodebaseScanStatus,
   FindingInboxItem,
   FindingsListFilters,
   FindingsListResponse,
@@ -12,8 +14,14 @@ import type { DatabaseExecutor } from "../../infrastructure/database/migrations"
 
 export const FINDINGS_STORE = Symbol("FINDINGS_STORE");
 
+export interface ListFindingsInput {
+  readonly workspaceId: string;
+  readonly filters: FindingsListFilters;
+  readonly canManageCodebaseFindings: boolean;
+}
+
 export interface FindingsStore {
-  listFindings(filters: FindingsListFilters): Promise<FindingsListResponse>;
+  listFindings(input: ListFindingsInput): Promise<FindingsListResponse>;
 }
 
 interface FindingInboxRow {
@@ -42,17 +50,57 @@ interface FindingInboxRow {
   readonly github_comment_id: string | number | null;
 }
 
+interface CodebaseFindingInboxRow {
+  readonly id: string;
+  readonly scan_run_id: string;
+  readonly repository_id: string;
+  readonly repository_full_name: string;
+  readonly scan_status: CodebaseScanStatus;
+  readonly source: CodebaseScanFindingInboxItem["source"];
+  readonly category: CodebaseScanFindingInboxItem["category"];
+  readonly severity: CodebaseScanFindingInboxItem["severity"];
+  readonly confidence: CodebaseScanFindingInboxItem["confidence"];
+  readonly file_path: string | null;
+  readonly start_line: number | null;
+  readonly end_line: number | null;
+  readonly title: string;
+  readonly body: string;
+  readonly evidence_json: unknown;
+  readonly recommendation: string | null;
+  readonly dedupe_key: string;
+  readonly status: CodebaseScanFindingInboxItem["status"];
+  readonly scan_created_at: Date | string | null;
+  readonly created_at: Date | string | null;
+  readonly updated_at: Date | string | null;
+}
+
 export class EmptyFindingsStore implements FindingsStore {
-  async listFindings(filters: FindingsListFilters): Promise<FindingsListResponse> {
-    return { findings: [], filters };
+  async listFindings(input: ListFindingsInput): Promise<FindingsListResponse> {
+    return {
+      findings: [],
+      filters: input.filters,
+      permissions: { canManageCodebaseFindings: input.canManageCodebaseFindings }
+    };
   }
 }
 
 export class PostgresFindingsStore implements FindingsStore {
   constructor(private readonly database: DatabaseExecutor) {}
 
-  async listFindings(filters: FindingsListFilters): Promise<FindingsListResponse> {
-    const { whereSql, values } = buildFindingsWhereClause(filters);
+  async listFindings(input: ListFindingsInput): Promise<FindingsListResponse> {
+    const pullRequestFindings = input.filters.findingType === "codebase_scan" ? [] : await this.listPullRequestFindings(input);
+    const codebaseFindings = input.filters.findingType === "pull_request" ? [] : await this.listCodebaseFindings(input);
+    const findings = [...pullRequestFindings, ...codebaseFindings].sort(compareFindings).slice(0, 200);
+
+    return {
+      findings,
+      filters: input.filters,
+      permissions: { canManageCodebaseFindings: input.canManageCodebaseFindings }
+    };
+  }
+
+  private async listPullRequestFindings(input: ListFindingsInput): Promise<FindingInboxItem[]> {
+    const { whereSql, values } = buildPullRequestFindingsWhereClause(input.workspaceId, input.filters);
     const result = await this.database.query<FindingInboxRow>(
       `
 SELECT
@@ -82,6 +130,7 @@ SELECT
 FROM findings f
 JOIN review_runs rr ON rr.id = f.review_run_id
 JOIN repositories r ON r.id = rr.repository_id
+JOIN github_installations gi ON gi.id = r.installation_id
 JOIN pull_requests pr ON pr.id = rr.pull_request_id
 LEFT JOIN published_comments pc ON pc.finding_id = f.id AND pc.comment_type = 'inline'
 ${whereSql}
@@ -100,39 +149,64 @@ LIMIT 200
       values
     );
 
-    return {
-      findings: result.rows.map(toFindingInboxItem),
-      filters
-    };
+    return result.rows.map(toFindingInboxItem);
+  }
+
+  private async listCodebaseFindings(input: ListFindingsInput): Promise<CodebaseScanFindingInboxItem[]> {
+    const { whereSql, values } = buildCodebaseFindingsWhereClause(input.workspaceId, input.filters);
+    const result = await this.database.query<CodebaseFindingInboxRow>(
+      `
+SELECT
+  csf.id,
+  csf.scan_run_id,
+  csf.repository_id,
+  r.full_name AS repository_full_name,
+  csr.status AS scan_status,
+  csf.source,
+  csf.category,
+  csf.severity,
+  csf.confidence,
+  csf.file_path,
+  csf.start_line,
+  csf.end_line,
+  csf.title,
+  csf.body,
+  csf.evidence_json,
+  csf.recommendation,
+  csf.dedupe_key,
+  csf.status,
+  csr.created_at AS scan_created_at,
+  csf.created_at,
+  csf.updated_at
+FROM codebase_scan_findings csf
+JOIN codebase_scan_runs csr ON csr.id = csf.scan_run_id
+JOIN repositories r ON r.id = csf.repository_id
+JOIN github_installations gi ON gi.id = r.installation_id
+${whereSql}
+ORDER BY
+  CASE csf.severity
+    WHEN 'critical' THEN 0
+    WHEN 'high' THEN 1
+    WHEN 'medium' THEN 2
+    WHEN 'low' THEN 3
+    ELSE 4
+  END,
+  csf.last_seen_at DESC,
+  csf.file_path ASC
+LIMIT 200
+`,
+      values
+    );
+
+    return result.rows.map(toCodebaseFindingInboxItem);
   }
 }
 
-function buildFindingsWhereClause(filters: FindingsListFilters): { whereSql: string; values: unknown[] } {
-  const conditions: string[] = [];
-  const values: unknown[] = [];
+function buildPullRequestFindingsWhereClause(workspaceId: string, filters: FindingsListFilters): { whereSql: string; values: unknown[] } {
+  const conditions: string[] = ["gi.workspace_id = $1"];
+  const values: unknown[] = [workspaceId];
 
-  if (filters.severity !== undefined) {
-    values.push(filters.severity);
-    conditions.push(`f.severity = $${values.length}`);
-  }
-
-  if (filters.source !== undefined) {
-    values.push(filters.source);
-    conditions.push(`f.source = $${values.length}`);
-  }
-
-  if (filters.category !== undefined) {
-    values.push(filters.category);
-    conditions.push(`f.category = $${values.length}`);
-  }
-
-  if (filters.repositoryId !== undefined) {
-    values.push(filters.repositoryId);
-    conditions.push(`rr.repository_id = $${values.length}`);
-  } else if (filters.repository !== undefined) {
-    values.push(filters.repository);
-    conditions.push(`lower(r.full_name) = lower($${values.length})`);
-  }
+  appendSharedFindingFilters("f", "rr", "r", conditions, values, filters);
 
   if (filters.status !== undefined) {
     if (filters.status === "posted") {
@@ -148,20 +222,77 @@ function buildFindingsWhereClause(filters: FindingsListFilters): { whereSql: str
     conditions.push(filters.postedInline ? "pc.finding_id IS NOT NULL" : "pc.finding_id IS NULL");
   }
 
+  return {
+    whereSql: `WHERE ${conditions.join(" AND ")}`,
+    values
+  };
+}
+
+function buildCodebaseFindingsWhereClause(workspaceId: string, filters: FindingsListFilters): { whereSql: string; values: unknown[] } {
+  const conditions: string[] = ["gi.workspace_id = $1"];
+  const values: unknown[] = [workspaceId];
+
+  appendSharedFindingFilters("csf", "csf", "r", conditions, values, filters);
+
+  if (filters.status !== undefined) {
+    if (filters.status === "posted") {
+      conditions.push("1 = 0");
+    } else {
+      values.push(filters.status);
+      conditions.push(`csf.status = $${values.length}`);
+    }
+  }
+
+  if (filters.postedInline === true) {
+    conditions.push("1 = 0");
+  }
+
+  return {
+    whereSql: `WHERE ${conditions.join(" AND ")}`,
+    values
+  };
+}
+
+function appendSharedFindingFilters(
+  findingAlias: string,
+  repositoryIdAlias: string,
+  repositoryAlias: string,
+  conditions: string[],
+  values: unknown[],
+  filters: FindingsListFilters
+): void {
+  if (filters.severity !== undefined) {
+    values.push(filters.severity);
+    conditions.push(`${findingAlias}.severity = $${values.length}`);
+  }
+
+  if (filters.source !== undefined) {
+    values.push(filters.source);
+    conditions.push(`${findingAlias}.source = $${values.length}`);
+  }
+
+  if (filters.category !== undefined) {
+    values.push(filters.category);
+    conditions.push(`${findingAlias}.category = $${values.length}`);
+  }
+
+  if (filters.repositoryId !== undefined) {
+    values.push(filters.repositoryId);
+    conditions.push(`${repositoryIdAlias}.repository_id = $${values.length}`);
+  } else if (filters.repository !== undefined) {
+    values.push(filters.repository);
+    conditions.push(`lower(${repositoryAlias}.full_name) = lower($${values.length})`);
+  }
+
   if (filters.dateFrom !== undefined) {
     values.push(filters.dateFrom);
-    conditions.push(`f.created_at >= $${values.length}`);
+    conditions.push(`${findingAlias}.created_at >= $${values.length}`);
   }
 
   if (filters.dateTo !== undefined) {
     values.push(filters.dateTo);
-    conditions.push(`f.created_at <= $${values.length}`);
+    conditions.push(`${findingAlias}.created_at <= $${values.length}`);
   }
-
-  return {
-    whereSql: conditions.length === 0 ? "" : `WHERE ${conditions.join(" AND ")}`,
-    values
-  };
 }
 
 function toFindingInboxItem(row: FindingInboxRow): FindingInboxItem {
@@ -169,12 +300,15 @@ function toFindingInboxItem(row: FindingInboxRow): FindingInboxItem {
   const evidence = Array.isArray(row.evidence_json) ? row.evidence_json : [];
 
   return {
+    findingType: "pull_request",
     id: row.id,
     reviewRunId: row.review_run_id,
+    scanRunId: null,
     repositoryId: row.repository_id,
     repositoryFullName: row.repository_full_name,
     pullRequestNumber: row.pull_request_number,
     pullRequestTitle: row.pull_request_title,
+    scanStatus: null,
     source: row.source,
     category: row.category,
     severity: row.severity,
@@ -195,8 +329,74 @@ function toFindingInboxItem(row: FindingInboxRow): FindingInboxItem {
     githubCommentUrl: buildGitHubCommentUrl(row.repository_full_name, row.pull_request_number, row.github_comment_id),
     postedAt: toIsoString(row.posted_at),
     createdAt: toRequiredIsoString(row.finding_created_at),
-    reviewRunCreatedAt: toRequiredIsoString(row.review_run_created_at)
+    reviewRunCreatedAt: toRequiredIsoString(row.review_run_created_at),
+    scanRunCreatedAt: null,
+    statusUpdatedAt: null
   };
+}
+
+function toCodebaseFindingInboxItem(row: CodebaseFindingInboxRow): CodebaseScanFindingInboxItem {
+  const evidence = Array.isArray(row.evidence_json) ? row.evidence_json : [];
+
+  return {
+    findingType: "codebase_scan",
+    id: row.id,
+    reviewRunId: null,
+    scanRunId: row.scan_run_id,
+    repositoryId: row.repository_id,
+    repositoryFullName: row.repository_full_name,
+    pullRequestNumber: null,
+    pullRequestTitle: null,
+    scanStatus: row.scan_status,
+    source: row.source,
+    category: row.category,
+    severity: row.severity,
+    confidence: row.confidence,
+    filePath: row.file_path,
+    startLine: row.start_line,
+    endLine: row.end_line,
+    title: row.title,
+    body: row.body,
+    evidence,
+    suggestion: row.recommendation,
+    dedupeKey: row.dedupe_key,
+    postAsInline: false,
+    postedInline: false,
+    status: row.status,
+    semgrepRuleId: findSemgrepRuleId(evidence),
+    githubCommentId: null,
+    githubCommentUrl: null,
+    postedAt: null,
+    createdAt: toRequiredIsoString(row.created_at),
+    reviewRunCreatedAt: null,
+    scanRunCreatedAt: toRequiredIsoString(row.scan_created_at),
+    statusUpdatedAt: toRequiredIsoString(row.updated_at)
+  };
+}
+
+function compareFindings(left: FindingInboxItem, right: FindingInboxItem): number {
+  const severityDelta = severityRank(left.severity) - severityRank(right.severity);
+
+  if (severityDelta !== 0) {
+    return severityDelta;
+  }
+
+  return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime();
+}
+
+function severityRank(severity: ReviewFindingSeverity): number {
+  switch (severity) {
+    case "critical":
+      return 0;
+    case "high":
+      return 1;
+    case "medium":
+      return 2;
+    case "low":
+      return 3;
+    case "info":
+      return 4;
+  }
 }
 
 function deriveFindingStatus(postedInline: boolean): ReviewFindingStatus {

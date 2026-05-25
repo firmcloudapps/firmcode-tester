@@ -1,21 +1,24 @@
 import React from "react";
-import type { RepositoryDetailResponse, RepositoryReviewConfiguration } from "@firmcode/shared";
+import type { RepositoryDetailResponse } from "@firmcode/shared";
 import type { ViewState } from "../../lib/view-state";
 import { BooleanBadge, SeverityBadge, StatusBadge } from "./status-badge";
 import { formatDateTime, shortSha } from "./format";
 import { RepositoryAutomationToggle } from "./repository-automation-toggle";
+import { ManualCodebaseScanButton } from "./manual-codebase-scan-button";
+import { RepositoryConfigurationForm } from "./repository-configuration-form";
 
 interface RepositoryDetailViewProps {
   state: ViewState<RepositoryDetailResponse>;
   activeTab: RepositoryDetailTab;
 }
 
-export type RepositoryDetailTab = "overview" | "pull-requests" | "findings" | "configuration" | "activity";
+export type RepositoryDetailTab = "overview" | "pull-requests" | "findings" | "scans" | "configuration" | "activity";
 
 const tabs: Array<{ id: RepositoryDetailTab; label: string }> = [
   { id: "overview", label: "Overview" },
   { id: "pull-requests", label: "Pull Requests" },
   { id: "findings", label: "Findings" },
+  { id: "scans", label: "Scans" },
   { id: "configuration", label: "Configuration" },
   { id: "activity", label: "Activity" }
 ];
@@ -42,6 +45,7 @@ export function RepositoryDetailView({ state, activeTab }: RepositoryDetailViewP
       {activeTab === "overview" ? <OverviewTab data={data} /> : null}
       {activeTab === "pull-requests" ? <PullRequestsTab data={data} /> : null}
       {activeTab === "findings" ? <FindingsTab data={data} /> : null}
+      {activeTab === "scans" ? <ScansTab data={data} /> : null}
       {activeTab === "configuration" ? <ConfigurationTab data={data} /> : null}
       {activeTab === "activity" ? <ActivityTab data={data} /> : null}
     </div>
@@ -102,6 +106,12 @@ function OverviewTab({ data }: { data: RepositoryDetailResponse }) {
   return (
     <div className="grid gap-4 lg:grid-cols-3">
       <Metric label="Open findings" value={String(data.repository.openFindingsCount)} helper="Active review findings" />
+      <Metric label="Codebase findings" value={String(data.repository.openCodebaseFindingsCount ?? 0)} helper="Open background scan findings" />
+      <Metric
+        label="Latest scan"
+        value={data.repository.codebaseScan?.latestScanStatus ?? "none"}
+        helper={formatDateTime(data.repository.codebaseScan?.latestScanFinishedAt ?? data.repository.codebaseScan?.latestScanCreatedAt ?? null)}
+      />
       <Metric label="Pull requests" value={String(data.pullRequests.length)} helper="Tracked by webhooks" />
       <Metric label="Review runs" value={String(data.reviewRuns.length)} helper="Recent review executions" />
       <section className="rounded-lg border border-border bg-surface p-4 lg:col-span-2">
@@ -127,6 +137,8 @@ function OverviewTab({ data }: { data: RepositoryDetailResponse }) {
         <h2 className="text-sm font-semibold text-primary">Configuration summary</h2>
         <dl className="mt-3 space-y-2 text-sm">
           <KeyValue label="Severity threshold" value={data.configuration.severityThreshold} />
+          <KeyValue label="Codebase scans" value={(data.configuration.codebaseScanEnabled ?? true) ? "Enabled" : "Disabled"} />
+          <KeyValue label="Scan cadence" value={`${data.configuration.codebaseScanCadenceHours ?? 24}h`} />
           <KeyValue label="Max inline comments" value={String(data.configuration.maxInlineComments)} />
           <KeyValue label="Dry run" value={data.configuration.dryRunEnabled ? "Enabled" : "Disabled"} />
         </dl>
@@ -209,6 +221,84 @@ function FindingsTab({ data }: { data: RepositoryDetailResponse }) {
   );
 }
 
+function ScansTab({ data }: { data: RepositoryDetailResponse }) {
+  return (
+    <div className="space-y-4">
+      <section className="rounded-lg border border-border bg-surface p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 className="text-sm font-semibold text-primary">Codebase scans</h2>
+            <p className="mt-1 text-sm leading-6 text-secondary">
+              Recent scheduled, install, push, and manual scans for the default branch.
+            </p>
+          </div>
+          <ManualCodebaseScanButton
+            repositoryId={data.repository.id}
+            disabled={!data.permissions.canTriggerCodebaseScans || !data.configuration.automationEnabled || !(data.configuration.codebaseScanEnabled ?? true)}
+            disabledReason="Developer, Admin, or Owner access and enabled scan configuration are required."
+          />
+        </div>
+      </section>
+      {(data.codebaseScans ?? []).length === 0 ? (
+        <EmptyPanel title="No codebase scans yet" body="A scan will appear after repository automation schedules or queues background analysis." />
+      ) : (
+        <section className="overflow-hidden rounded-lg border border-border bg-surface">
+          <table className="min-w-full divide-y divide-border text-sm">
+            <thead className="bg-subtle text-left text-xs font-semibold uppercase text-secondary">
+              <tr>
+                <th className="px-4 py-3">Scan</th>
+                <th className="px-4 py-3">Trigger</th>
+                <th className="px-4 py-3">Commit</th>
+                <th className="px-4 py-3">Findings</th>
+                <th className="px-4 py-3">Finished</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {(data.codebaseScans ?? []).map((scan) => (
+                <tr key={scan.id}>
+                  <td className="px-4 py-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <StatusBadge status={scan.status} />
+                      <span className="font-mono text-xs text-secondary">{scan.id.slice(0, 8)}</span>
+                    </div>
+                    {scan.errorMessage === null ? null : <p className="mt-1 text-xs text-red-700">{scan.errorMessage}</p>}
+                  </td>
+                  <td className="px-4 py-3 text-primary">{scan.trigger}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-primary">{scan.commitSha === null ? scan.defaultBranch : shortSha(scan.commitSha)}</td>
+                  <td className="px-4 py-3 text-primary">{scan.openFindingsCount} open / {scan.findingsCount} total</td>
+                  <td className="px-4 py-3 text-secondary">{formatDateTime(scan.finishedAt ?? scan.createdAt)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
+      {(data.codebaseFindings ?? []).length === 0 ? (
+        <EmptyPanel title="No open scan findings" body="Open repository-level findings from background scans will appear here." />
+      ) : (
+        <div className="grid gap-3">
+          {(data.codebaseFindings ?? []).map((finding) => (
+            <article key={finding.id} className="rounded-lg border border-border bg-surface p-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <SeverityBadge severity={finding.severity} />
+                <span className="rounded-md border border-border bg-subtle px-2 py-1 text-xs font-medium text-secondary">{finding.source}</span>
+                <a className="ml-auto text-xs font-medium text-accent" href={`/findings?findingType=codebase_scan&repositoryId=${encodeURIComponent(finding.repositoryId)}`}>
+                  Findings inbox
+                </a>
+              </div>
+              <h2 className="mt-3 text-sm font-semibold text-primary">{finding.title}</h2>
+              <p className="mt-2 text-sm leading-6 text-secondary">{finding.body}</p>
+              <p className="mt-2 font-mono text-xs text-secondary">
+                {finding.startLine === null ? finding.filePath ?? "repository summary" : `${finding.filePath ?? "repository summary"}:${finding.startLine}`}
+              </p>
+            </article>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ConfigurationTab({ data }: { data: RepositoryDetailResponse }) {
   const canManage = data.permissions.canManageConfiguration;
 
@@ -234,61 +324,8 @@ function ConfigurationTab({ data }: { data: RepositoryDetailResponse }) {
           </button>
         )}
       </div>
-      <ConfigurationFields configuration={data.configuration} readOnly={!canManage} />
+      <RepositoryConfigurationForm repositoryId={data.repository.id} initialConfiguration={data.configuration} readOnly={!canManage} />
     </section>
-  );
-}
-
-function ConfigurationFields({
-  configuration,
-  readOnly
-}: {
-  configuration: RepositoryReviewConfiguration;
-  readOnly: boolean;
-}) {
-  const checkboxFields = [
-    ["draftPullRequestReviewsEnabled", "Draft PR reviews", configuration.draftPullRequestReviewsEnabled],
-    ["semgrepEnabled", "Semgrep", configuration.semgrepEnabled],
-    ["treeSitterEnabled", "Tree-sitter", configuration.treeSitterEnabled],
-    ["ciExplanationEnabled", "CI explanations", configuration.ciExplanationEnabled],
-    ["infrastructureReviewEnabled", "Infrastructure review", configuration.infrastructureReviewEnabled],
-    ["dryRunEnabled", "Dry run", configuration.dryRunEnabled]
-  ] as const;
-
-  return (
-    <form className="mt-4 grid gap-4 md:grid-cols-2" aria-label="Repository review configuration">
-      <label className="flex flex-col gap-1 text-sm font-medium text-primary">
-        Severity threshold
-        <select
-          className="rounded-md border border-border bg-surface px-3 py-2 text-sm text-primary disabled:bg-subtle disabled:text-secondary"
-          name="severityThreshold"
-          defaultValue={configuration.severityThreshold}
-          disabled={readOnly}
-        >
-          {["info", "low", "medium", "high", "critical"].map((severity) => (
-            <option key={severity} value={severity}>{severity}</option>
-          ))}
-        </select>
-      </label>
-      <label className="flex flex-col gap-1 text-sm font-medium text-primary">
-        Max inline comments
-        <input
-          className="rounded-md border border-border bg-surface px-3 py-2 text-sm text-primary disabled:bg-subtle disabled:text-secondary"
-          name="maxInlineComments"
-          type="number"
-          min="0"
-          max="50"
-          defaultValue={configuration.maxInlineComments}
-          disabled={readOnly}
-        />
-      </label>
-      {checkboxFields.map(([name, label, checked]) => (
-        <label key={name} className="flex items-center gap-3 rounded-md border border-border bg-shell px-3 py-2 text-sm font-medium text-primary">
-          <input className="h-4 w-4 accent-accent" name={name} type="checkbox" defaultChecked={checked} disabled={readOnly} />
-          {label}
-        </label>
-      ))}
-    </form>
   );
 }
 

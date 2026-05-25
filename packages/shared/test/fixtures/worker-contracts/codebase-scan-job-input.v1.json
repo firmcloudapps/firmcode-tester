@@ -8,5 +8,11 @@
   "commitSha": null,
   "trigger": "scheduled",
   "correlationId": "scan-correlation-001",
-  "requestedByClerkUserId": null
+  "requestedByClerkUserId": null,
+  "scanConfig": {
+    "ignoredPaths": ["dist/**", "coverage/**"],
+    "severityThreshold": "medium",
+    "maxFiles": 500,
+    "maxBytes": 10000000
+  }
 }

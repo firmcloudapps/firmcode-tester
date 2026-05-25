@@ -1,8 +1,8 @@
 import React from "react";
 import {
   REVIEW_FINDING_CATEGORIES,
+  FINDING_INBOX_SOURCES,
   REVIEW_FINDING_SEVERITIES,
-  REVIEW_FINDING_SOURCES,
   REVIEW_FINDING_STATUSES,
   type FindingInboxItem,
   type FindingsListFilters,
@@ -52,8 +52,9 @@ function getStateFilters(state: ViewState<FindingsListResponse>): FindingsListFi
 function FindingsFilters({ filters }: { filters: FindingsListFilters }) {
   return (
     <form className="grid gap-3 rounded-lg border border-border bg-surface p-4 md:grid-cols-8" action="/findings">
+      <FilterSelect label="Type" name="findingType" options={["pull_request", "codebase_scan"]} value={filters.findingType} />
       <FilterSelect label="Severity" name="severity" options={REVIEW_FINDING_SEVERITIES} value={filters.severity} />
-      <FilterSelect label="Source" name="source" options={REVIEW_FINDING_SOURCES} value={filters.source} />
+      <FilterSelect label="Source" name="source" options={FINDING_INBOX_SOURCES} value={filters.source} />
       <FilterSelect label="Category" name="category" options={REVIEW_FINDING_CATEGORIES} value={filters.category} />
       <label className="flex flex-col gap-1 text-sm font-medium text-primary md:col-span-2">
         Repository
@@ -198,9 +199,7 @@ function FindingRow({ finding }: { finding: FindingInboxItem }) {
         <div className="min-w-0">
           <div className="font-medium text-primary">{finding.title}</div>
           <div className="mt-1 truncate font-mono text-xs text-secondary">{finding.filePath ?? "summary"}</div>
-          <div className="mt-1 truncate text-xs text-secondary">
-            {finding.repositoryFullName} / PR #{finding.pullRequestNumber}
-          </div>
+          <div className="mt-1 truncate text-xs text-secondary">{formatFindingContext(finding)}</div>
         </div>
         <div className="font-mono text-xs text-primary">{formatLine(finding)}</div>
         <div>
@@ -243,9 +242,16 @@ function FindingRow({ finding }: { finding: FindingInboxItem }) {
               <Metadata label="Posted" value={finding.postedAt === null ? "Not posted" : formatDateTime(finding.postedAt)} />
             </dl>
             <div className="mt-4 flex flex-wrap gap-2">
-              <a className="rounded-md border border-border px-2 py-1 text-xs font-medium text-primary" href={`/review-runs/${finding.reviewRunId}`}>
-                Review run
-              </a>
+              {finding.reviewRunId === null ? null : (
+                <a className="rounded-md border border-border px-2 py-1 text-xs font-medium text-primary" href={`/review-runs/${finding.reviewRunId}`}>
+                  Review run
+                </a>
+              )}
+              {finding.scanRunId === null ? null : (
+                <a className="rounded-md border border-border px-2 py-1 text-xs font-medium text-primary" href={`/repositories/${encodeURIComponent(finding.repositoryId)}?tab=scans`}>
+                  Scan run
+                </a>
+              )}
               {finding.githubCommentUrl === null ? null : (
                 <a className="rounded-md border border-border px-2 py-1 text-xs font-medium text-primary" href={finding.githubCommentUrl}>
                   GitHub comment
@@ -257,6 +263,12 @@ function FindingRow({ finding }: { finding: FindingInboxItem }) {
       </details>
     </article>
   );
+}
+
+function formatFindingContext(finding: FindingInboxItem): string {
+  return finding.pullRequestNumber === null
+    ? `${finding.repositoryFullName} / codebase scan`
+    : `${finding.repositoryFullName} / PR #${finding.pullRequestNumber}`;
 }
 
 function DetailBlock({ children, title }: { children: React.ReactNode; title: string }) {

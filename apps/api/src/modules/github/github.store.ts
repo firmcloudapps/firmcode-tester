@@ -531,7 +531,18 @@ function toRepositoryListItem(row: RepositoryRow): RepositoryListItem {
     enabled: row.enabled,
     primaryLanguage: null,
     openFindingsCount: 0,
+    openCodebaseFindingsCount: 0,
     lastReview: null,
+    codebaseScan: {
+      latestScanRunId: null,
+      latestScanStatus: null,
+      latestScanTrigger: null,
+      latestScanCommitSha: null,
+      latestScanStartedAt: null,
+      latestScanFinishedAt: null,
+      latestScanCreatedAt: null,
+      openCodebaseFindingsCount: 0
+    },
     updatedAt: toIsoString(row.updated_at)
   };
 }

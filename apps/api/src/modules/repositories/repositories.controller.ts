@@ -79,7 +79,9 @@ export class RepositoriesController {
       permissions: {
         canManageConfiguration: roleHasDashboardCapability(membership.role, "manage_repository_configuration"),
         canRetryReviewRuns: roleHasDashboardCapability(membership.role, "retry_review_run"),
-        canAccessRawArtifacts: roleHasDashboardCapability(membership.role, "access_raw_artifacts")
+        canAccessRawArtifacts: roleHasDashboardCapability(membership.role, "access_raw_artifacts"),
+        canTriggerCodebaseScans: roleHasDashboardCapability(membership.role, "trigger_codebase_scan"),
+        canManageCodebaseScans: roleHasDashboardCapability(membership.role, "manage_codebase_scan_findings")
       }
     });
 

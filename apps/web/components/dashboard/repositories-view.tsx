@@ -3,6 +3,7 @@ import { canManageRepositoryConfiguration, type RepositoryListResponse } from "@
 import type { ViewState } from "../../lib/view-state";
 import type { GitHubRepositoryControlsState } from "../../lib/dashboard-data";
 import { GitHubInstallationSyncButton, GitHubRepositorySyncButton } from "./github-sync-controls";
+import { ManualCodebaseScanButton } from "./manual-codebase-scan-button";
 import { RepositoryAutomationToggle } from "./repository-automation-toggle";
 import { BooleanBadge, StatusBadge } from "./status-badge";
 import { formatDateTime, shortSha } from "./format";
@@ -119,6 +120,7 @@ function RepositoryTable({ controls, data }: { controls: RepositoryControls; dat
               <th className="px-4 py-3">Default branch</th>
               <th className="px-4 py-3">Visibility</th>
               <th className="px-4 py-3">Review automation</th>
+              <th className="px-4 py-3">Codebase scan</th>
               <th className="px-4 py-3">Last review</th>
               <th className="px-4 py-3">Open findings</th>
               <th className="px-4 py-3">Actions</th>
@@ -151,6 +153,25 @@ function RepositoryTable({ controls, data }: { controls: RepositoryControls; dat
                   </div>
                 </td>
                 <td className="px-4 py-3">
+                  <div className="space-y-2">
+                    {(repository.codebaseScan?.latestScanStatus ?? null) === null ? (
+                      <span className="text-secondary">No scan yet</span>
+                    ) : (
+                      <div className="space-y-1">
+                        <StatusBadge status={repository.codebaseScan?.latestScanStatus ?? "queued"} />
+                        <div className="font-mono text-xs text-secondary">
+                          {formatDateTime(repository.codebaseScan?.latestScanFinishedAt ?? repository.codebaseScan?.latestScanCreatedAt ?? null)}
+                        </div>
+                      </div>
+                    )}
+                    <ManualCodebaseScanButton
+                      repositoryId={repository.id}
+                      disabled={!controls.canTriggerCodebaseScans || !repository.enabled}
+                      disabledReason={controls.scanDisabledReason ?? "Repository automation must be enabled."}
+                    />
+                  </div>
+                </td>
+                <td className="px-4 py-3">
                   {repository.lastReview === null ? (
                     <span className="text-secondary">No review yet</span>
                   ) : (
@@ -167,7 +188,10 @@ function RepositoryTable({ controls, data }: { controls: RepositoryControls; dat
                     </div>
                   )}
                 </td>
-                <td className="px-4 py-3 font-mono text-sm text-primary">{repository.openFindingsCount}</td>
+                <td className="px-4 py-3 font-mono text-sm text-primary">
+                  {repository.openFindingsCount + (repository.openCodebaseFindingsCount ?? 0)}
+                  <div className="mt-1 text-xs text-secondary">{repository.openCodebaseFindingsCount ?? 0} scan</div>
+                </td>
                 <td className="px-4 py-3">
                   <div className="flex flex-wrap gap-2">
                     <a
@@ -204,9 +228,11 @@ interface RepositoryControls {
   canSync: boolean;
   canSyncRepository: boolean;
   canManageRepositoryConfiguration: boolean;
+  canTriggerCodebaseScans: boolean;
   connectHref: string;
   syncDisabledReason?: string;
   repositoryDisabledReason?: string;
+  scanDisabledReason?: string;
 }
 
 function GitHubConnectionAction({ controls }: { controls: RepositoryControls }) {
@@ -254,9 +280,11 @@ function toRepositoryControls(state: GitHubRepositoryControlsState | undefined):
       canSync: false,
       canSyncRepository: false,
       canManageRepositoryConfiguration: false,
+      canTriggerCodebaseScans: false,
       connectHref: "/auth/github",
       syncDisabledReason: state?.status === "signed-out" ? "Sign in before syncing GitHub." : "GitHub connection status is unavailable.",
-      repositoryDisabledReason: state?.status === "signed-out" ? "Sign in required." : "GitHub connection status unavailable."
+      repositoryDisabledReason: state?.status === "signed-out" ? "Sign in required." : "GitHub connection status unavailable.",
+      scanDisabledReason: state?.status === "signed-out" ? "Sign in required." : "GitHub connection status unavailable."
     };
   }
 
@@ -264,6 +292,7 @@ function toRepositoryControls(state: GitHubRepositoryControlsState | undefined):
   const hasInstallations = settings.githubApp.installations.length > 0;
   const canManage = settings.workspace.canManageSensitiveSettings;
   const canManageRepositories = oauth.connected && hasInstallations && canManageRepositoryConfiguration(settings.workspace.role);
+  const canTriggerScans = oauth.connected && hasInstallations && ["owner", "admin", "developer"].includes(settings.workspace.role);
 
   return {
     canConnectOAuth: !oauth.connected,
@@ -271,9 +300,11 @@ function toRepositoryControls(state: GitHubRepositoryControlsState | undefined):
     canSync: oauth.connected && canManage && hasInstallations,
     canSyncRepository: canManageRepositories,
     canManageRepositoryConfiguration: canManageRepositories,
+    canTriggerCodebaseScans: canTriggerScans,
     connectHref: "/auth/github",
     syncDisabledReason: headerSyncDisabledReason({ oauthConnected: oauth.connected, canManage, hasInstallations }),
-    repositoryDisabledReason: rowDisabledReason({ oauthConnected: oauth.connected, canManage: canManageRepositories, hasInstallations })
+    repositoryDisabledReason: rowDisabledReason({ oauthConnected: oauth.connected, canManage: canManageRepositories, hasInstallations }),
+    scanDisabledReason: rowDisabledReason({ oauthConnected: oauth.connected, canManage: canTriggerScans, hasInstallations })
   };
 }
 

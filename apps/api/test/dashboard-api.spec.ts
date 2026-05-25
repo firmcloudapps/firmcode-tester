@@ -43,7 +43,7 @@ describe("dashboard API controllers", () => {
       dashboardAuthStore,
       new RepositoryConfigurationService(repositoriesStore, dashboardAuthStore)
     );
-    findingsController = new FindingsController(new PostgresFindingsStore(pool));
+    findingsController = new FindingsController(new PostgresFindingsStore(pool), dashboardAuthStore);
     reviewRunsController = new ReviewRunsController(
       new PostgresReviewRunsStore(pool),
       dashboardAuthStore
@@ -120,7 +120,9 @@ describe("dashboard API controllers", () => {
     expect(detail.permissions).toEqual({
       canManageConfiguration: false,
       canRetryReviewRuns: true,
-      canAccessRawArtifacts: true
+      canAccessRawArtifacts: true,
+      canTriggerCodebaseScans: true,
+      canManageCodebaseScans: false
     });
     expect(JSON.stringify(detail)).not.toContain("artifacts/run-6");
   });
@@ -305,16 +307,20 @@ describe("dashboard API controllers", () => {
   });
 
   it("lists findings with filterable inbox metadata and GitHub comment links", async () => {
-    const response = await findingsController.listFindings({
-      severity: "high",
-      source: "semgrep",
-      category: "security",
-      repository: "openclaw/firmcode",
-      status: "posted",
-      postedInline: "true",
-      dateFrom: "2026-05-22T00:00:00.000Z",
-      dateTo: "2026-05-23T00:00:00.000Z"
-    });
+    const response = await findingsController.listFindings(
+      {
+        severity: "high",
+        source: "semgrep",
+        category: "security",
+        repository: "openclaw/firmcode",
+        status: "posted",
+        postedInline: "true",
+        dateFrom: "2026-05-22T00:00:00.000Z",
+        dateTo: "2026-05-23T00:00:00.000Z"
+      },
+      WORKSPACE_ID,
+      DEVELOPER_USER_ID
+    );
 
     expect(response.findings).toHaveLength(1);
     expect(response.findings[0]).toMatchObject({
@@ -331,8 +337,12 @@ describe("dashboard API controllers", () => {
   });
 
   it("filters open and unsupported future finding statuses", async () => {
-    const openResponse = await findingsController.listFindings({ status: "open", postedInline: "false" });
-    const resolvedResponse = await findingsController.listFindings({ status: "resolved" });
+    const openResponse = await findingsController.listFindings(
+      { status: "open", postedInline: "false" },
+      WORKSPACE_ID,
+      DEVELOPER_USER_ID
+    );
+    const resolvedResponse = await findingsController.listFindings({ status: "resolved" }, WORKSPACE_ID, DEVELOPER_USER_ID);
 
     expect(openResponse.findings.map((finding) => finding.title)).toEqual(["Keep filters stable"]);
     expect(resolvedResponse.findings).toEqual([]);
@@ -340,8 +350,8 @@ describe("dashboard API controllers", () => {
 
   it("rejects invalid filters and missing review run details", async () => {
     await expect(reviewRunsController.listReviewRuns({ status: "done" })).rejects.toThrow(BadRequestException);
-    await expect(findingsController.listFindings({ severity: "urgent" })).rejects.toThrow(BadRequestException);
-    await expect(findingsController.listFindings({ postedInline: "sometimes" })).rejects.toThrow(BadRequestException);
+    await expect(findingsController.listFindings({ severity: "urgent" }, WORKSPACE_ID, DEVELOPER_USER_ID)).rejects.toThrow(BadRequestException);
+    await expect(findingsController.listFindings({ postedInline: "sometimes" }, WORKSPACE_ID, DEVELOPER_USER_ID)).rejects.toThrow(BadRequestException);
     await expect(
       reviewRunsController.getReviewRunDetail("00000000-0000-4000-8000-000000999999", WORKSPACE_ID, DEVELOPER_USER_ID)
     ).rejects.toThrow(NotFoundException);

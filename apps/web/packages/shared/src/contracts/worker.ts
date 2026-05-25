@@ -6,6 +6,10 @@ export const WORKER_CI_LOG_ARTIFACT_SCHEMA_VERSION = "ci-log-artifact/v1" as con
 export const WORKER_CI_FAILURE_EXPLANATION_SCHEMA_VERSION = "ci-failure-explanation/v1" as const;
 export const WORKER_LLM_REVIEW_OUTPUT_SCHEMA_VERSION = "llm-review-output/v1" as const;
 export const WORKER_PUBLISH_PAYLOAD_SCHEMA_VERSION = "publish-payload/v1" as const;
+export const WORKER_CODEBASE_SCAN_JOB_INPUT_SCHEMA_VERSION = "codebase-scan-job-input/v1" as const;
+export const WORKER_CODEBASE_SCAN_ARTIFACT_METADATA_SCHEMA_VERSION = "codebase-scan-artifact-metadata/v1" as const;
+export const WORKER_CODEBASE_SCAN_FINDING_SCHEMA_VERSION = "codebase-scan-finding/v1" as const;
+export const WORKER_CODEBASE_SCAN_REVIEW_ENRICHMENT_SCHEMA_VERSION = "codebase-scan-review-enrichment/v1" as const;
 
 export const WORKER_CONTRACT_SCHEMA_VERSIONS = {
   reviewJobInput: WORKER_REVIEW_JOB_INPUT_SCHEMA_VERSION,
@@ -15,7 +19,11 @@ export const WORKER_CONTRACT_SCHEMA_VERSIONS = {
   ciLogArtifact: WORKER_CI_LOG_ARTIFACT_SCHEMA_VERSION,
   ciFailureExplanation: WORKER_CI_FAILURE_EXPLANATION_SCHEMA_VERSION,
   llmReviewOutput: WORKER_LLM_REVIEW_OUTPUT_SCHEMA_VERSION,
-  publishPayload: WORKER_PUBLISH_PAYLOAD_SCHEMA_VERSION
+  publishPayload: WORKER_PUBLISH_PAYLOAD_SCHEMA_VERSION,
+  codebaseScanJobInput: WORKER_CODEBASE_SCAN_JOB_INPUT_SCHEMA_VERSION,
+  codebaseScanArtifactMetadata: WORKER_CODEBASE_SCAN_ARTIFACT_METADATA_SCHEMA_VERSION,
+  codebaseScanFinding: WORKER_CODEBASE_SCAN_FINDING_SCHEMA_VERSION,
+  codebaseScanReviewEnrichment: WORKER_CODEBASE_SCAN_REVIEW_ENRICHMENT_SCHEMA_VERSION
 } as const;
 
 export type WorkerContractSchemaVersion =
@@ -25,6 +33,12 @@ export type WorkerFileStatus = "added" | "deleted" | "modified" | "renamed" | "c
 export type WorkerSeverity = "info" | "low" | "medium" | "high" | "critical";
 export type WorkerRiskLevel = "low" | "medium" | "high";
 export type WorkerFindingSource = "llm" | "semgrep" | "tree_sitter" | "ci" | "policy";
+export type WorkerCodebaseScanTrigger = "install" | "scheduled" | "manual" | "push";
+export type WorkerCodebaseScanStatus = "queued" | "running" | "succeeded" | "failed" | "cancelled" | "superseded";
+export type WorkerCodebaseScanFindingStatus = "open" | "resolved" | "suppressed" | "false_positive";
+export type WorkerCodebaseScanArtifactType = "semgrep" | "tree_sitter" | "context_pack" | "llm_raw" | "scan_summary";
+export type WorkerCodebaseScanFindingCategory = "bug" | "security" | "performance" | "maintainability" | "test" | "infra" | "ci";
+export type WorkerCodebaseScanFindingConfidence = "low" | "medium" | "high";
 export type WorkerFindingCategory =
   | "bug"
   | "security"
@@ -361,14 +375,127 @@ export interface WorkerPublishPayload {
   readonly inlineComments: WorkerPublishInlineComment[];
 }
 
+export interface WorkerCodebaseScanJobInput {
+  readonly schemaVersion: typeof WORKER_CODEBASE_SCAN_JOB_INPUT_SCHEMA_VERSION;
+  readonly scanRunId: string | null;
+  readonly repositoryId: string;
+  readonly installationId: number;
+  readonly repositoryFullName: string;
+  readonly defaultBranch: string;
+  readonly commitSha: string | null;
+  readonly trigger: WorkerCodebaseScanTrigger;
+  readonly correlationId: string;
+  readonly requestedByClerkUserId: string | null;
+  readonly scanConfig?: WorkerCodebaseScanJobConfig;
+}
+
+export interface WorkerCodebaseScanJobConfig {
+  readonly ignoredPaths: readonly string[];
+  readonly severityThreshold: WorkerSeverity;
+  readonly maxFiles: number;
+  readonly maxBytes: number;
+}
+
+export interface WorkerCodebaseScanArtifactMetadataItem {
+  readonly artifactType: WorkerCodebaseScanArtifactType;
+  readonly storageKey: string;
+  readonly sizeBytes: number;
+  readonly sha256: string;
+  readonly redacted: boolean;
+  readonly retentionExpiresAt: string;
+  readonly metadata: Record<string, unknown>;
+}
+
+export interface WorkerCodebaseScanArtifactMetadata {
+  readonly schemaVersion: typeof WORKER_CODEBASE_SCAN_ARTIFACT_METADATA_SCHEMA_VERSION;
+  readonly scanRunId: string;
+  readonly repositoryId: string;
+  readonly repositoryFullName: string;
+  readonly defaultBranch: string;
+  readonly commitSha: string;
+  readonly artifacts: WorkerCodebaseScanArtifactMetadataItem[];
+}
+
+export interface WorkerCodebaseScanFindingEvidence {
+  readonly source: WorkerFindingSource;
+  readonly artifactType: WorkerCodebaseScanArtifactType | null;
+  readonly path: string | null;
+  readonly lineRange: WorkerLineRange | null;
+  readonly excerpt: string;
+  readonly redacted: boolean;
+}
+
+export interface WorkerCodebaseScanFinding {
+  readonly schemaVersion: typeof WORKER_CODEBASE_SCAN_FINDING_SCHEMA_VERSION;
+  readonly scanRunId: string;
+  readonly repositoryId: string;
+  readonly repositoryFullName: string;
+  readonly defaultBranch: string;
+  readonly commitSha: string;
+  readonly source: WorkerFindingSource;
+  readonly category: WorkerCodebaseScanFindingCategory;
+  readonly severity: WorkerSeverity;
+  readonly confidence: WorkerCodebaseScanFindingConfidence;
+  readonly filePath: string | null;
+  readonly startLine: number | null;
+  readonly endLine: number | null;
+  readonly title: string;
+  readonly body: string;
+  readonly evidence: WorkerCodebaseScanFindingEvidence[];
+  readonly recommendation: string | null;
+  readonly dedupeKey: string;
+  readonly status: WorkerCodebaseScanFindingStatus;
+  readonly firstSeenAt: string | null;
+  readonly lastSeenAt: string | null;
+  readonly resolvedAt: string | null;
+}
+
+export interface WorkerCodebaseScanReviewEnrichmentFinding {
+  readonly findingId: string;
+  readonly dedupeKey: string;
+  readonly source: WorkerFindingSource;
+  readonly category: WorkerCodebaseScanFindingCategory;
+  readonly severity: WorkerSeverity;
+  readonly confidence: WorkerCodebaseScanFindingConfidence;
+  readonly filePath: string | null;
+  readonly startLine: number | null;
+  readonly endLine: number | null;
+  readonly title: string;
+  readonly evidence: WorkerCodebaseScanFindingEvidence[];
+  readonly recommendation: string | null;
+  readonly firstSeenAt: string;
+  readonly lastSeenAt: string;
+}
+
+export interface WorkerCodebaseScanReviewEnrichment {
+  readonly schemaVersion: typeof WORKER_CODEBASE_SCAN_REVIEW_ENRICHMENT_SCHEMA_VERSION;
+  readonly reviewRunId: string;
+  readonly repositoryId: string;
+  readonly repositoryFullName: string;
+  readonly pullRequestNumber: number;
+  readonly headSha: string;
+  readonly touchedFilePaths: string[];
+  readonly findings: WorkerCodebaseScanReviewEnrichmentFinding[];
+}
+
 const nonEmptyStringSchema = { type: "string", minLength: 1 } as const;
 const nullableStringSchema = { anyOf: [nonEmptyStringSchema, { type: "null" }] } as const;
 const nonNegativeIntegerSchema = { type: "integer", minimum: 0 } as const;
 const positiveIntegerSchema = { type: "integer", minimum: 1 } as const;
+const repositoryRelativePathSchema = { type: "string", minLength: 1, maxLength: 240 } as const;
 const confidenceSchema = { type: "number", minimum: 0, maximum: 1 } as const;
 const workerSeveritySchema = { enum: ["info", "low", "medium", "high", "critical"] } as const;
 const workerFileStatusSchema = { enum: ["added", "deleted", "modified", "renamed", "copied", "unknown"] } as const;
 const workerFindingSourceSchema = { enum: ["llm", "semgrep", "tree_sitter", "ci", "policy"] } as const;
+const codebaseScanTriggerSchema = { enum: ["install", "scheduled", "manual", "push"] } as const;
+const codebaseScanFindingStatusSchema = { enum: ["open", "resolved", "suppressed", "false_positive"] } as const;
+const codebaseScanArtifactTypeSchema = {
+  enum: ["semgrep", "tree_sitter", "context_pack", "llm_raw", "scan_summary"]
+} as const;
+const codebaseScanCategorySchema = {
+  enum: ["bug", "security", "performance", "maintainability", "test", "infra", "ci"]
+} as const;
+const codebaseScanConfidenceSchema = { enum: ["low", "medium", "high"] } as const;
 const ciLogUnavailableReasonSchema = {
   enum: [
     "checks_unavailable",
@@ -436,6 +563,20 @@ const evidenceSchema = {
     path: nullableStringSchema,
     lineRange: { anyOf: [workerLineRangeSchema, { type: "null" }] },
     excerpt: nonEmptyStringSchema
+  }
+} as const;
+
+const codebaseScanEvidenceSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["source", "artifactType", "path", "lineRange", "excerpt", "redacted"],
+  properties: {
+    source: workerFindingSourceSchema,
+    artifactType: { anyOf: [codebaseScanArtifactTypeSchema, { type: "null" }] },
+    path: nullableStringSchema,
+    lineRange: { anyOf: [workerLineRangeSchema, { type: "null" }] },
+    excerpt: nonEmptyStringSchema,
+    redacted: { type: "boolean" }
   }
 } as const;
 
@@ -509,6 +650,205 @@ export const workerReviewJobInputJsonSchema = {
     pullRequestNumber: positiveIntegerSchema,
     headSha: nonEmptyStringSchema,
     triggerEvent: nonEmptyStringSchema
+  }
+} as const;
+
+export const workerCodebaseScanJobInputJsonSchema = {
+  $schema: "https://json-schema.org/draft/2020-12/schema",
+  $id: "https://firmcode.dev/schemas/codebase-scan-job-input.v1.json",
+  title: "Firmcode worker codebase scan job input v1",
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "schemaVersion",
+    "scanRunId",
+    "repositoryId",
+    "installationId",
+    "repositoryFullName",
+    "defaultBranch",
+    "commitSha",
+    "trigger",
+    "correlationId",
+    "requestedByClerkUserId"
+  ],
+  properties: {
+    schemaVersion: { const: WORKER_CODEBASE_SCAN_JOB_INPUT_SCHEMA_VERSION },
+    scanRunId: nullableStringSchema,
+    repositoryId: nonEmptyStringSchema,
+    installationId: positiveIntegerSchema,
+    repositoryFullName: nonEmptyStringSchema,
+    defaultBranch: nonEmptyStringSchema,
+    commitSha: nullableStringSchema,
+    trigger: codebaseScanTriggerSchema,
+    correlationId: nonEmptyStringSchema,
+    requestedByClerkUserId: nullableStringSchema,
+    scanConfig: {
+      type: "object",
+      additionalProperties: false,
+      required: ["ignoredPaths", "severityThreshold", "maxFiles", "maxBytes"],
+      properties: {
+        ignoredPaths: { type: "array", maxItems: 100, items: repositoryRelativePathSchema },
+        severityThreshold: workerSeveritySchema,
+        maxFiles: positiveIntegerSchema,
+        maxBytes: positiveIntegerSchema
+      }
+    }
+  }
+} as const;
+
+export const workerCodebaseScanArtifactMetadataJsonSchema = {
+  $schema: "https://json-schema.org/draft/2020-12/schema",
+  $id: "https://firmcode.dev/schemas/codebase-scan-artifact-metadata.v1.json",
+  title: "Firmcode worker codebase scan artifact metadata v1",
+  type: "object",
+  additionalProperties: false,
+  required: ["schemaVersion", "scanRunId", "repositoryId", "repositoryFullName", "defaultBranch", "commitSha", "artifacts"],
+  properties: {
+    schemaVersion: { const: WORKER_CODEBASE_SCAN_ARTIFACT_METADATA_SCHEMA_VERSION },
+    scanRunId: nonEmptyStringSchema,
+    repositoryId: nonEmptyStringSchema,
+    repositoryFullName: nonEmptyStringSchema,
+    defaultBranch: nonEmptyStringSchema,
+    commitSha: nonEmptyStringSchema,
+    artifacts: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["artifactType", "storageKey", "sizeBytes", "sha256", "redacted", "retentionExpiresAt", "metadata"],
+        properties: {
+          artifactType: codebaseScanArtifactTypeSchema,
+          storageKey: nonEmptyStringSchema,
+          sizeBytes: nonNegativeIntegerSchema,
+          sha256: nonEmptyStringSchema,
+          redacted: { type: "boolean" },
+          retentionExpiresAt: nonEmptyStringSchema,
+          metadata: { type: "object", additionalProperties: true }
+        }
+      }
+    }
+  }
+} as const;
+
+export const workerCodebaseScanFindingJsonSchema = {
+  $schema: "https://json-schema.org/draft/2020-12/schema",
+  $id: "https://firmcode.dev/schemas/codebase-scan-finding.v1.json",
+  title: "Firmcode worker codebase scan finding v1",
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "schemaVersion",
+    "scanRunId",
+    "repositoryId",
+    "repositoryFullName",
+    "defaultBranch",
+    "commitSha",
+    "source",
+    "category",
+    "severity",
+    "confidence",
+    "filePath",
+    "startLine",
+    "endLine",
+    "title",
+    "body",
+    "evidence",
+    "recommendation",
+    "dedupeKey",
+    "status",
+    "firstSeenAt",
+    "lastSeenAt",
+    "resolvedAt"
+  ],
+  properties: {
+    schemaVersion: { const: WORKER_CODEBASE_SCAN_FINDING_SCHEMA_VERSION },
+    scanRunId: nonEmptyStringSchema,
+    repositoryId: nonEmptyStringSchema,
+    repositoryFullName: nonEmptyStringSchema,
+    defaultBranch: nonEmptyStringSchema,
+    commitSha: nonEmptyStringSchema,
+    source: workerFindingSourceSchema,
+    category: codebaseScanCategorySchema,
+    severity: workerSeveritySchema,
+    confidence: codebaseScanConfidenceSchema,
+    filePath: nullableStringSchema,
+    startLine: { anyOf: [positiveIntegerSchema, { type: "null" }] },
+    endLine: { anyOf: [positiveIntegerSchema, { type: "null" }] },
+    title: nonEmptyStringSchema,
+    body: nonEmptyStringSchema,
+    evidence: { type: "array", minItems: 1, items: codebaseScanEvidenceSchema },
+    recommendation: nullableStringSchema,
+    dedupeKey: nonEmptyStringSchema,
+    status: codebaseScanFindingStatusSchema,
+    firstSeenAt: nullableStringSchema,
+    lastSeenAt: nullableStringSchema,
+    resolvedAt: nullableStringSchema
+  }
+} as const;
+
+export const workerCodebaseScanReviewEnrichmentJsonSchema = {
+  $schema: "https://json-schema.org/draft/2020-12/schema",
+  $id: "https://firmcode.dev/schemas/codebase-scan-review-enrichment.v1.json",
+  title: "Firmcode worker codebase scan review enrichment v1",
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "schemaVersion",
+    "reviewRunId",
+    "repositoryId",
+    "repositoryFullName",
+    "pullRequestNumber",
+    "headSha",
+    "touchedFilePaths",
+    "findings"
+  ],
+  properties: {
+    schemaVersion: { const: WORKER_CODEBASE_SCAN_REVIEW_ENRICHMENT_SCHEMA_VERSION },
+    reviewRunId: nonEmptyStringSchema,
+    repositoryId: nonEmptyStringSchema,
+    repositoryFullName: nonEmptyStringSchema,
+    pullRequestNumber: positiveIntegerSchema,
+    headSha: nonEmptyStringSchema,
+    touchedFilePaths: { type: "array", items: nonEmptyStringSchema },
+    findings: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: [
+          "findingId",
+          "dedupeKey",
+          "source",
+          "category",
+          "severity",
+          "confidence",
+          "filePath",
+          "startLine",
+          "endLine",
+          "title",
+          "evidence",
+          "recommendation",
+          "firstSeenAt",
+          "lastSeenAt"
+        ],
+        properties: {
+          findingId: nonEmptyStringSchema,
+          dedupeKey: nonEmptyStringSchema,
+          source: workerFindingSourceSchema,
+          category: codebaseScanCategorySchema,
+          severity: workerSeveritySchema,
+          confidence: codebaseScanConfidenceSchema,
+          filePath: nullableStringSchema,
+          startLine: { anyOf: [positiveIntegerSchema, { type: "null" }] },
+          endLine: { anyOf: [positiveIntegerSchema, { type: "null" }] },
+          title: nonEmptyStringSchema,
+          evidence: { type: "array", minItems: 1, items: codebaseScanEvidenceSchema },
+          recommendation: nullableStringSchema,
+          firstSeenAt: nonEmptyStringSchema,
+          lastSeenAt: nonEmptyStringSchema
+        }
+      }
+    }
   }
 } as const;
 
@@ -1064,5 +1404,9 @@ export const workerContractJsonSchemas = {
   ciLogArtifact: workerCiLogArtifactJsonSchema,
   ciFailureExplanation: workerCiFailureExplanationJsonSchema,
   llmReviewOutput: workerLlmReviewOutputJsonSchema,
-  publishPayload: workerPublishPayloadJsonSchema
+  publishPayload: workerPublishPayloadJsonSchema,
+  codebaseScanJobInput: workerCodebaseScanJobInputJsonSchema,
+  codebaseScanArtifactMetadata: workerCodebaseScanArtifactMetadataJsonSchema,
+  codebaseScanFinding: workerCodebaseScanFindingJsonSchema,
+  codebaseScanReviewEnrichment: workerCodebaseScanReviewEnrichmentJsonSchema
 } as const;

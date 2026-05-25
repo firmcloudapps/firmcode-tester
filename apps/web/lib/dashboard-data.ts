@@ -111,7 +111,7 @@ export async function loadReviewRunsState(searchParams: SearchParams): Promise<V
 export async function loadFindingsState(searchParams: SearchParams): Promise<ViewState<FindingsListResponse>> {
   try {
     const filters = pickFindingsFilters(searchParams);
-    const data = await requestJson<FindingsListResponse>("/api/findings", filters);
+    const data = await requestAuthenticatedJsonWithQuery<FindingsListResponse>("/api/findings", filters);
 
     return data.findings.length === 0 ? { status: "empty", data } : { status: "populated", data };
   } catch (error) {
@@ -272,6 +272,7 @@ function pickReviewRunFilters(searchParams: SearchParams): ReviewRunListFilters 
 
 function pickFindingsFilters(searchParams: SearchParams): FindingsListFilters {
   return removeUndefinedValues({
+    findingType: readSingleValue(searchParams.findingType) as FindingsListFilters["findingType"],
     severity: readSingleValue(searchParams.severity) as FindingsListFilters["severity"],
     source: readSingleValue(searchParams.source) as FindingsListFilters["source"],
     category: readSingleValue(searchParams.category) as FindingsListFilters["category"],

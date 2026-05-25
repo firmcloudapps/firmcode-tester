@@ -866,13 +866,13 @@ function toPublishedComment(row: PublishedCommentRow): ReviewRunPublishedComment
   };
 }
 
-function countFindingsBySource(findings: ReviewRunFinding[]): Record<ReviewFindingSource, number> {
-  return findings.reduce<Record<ReviewFindingSource, number>>(
+function countFindingsBySource(findings: ReviewRunFinding[]): Record<ReviewFindingSource | "tree_sitter", number> {
+  return findings.reduce<Record<ReviewFindingSource | "tree_sitter", number>>(
     (counts, finding) => {
       counts[finding.source] += 1;
       return counts;
     },
-    { semgrep: 0, llm: 0, ci: 0, policy: 0 }
+    { semgrep: 0, llm: 0, ci: 0, policy: 0, tree_sitter: 0 }
   );
 }
 
