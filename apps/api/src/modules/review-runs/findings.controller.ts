@@ -1,4 +1,4 @@
-import { BadRequestException, Controller, Get, Headers, Inject, NotFoundException, Query, UnauthorizedException } from "@nestjs/common";
+import { BadRequestException, Controller, Get, Headers, Inject, NotFoundException, Query, UnauthorizedException, UseGuards } from "@nestjs/common";
 import {
   FINDING_INBOX_SOURCES,
   REVIEW_FINDING_CATEGORIES,
@@ -7,6 +7,7 @@ import {
   type FindingsListFilters,
   type FindingsListResponse
 } from "@firmcode/shared";
+import { DashboardAuthGuard } from "../auth/dashboard-auth.guard";
 import {
   DASHBOARD_AUTH_STORE,
   roleHasDashboardCapability,
@@ -15,6 +16,7 @@ import {
 import { FINDINGS_STORE, type FindingsStore } from "./findings.store";
 
 @Controller("api/findings")
+@UseGuards(DashboardAuthGuard)
 export class FindingsController {
   constructor(
     @Inject(FINDINGS_STORE) private readonly findingsStore: FindingsStore,

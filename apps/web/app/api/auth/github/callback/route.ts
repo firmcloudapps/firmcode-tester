@@ -10,7 +10,7 @@ export async function GET(request: Request): Promise<Response> {
 
   const response = await fetch(callbackUrl, {
     cache: "no-store",
-    headers: createDashboardApiHeaders(process.env, false)
+    headers: await createDashboardApiHeaders(process.env, false)
   });
 
   if (!response.ok) {

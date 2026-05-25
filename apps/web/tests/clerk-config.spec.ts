@@ -9,8 +9,21 @@ describe("web Clerk config", () => {
 
     expect(config).toEqual({
       publishableKey: "pk_test_example",
+      signInUrl: "/sign-in",
+      signUpUrl: "/sign-up",
       billingPortalUrl: "https://accounts.clerk.example/billing"
     });
+  });
+
+  it("accepts explicit Clerk sign-in and sign-up routes", () => {
+    const config = createWebClerkConfig({
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_example",
+      NEXT_PUBLIC_CLERK_SIGN_IN_URL: "/sign-in",
+      NEXT_PUBLIC_CLERK_SIGN_UP_URL: "/sign-up"
+    });
+
+    expect(config.signInUrl).toBe("/sign-in");
+    expect(config.signUpUrl).toBe("/sign-up");
   });
 
   it("fails when the Clerk publishable key is missing", () => {

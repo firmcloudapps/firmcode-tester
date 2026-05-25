@@ -1,9 +1,23 @@
 import React from "react";
+import { ClerkProvider } from "@clerk/nextjs";
+import { loadWebClerkConfig } from "../config/clerk";
 
 interface ClerkProviderBoundaryProps {
   children: React.ReactNode;
 }
 
 export function ClerkProviderBoundary({ children }: ClerkProviderBoundaryProps) {
-  return <>{children}</>;
+  const clerk = loadWebClerkConfig();
+
+  return (
+    <ClerkProvider
+      publishableKey={clerk.publishableKey}
+      signInUrl={clerk.signInUrl}
+      signUpUrl={clerk.signUpUrl}
+      afterSignInUrl="/"
+      afterSignUpUrl="/"
+    >
+      {children}
+    </ClerkProvider>
+  );
 }

@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import { DashboardAuthModule } from "./auth/dashboard-auth.module";
 import { BillingModule } from "./billing/billing.module";
 import { CiFailuresModule } from "./ci-failures/ci-failures.module";
 import { CodebaseScansModule } from "./codebase-scans/codebase-scans.module";
@@ -13,6 +14,7 @@ import { GitHubWebhookModule } from "./webhooks/github/github-webhook.module";
 
 @Module({
   imports: [
+    DashboardAuthModule,
     HealthModule,
     GitHubWebhookModule,
     CodebaseScansModule,

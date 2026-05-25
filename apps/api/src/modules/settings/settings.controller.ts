@@ -1,8 +1,10 @@
-import { Body, Controller, Get, Headers, Patch, Post } from "@nestjs/common";
+import { Body, Controller, Get, Headers, Patch, Post, UseGuards } from "@nestjs/common";
 import type { WorkspaceSettingsResponse } from "@firmcode/shared";
+import { DashboardAuthGuard } from "../auth/dashboard-auth.guard";
 import { SettingsService } from "./settings.service";
 
 @Controller("api/settings")
+@UseGuards(DashboardAuthGuard)
 export class SettingsController {
   constructor(private readonly settingsService: SettingsService) {}
 

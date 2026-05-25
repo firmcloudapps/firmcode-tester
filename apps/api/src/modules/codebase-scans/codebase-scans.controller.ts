@@ -10,7 +10,8 @@ import {
   Param,
   Patch,
   Query,
-  UnauthorizedException
+  UnauthorizedException,
+  UseGuards
 } from "@nestjs/common";
 import {
   CODEBASE_SCAN_FINDING_SOURCES,
@@ -26,6 +27,7 @@ import {
   type CodebaseScanRunListResponse,
   type UpdateCodebaseScanFindingStatusRequest
 } from "@firmcode/shared";
+import { DashboardAuthGuard } from "../auth/dashboard-auth.guard";
 import {
   DASHBOARD_AUTH_STORE,
   roleHasDashboardCapability,
@@ -35,6 +37,7 @@ import {
 import { CODEBASE_SCAN_STORE, type CodebaseScanStore } from "./codebase-scan.store";
 
 @Controller()
+@UseGuards(DashboardAuthGuard)
 export class CodebaseScansController {
   constructor(
     @Inject(CODEBASE_SCAN_STORE) private readonly scanStore: CodebaseScanStore,

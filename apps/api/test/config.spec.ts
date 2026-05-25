@@ -30,6 +30,7 @@ describe("API runtime config", () => {
     expect(config.database.ssl).toBe(false);
     expect(config.queue.redactedRedisUrl).toBe("redis://:REDACTED@localhost:6379");
     expect(config.clerk.secretKey).toBe("sk_test_example");
+    expect(config.clerk.jwtAudience).toBeNull();
     expect(config.publicAppUrl).toBe("https://firmcode.firmoncloud.com");
     expect(config.publicApiUrl).toBe("https://firmcodeapi.firmoncloud.com");
     expect(config.github?.appId).toBe(12345);
@@ -97,9 +98,20 @@ describe("API runtime config", () => {
       createApiRuntimeConfig({
         ...VALID_ENV,
         NODE_ENV: "production",
+        CLERK_JWT_AUDIENCE: "firmcode-api",
         DATABASE_SSL: "false"
       })
     ).toThrow(/DATABASE_SSL must be true/);
+  });
+
+  it("requires a Clerk JWT audience in production", () => {
+    expect(() =>
+      createApiRuntimeConfig({
+        ...VALID_ENV,
+        NODE_ENV: "production",
+        DATABASE_SSL: "true"
+      })
+    ).toThrow(/CLERK_JWT_AUDIENCE is required/);
   });
 
   it("rejects an invalid API port", () => {

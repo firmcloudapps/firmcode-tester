@@ -43,11 +43,14 @@ export interface DatabaseConnectionSmokeCheck {
 
 export interface ClerkWebConfig {
   publishableKey: string;
+  signInUrl: string;
+  signUpUrl: string;
   billingPortalUrl: string | null;
 }
 
 export interface ClerkApiConfig {
   secretKey: string;
+  jwtAudience: string | null;
   webhookSecret: string | null;
 }
 
@@ -140,14 +143,18 @@ export function createApiRuntimeConfig(env: EnvironmentVariables): ApiRuntimeCon
 export function createWebClerkConfig(env: EnvironmentVariables): ClerkWebConfig {
   const issues: ConfigValidationIssue[] = [];
   const publishableKey = readRequired(env, "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY", issues);
+  const signInUrl = readClerkRoute(env, "NEXT_PUBLIC_CLERK_SIGN_IN_URL", "/sign-in", issues);
+  const signUpUrl = readClerkRoute(env, "NEXT_PUBLIC_CLERK_SIGN_UP_URL", "/sign-up", issues);
   const billingPortalUrl = readOptionalHttpUrl(env, "CLERK_BILLING_PORTAL_URL", issues);
 
-  if (issues.length > 0 || publishableKey === null) {
+  if (issues.length > 0 || publishableKey === null || signInUrl === null || signUpUrl === null) {
     throw new ConfigValidationError("Web Clerk", issues);
   }
 
   return {
     publishableKey,
+    signInUrl,
+    signUpUrl,
     billingPortalUrl
   };
 }
@@ -254,13 +261,17 @@ function readDatabaseConfig(
 
 function readClerkApiConfig(env: EnvironmentVariables, issues: ConfigValidationIssue[]): ClerkApiConfig | null {
   const secretKey = readRequired(env, "CLERK_SECRET_KEY", issues);
+  const jwtAudience =
+    readOptional(env, "CLERK_JWT_AUDIENCE") ??
+    (env.NODE_ENV === "production" ? readRequired(env, "CLERK_JWT_AUDIENCE", issues) : null);
 
-  if (secretKey === null) {
+  if (secretKey === null || (env.NODE_ENV === "production" && jwtAudience === null)) {
     return null;
   }
 
   return {
     secretKey,
+    jwtAudience,
     webhookSecret: readOptional(env, "CLERK_WEBHOOK_SECRET")
   };
 }
@@ -572,6 +583,34 @@ function readOptionalHttpUrl(
   issues.push({
     variable,
     message: "must be an absolute http(s) URL"
+  });
+  return null;
+}
+
+function readClerkRoute(
+  env: EnvironmentVariables,
+  variable: string,
+  fallback: string,
+  issues: ConfigValidationIssue[]
+): string | null {
+  const value = readOptional(env, variable) ?? fallback;
+
+  if (value.startsWith("/")) {
+    return value;
+  }
+
+  try {
+    const url = new URL(value);
+    if (url.protocol === "https:" || url.protocol === "http:") {
+      return value;
+    }
+  } catch {
+    // Reported below with a stable message.
+  }
+
+  issues.push({
+    variable,
+    message: "must be an absolute http(s) URL or app-relative path"
   });
   return null;
 }

@@ -9,7 +9,8 @@ import {
   Param,
   Post,
   Query,
-  UnauthorizedException
+  UnauthorizedException,
+  UseGuards
 } from "@nestjs/common";
 import {
   type RawReviewRunArtifactAccess,
@@ -20,6 +21,7 @@ import {
   type ReviewRunRetryResponse
 } from "@firmcode/shared";
 import { ReviewRunRetryService } from "./review-run-retry.service";
+import { DashboardAuthGuard } from "../auth/dashboard-auth.guard";
 import {
   DASHBOARD_AUTH_STORE,
   roleHasDashboardCapability,
@@ -29,6 +31,7 @@ import {
 import { REVIEW_RUNS_STORE, type ReviewRunsStore } from "./review-runs.store";
 
 @Controller("api/review-runs")
+@UseGuards(DashboardAuthGuard)
 export class ReviewRunsController {
   constructor(
     @Inject(REVIEW_RUNS_STORE) private readonly reviewRunsStore: ReviewRunsStore,

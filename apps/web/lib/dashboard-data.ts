@@ -326,9 +326,7 @@ async function requestJson<T>(path: string, query: object): Promise<T> {
 
   const response = await fetch(url, {
     cache: "no-store",
-    headers: {
-      accept: "application/json"
-    }
+    headers: await createDashboardApiHeaders(process.env, false)
   });
 
   if (!response.ok) {
@@ -349,7 +347,7 @@ async function requestAuthenticatedJsonWithQuery<T>(path: string, query: object)
 
   const response = await fetch(url, {
     cache: "no-store",
-    headers: createDashboardApiHeaders(process.env, false)
+    headers: await createDashboardApiHeaders(process.env, false)
   });
 
   if (!response.ok) {
@@ -363,7 +361,7 @@ async function requestAuthenticatedJson<T>(path: string): Promise<T> {
   const url = new URL(path, getApiBaseUrl());
   const response = await fetch(url, {
     cache: "no-store",
-    headers: createDashboardApiHeaders(process.env, false)
+    headers: await createDashboardApiHeaders(process.env, false)
   });
 
   if (!response.ok) {

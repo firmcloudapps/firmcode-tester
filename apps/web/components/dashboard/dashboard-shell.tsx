@@ -1,5 +1,6 @@
 import React from "react";
 import { DASHBOARD_NAV_ITEMS, type DashboardActiveItem } from "../../lib/dashboard-navigation";
+import { DashboardClerkControls, DashboardWorkspaceLabel } from "./dashboard-clerk-controls";
 
 interface DashboardShellProps {
   activeItem: DashboardActiveItem;
@@ -13,7 +14,9 @@ export function DashboardShell({ activeItem, children }: DashboardShellProps) {
         <div className="flex min-h-16 items-center gap-3 px-4 sm:px-6 lg:pl-[17rem]">
           <div className="min-w-0">
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-secondary">Workspace</p>
-            <p className="truncate text-sm font-semibold text-primary">Personal engineering</p>
+            <p className="truncate text-sm font-semibold text-primary">
+              <DashboardWorkspaceLabel />
+            </p>
           </div>
           <label className="ml-auto hidden min-w-0 flex-1 max-w-2xl items-center gap-2 rounded-md border border-border bg-shell px-3 py-2 text-sm text-secondary md:flex">
             <span className="font-mono text-xs text-accent" aria-hidden="true">
@@ -39,9 +42,7 @@ export function DashboardShell({ activeItem, children }: DashboardShellProps) {
           >
             !
           </button>
-          <div className="flex h-9 w-9 items-center justify-center rounded-md bg-accent text-xs font-semibold text-white shadow-sm">
-            KO
-          </div>
+          <DashboardClerkControls />
         </div>
         <details className="border-t border-border px-4 py-2 lg:hidden">
           <summary className="cursor-pointer text-sm font-medium text-primary">Navigation</summary>
@@ -115,8 +116,10 @@ export function DashboardShell({ activeItem, children }: DashboardShellProps) {
             })}
           </nav>
           <div className="absolute bottom-5 left-4 right-4 border-t border-border pt-4">
-            <p className="text-xs font-medium text-primary">Kelly O.</p>
-            <p className="mt-1 truncate text-xs text-secondary">Dashboard workspace</p>
+            <p className="text-xs font-medium text-primary">Signed in with Clerk</p>
+            <p className="mt-1 truncate text-xs text-secondary">
+              <DashboardWorkspaceLabel />
+            </p>
           </div>
         </aside>
         <main className="min-w-0 flex-1 lg:pl-64">{children}</main>

@@ -7,7 +7,8 @@ import {
   NotFoundException,
   Param,
   Query,
-  UnauthorizedException
+  UnauthorizedException,
+  UseGuards
 } from "@nestjs/common";
 import {
   REVIEW_RUN_STATUSES,
@@ -15,6 +16,7 @@ import {
   type PullRequestListFilters,
   type PullRequestListResponse
 } from "@firmcode/shared";
+import { DashboardAuthGuard } from "../auth/dashboard-auth.guard";
 import {
   DASHBOARD_AUTH_STORE,
   type DashboardAuthStore,
@@ -23,6 +25,7 @@ import {
 import { PULL_REQUESTS_STORE, type PullRequestsStore } from "./pull-requests.store";
 
 @Controller("api/pull-requests")
+@UseGuards(DashboardAuthGuard)
 export class PullRequestsController {
   constructor(
     @Inject(PULL_REQUESTS_STORE) private readonly pullRequestsStore: PullRequestsStore,

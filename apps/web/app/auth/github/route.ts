@@ -5,7 +5,7 @@ import { createDashboardApiHeaders } from "../../../lib/dashboard-api-proxy";
 export async function GET(): Promise<Response> {
   const response = await fetch(new URL("/auth/github", process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001"), {
     cache: "no-store",
-    headers: createDashboardApiHeaders(process.env, false)
+    headers: await createDashboardApiHeaders(process.env, false)
   });
   const payload = (await readJsonPayload(response)) as Partial<GitHubOAuthStartResponse> | null;
 
