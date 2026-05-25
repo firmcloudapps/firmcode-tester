@@ -339,11 +339,15 @@ function parseInstallationSyncPayload(body: unknown): { installationId: number |
 }
 
 function buildOAuthRedirectUri(config: ApiRuntimeConfig): string {
-  if (config.publicApiUrl === undefined || config.publicApiUrl === null) {
-    return DEFAULT_REDIRECT_URI;
+  if (config.publicAppUrl !== undefined && config.publicAppUrl !== null) {
+    return new URL("/api/auth/github/callback", config.publicAppUrl).toString();
   }
 
-  return new URL("/auth/github/callback", config.publicApiUrl).toString();
+  if (config.publicApiUrl !== undefined && config.publicApiUrl !== null) {
+    return new URL("/auth/github/callback", config.publicApiUrl).toString();
+  }
+
+  return DEFAULT_REDIRECT_URI;
 }
 
 function parsePositiveInteger(label: string, value: string | null): number {

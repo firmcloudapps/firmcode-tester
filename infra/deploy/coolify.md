@@ -35,7 +35,7 @@ Required API environment variables:
 | --- | --- |
 | `NODE_ENV=production` | Set explicitly for deployed API. |
 | `PORT=3001` | Must match the exposed container port. |
-| `APP_URL` | Vercel dashboard URL. |
+| `APP_URL` | Vercel dashboard URL, for example `https://firmcode.firmoncloud.com`. Used to build the GitHub OAuth callback URL. |
 | `API_URL` | Public Coolify API URL: `https://firmcodeapi.firmoncloud.com`. |
 | `CORS_ALLOWED_ORIGINS` | Comma-separated Vercel production, preview, and local dev origins. |
 | `DATABASE_URL` | NeonDB PostgreSQL URL with database name and SSL mode. Example: `postgresql://user:password@host/dbname?sslmode=require`. |
@@ -52,7 +52,13 @@ Required API environment variables:
 API CORS must use explicit origins:
 
 ```text
-CORS_ALLOWED_ORIGINS=https://firmcode.example.com,https://firmcode-git-main-owner.vercel.app,http://localhost:3000
+CORS_ALLOWED_ORIGINS=https://firmcode.firmoncloud.com,https://firmcode-git-main-owner.vercel.app,http://localhost:3000
+```
+
+The GitHub App OAuth callback URL should point at the web dashboard route, not the API host:
+
+```text
+https://firmcode.firmoncloud.com/api/auth/github/callback
 ```
 
 Coolify Compose compatibility note: `docker-compose.prod.yml` uses `env_file: .env` for API and worker application settings. Coolify should generate this `.env` file from runtime-enabled environment variables for the Compose app.

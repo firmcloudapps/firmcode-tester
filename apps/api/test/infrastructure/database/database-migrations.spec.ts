@@ -10,6 +10,7 @@ interface PgPoolLike {
 const EXPECTED_TABLES = [
   "analysis_artifacts",
   "changed_files",
+  "codebase_scan_finding_status_events",
   "codebase_scan_findings",
   "codebase_scan_runs",
   "findings",
@@ -169,7 +170,8 @@ ORDER BY table_name
       "005_github_oauth_and_sync",
       "006_review_policies",
       "007_ci_failure_artifacts",
-      "008_codebase_scan_persistence"
+      "008_codebase_scan_persistence",
+      "009_codebase_scan_dashboard_configuration"
     ]);
     expect(secondRunMigrationIds).toEqual([]);
     expect(tables.rows.map((row) => row.table_name)).toEqual(EXPECTED_TABLES);
@@ -181,7 +183,8 @@ ORDER BY table_name
       { id: "005_github_oauth_and_sync" },
       { id: "006_review_policies" },
       { id: "007_ci_failure_artifacts" },
-      { id: "008_codebase_scan_persistence" }
+      { id: "008_codebase_scan_persistence" },
+      { id: "009_codebase_scan_dashboard_configuration" }
     ]);
   });
 

@@ -36,7 +36,8 @@ Set these variables in Vercel for Production, Preview, and Development as approp
 | Variable | Scope | Notes |
 | --- | --- | --- |
 | `NODE_ENV` | Vercel | Usually managed by Vercel. |
-| `APP_URL` | web | Production dashboard URL. Preview deployments can use `https://${VERCEL_URL}` where supported. |
+| `APP_URL` | web | Production dashboard URL, for example `https://firmcode.firmoncloud.com`. Preview deployments can use `https://${VERCEL_URL}` where supported. |
+| `NEXT_PUBLIC_DASHBOARD_URL` | web | Public dashboard URL used after OAuth callback redirects. Usually the same value as `APP_URL`. |
 | `NEXT_PUBLIC_API_URL` | web | Public Coolify API URL, `https://firmcodeapi.firmoncloud.com`. |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | web | Clerk publishable key for the matching Clerk environment. |
 | `CLERK_SECRET_KEY` | web server | Required only for server-side Clerk calls in the dashboard. Keep it secret. |
@@ -50,7 +51,7 @@ Do not set GitHub App private keys, LLM API keys, Redis URLs, or worker-only set
 Every Vercel origin that calls the API must be listed in the Coolify API `CORS_ALLOWED_ORIGINS` value:
 
 ```text
-CORS_ALLOWED_ORIGINS=https://firmcode.example.com,https://firmcode-git-main-owner.vercel.app,http://localhost:3000
+CORS_ALLOWED_ORIGINS=https://firmcode.firmoncloud.com,https://firmcode-git-main-owner.vercel.app,http://localhost:3000
 ```
 
 Use explicit origins in production. Do not use wildcard CORS because dashboard requests carry authenticated Clerk context.
@@ -60,6 +61,7 @@ Use explicit origins in production. Do not use wildcard CORS because dashboard r
 Configure Clerk with:
 
 - Production dashboard URL in allowed redirect and callback URLs.
+- GitHub App OAuth callback URL: `https://firmcode.firmoncloud.com/api/auth/github/callback`.
 - Vercel preview URL pattern if preview deployments need authenticated dashboard access.
 - Billing portal URL exposed through `CLERK_BILLING_PORTAL_URL`.
 

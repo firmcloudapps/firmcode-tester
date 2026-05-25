@@ -15,6 +15,7 @@ export interface DashboardDestinationReadiness {
 export const DASHBOARD_IMPLEMENTED_ROUTE_PATTERNS: readonly DashboardRoutePattern[] = [
   { pattern: "/", kind: "page" },
   { pattern: "/auth/github", kind: "route-handler" },
+  { pattern: "/api/auth/github/callback", kind: "route-handler" },
   { pattern: "/billing", kind: "page" },
   { pattern: "/ci-failures", kind: "page" },
   { pattern: "/ci-failures/[id]", kind: "page" },
