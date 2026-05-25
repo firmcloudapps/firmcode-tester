@@ -20,6 +20,7 @@ export interface CodebaseScanStore {
   updateScanRun(input: UpdateCodebaseScanRunInput): Promise<CodebaseScanRunRecord | null>;
   upsertFinding(input: UpsertCodebaseScanFindingInput): Promise<CodebaseScanFindingRecord>;
   listOpenFindings(input: ListOpenCodebaseScanFindingsInput): Promise<CodebaseScanFindingRecord[]>;
+  listReviewEnrichmentFindings(input: ListReviewEnrichmentCodebaseScanFindingsInput): Promise<CodebaseScanFindingRecord[]>;
   resolveStaleFindingsAfterSuccessfulScan(input: ResolveStaleCodebaseScanFindingsInput): Promise<number>;
 }
 
@@ -69,6 +70,13 @@ export interface ListOpenCodebaseScanFindingsInput {
   readonly repositoryId: string;
   readonly severities?: readonly WorkerSeverity[];
   readonly filePaths?: readonly string[];
+  readonly limit?: number;
+}
+
+export interface ListReviewEnrichmentCodebaseScanFindingsInput {
+  readonly repositoryId: string;
+  readonly changedFilePaths: readonly string[];
+  readonly componentPrefixes: readonly string[];
   readonly limit?: number;
 }
 
@@ -178,6 +186,10 @@ export class EmptyCodebaseScanStore implements CodebaseScanStore {
   }
 
   async listOpenFindings(_input: ListOpenCodebaseScanFindingsInput): Promise<CodebaseScanFindingRecord[]> {
+    return [];
+  }
+
+  async listReviewEnrichmentFindings(_input: ListReviewEnrichmentCodebaseScanFindingsInput): Promise<CodebaseScanFindingRecord[]> {
     return [];
   }
 
@@ -459,6 +471,53 @@ LIMIT $${values.length}
     return result.rows.map(toFinding);
   }
 
+  async listReviewEnrichmentFindings(input: ListReviewEnrichmentCodebaseScanFindingsInput): Promise<CodebaseScanFindingRecord[]> {
+    const changedFilePaths = uniqueStrings(input.changedFilePaths);
+    const componentPrefixes = uniqueStrings(input.componentPrefixes);
+    if (changedFilePaths.length === 0 && componentPrefixes.length === 0) {
+      return [];
+    }
+
+    const values: unknown[] = [input.repositoryId];
+    const relevanceConditions: string[] = [];
+    const directMatchSql = buildDirectMatchSql("file_path", changedFilePaths, values);
+    if (directMatchSql !== null) {
+      relevanceConditions.push(directMatchSql);
+    }
+
+    const componentMatchSql = buildComponentMatchSql("file_path", componentPrefixes, values);
+    if (componentMatchSql !== null) {
+      relevanceConditions.push(`(severity IN ('critical', 'high') AND ${componentMatchSql})`);
+    }
+
+    values.push(input.limit ?? 12);
+    const limitIndex = values.length;
+    const result = await this.database.query<CodebaseScanFindingRow>(
+      `
+SELECT *
+FROM codebase_scan_findings
+WHERE repository_id = $1
+  AND status = 'open'
+  AND (${relevanceConditions.join(" OR ")})
+ORDER BY
+  CASE severity
+    WHEN 'critical' THEN 0
+    WHEN 'high' THEN 1
+    WHEN 'medium' THEN 2
+    WHEN 'low' THEN 3
+    ELSE 4
+  END,
+  CASE WHEN ${directMatchSql ?? "false"} THEN 0 ELSE 1 END,
+  last_seen_at DESC,
+  file_path ASC
+LIMIT $${limitIndex}
+`,
+      values
+    );
+
+    return result.rows.map(toFinding);
+  }
+
   async resolveStaleFindingsAfterSuccessfulScan(input: ResolveStaleCodebaseScanFindingsInput): Promise<number> {
     const scanRun = await this.database.query<{ status: WorkerCodebaseScanStatus }>(
       "SELECT status FROM codebase_scan_runs WHERE id = $1 AND repository_id = $2",
@@ -504,6 +563,46 @@ function toScanRun(row: CodebaseScanRunRow): CodebaseScanRunRecord {
     createdAt: toRequiredIsoString(row.created_at),
     updatedAt: toRequiredIsoString(row.updated_at)
   };
+}
+
+function buildDirectMatchSql(column: string, paths: readonly string[], values: unknown[]): string | null {
+  if (paths.length === 0) {
+    return null;
+  }
+
+  const placeholders = paths.map((path) => {
+    values.push(path);
+    return `$${values.length}`;
+  });
+
+  return `${column} IN (${placeholders.join(", ")})`;
+}
+
+function buildComponentMatchSql(column: string, prefixes: readonly string[], values: unknown[]): string | null {
+  if (prefixes.length === 0) {
+    return null;
+  }
+
+  const conditions = prefixes.map((prefix) => {
+    values.push(prefix);
+    const index = values.length;
+    return `(${column} = $${index} OR ${column} LIKE $${index} || '/%')`;
+  });
+
+  return `(${column} IS NOT NULL AND (${conditions.join(" OR ")}))`;
+}
+
+function uniqueStrings(values: readonly string[]): string[] {
+  const selected: string[] = [];
+  const seen = new Set<string>();
+  for (const value of values) {
+    if (!value || seen.has(value)) {
+      continue;
+    }
+    selected.push(value);
+    seen.add(value);
+  }
+  return selected;
 }
 
 function toFinding(row: CodebaseScanFindingRow): CodebaseScanFindingRecord {

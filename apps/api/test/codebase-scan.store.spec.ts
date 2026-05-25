@@ -302,6 +302,99 @@ describe("PostgresCodebaseScanStore", () => {
     expect(resolvedCount).toBe(1);
     expect(remainingOpen.map((finding) => finding.dedupeKey)).toEqual(["semgrep:dangerous-exec:src/server.ts:42"]);
   });
+
+  it("loads review enrichment findings for changed files and high severity touched components only", async () => {
+    const store = new PostgresCodebaseScanStore(
+      pool,
+      createIdFactory([
+        FIRST_SCAN_RUN_ID,
+        FIRST_FINDING_ID,
+        SECOND_FINDING_ID,
+        "00000000-0000-4000-8000-000000000203",
+        "00000000-0000-4000-8000-000000000204"
+      ])
+    );
+    const scanRun = await store.createScanRun({
+      repositoryId: REPOSITORY_ID,
+      trigger: "scheduled",
+      defaultBranch: "main",
+      commitSha: "abc123"
+    });
+
+    await store.upsertFinding({
+      scanRunId: scanRun.id,
+      repositoryId: REPOSITORY_ID,
+      source: "semgrep",
+      category: "security",
+      severity: "medium",
+      confidence: "high",
+      filePath: "src/server.ts",
+      startLine: 12,
+      endLine: 12,
+      title: "Direct changed file issue",
+      body: "The exact changed file has an unresolved issue.",
+      evidence: [scanEvidence("src/server.ts", 12)],
+      recommendation: "Fix the changed file issue.",
+      dedupeKey: "direct-medium"
+    });
+    await store.upsertFinding({
+      scanRunId: scanRun.id,
+      repositoryId: REPOSITORY_ID,
+      source: "semgrep",
+      category: "security",
+      severity: "high",
+      confidence: "high",
+      filePath: "src/auth/token.ts",
+      startLine: 8,
+      endLine: 8,
+      title: "Component issue",
+      body: "A touched component has an unresolved high severity issue.",
+      evidence: [scanEvidence("src/auth/token.ts", 8)],
+      recommendation: "Fix the component issue.",
+      dedupeKey: "component-high"
+    });
+    await store.upsertFinding({
+      scanRunId: scanRun.id,
+      repositoryId: REPOSITORY_ID,
+      source: "policy",
+      category: "maintainability",
+      severity: "medium",
+      confidence: "medium",
+      filePath: "src/auth/owner.ts",
+      startLine: 5,
+      endLine: 5,
+      title: "Medium component issue",
+      body: "Medium component findings should not enrich unless directly changed.",
+      evidence: [scanEvidence("src/auth/owner.ts", 5)],
+      recommendation: "Assign an owner.",
+      dedupeKey: "component-medium"
+    });
+    await store.upsertFinding({
+      scanRunId: scanRun.id,
+      repositoryId: REPOSITORY_ID,
+      source: "semgrep",
+      category: "security",
+      severity: "critical",
+      confidence: "high",
+      filePath: "packages/shared/src/token.ts",
+      startLine: 30,
+      endLine: 30,
+      title: "Unrelated issue",
+      body: "Unrelated components should not enrich the PR.",
+      evidence: [scanEvidence("packages/shared/src/token.ts", 30)],
+      recommendation: "Fix unrelated issue.",
+      dedupeKey: "unrelated-critical"
+    });
+
+    const findings = await store.listReviewEnrichmentFindings({
+      repositoryId: REPOSITORY_ID,
+      changedFilePaths: ["src/server.ts"],
+      componentPrefixes: ["src/auth"],
+      limit: 10
+    });
+
+    expect(findings.map((finding) => finding.dedupeKey)).toEqual(["component-high", "direct-medium"]);
+  });
 });
 
 function scanEvidence(path: string, line: number) {

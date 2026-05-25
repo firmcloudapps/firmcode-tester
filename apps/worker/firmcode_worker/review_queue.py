@@ -72,6 +72,7 @@ SET status = 'running',
     error_message = NULL,
     updated_at = now()
 WHERE id = %s
+  AND status <> 'superseded'
 """,
             (review_run_id,),
         )
@@ -86,6 +87,7 @@ SET status = 'succeeded',
     error_message = NULL,
     updated_at = now()
 WHERE id = %s
+  AND status <> 'superseded'
 """,
             (review_run_id,),
         )
@@ -100,6 +102,7 @@ SET status = 'failed',
     error_message = %s,
     updated_at = now()
 WHERE id = %s
+  AND status <> 'superseded'
 """,
             (error_code, error_message, review_run_id),
         )
