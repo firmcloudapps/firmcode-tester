@@ -26,6 +26,7 @@ const EXPECTED_TABLES = [
   "review_run_retries",
   "review_runs",
   "schema_migrations",
+  "workspace_audit_events",
   "workspace_memberships",
   "workspaces"
 ];
@@ -171,7 +172,8 @@ ORDER BY table_name
       "006_review_policies",
       "007_ci_failure_artifacts",
       "008_codebase_scan_persistence",
-      "009_codebase_scan_dashboard_configuration"
+      "009_codebase_scan_dashboard_configuration",
+      "010_workspace_membership_audit"
     ]);
     expect(secondRunMigrationIds).toEqual([]);
     expect(tables.rows.map((row) => row.table_name)).toEqual(EXPECTED_TABLES);
@@ -184,7 +186,8 @@ ORDER BY table_name
       { id: "006_review_policies" },
       { id: "007_ci_failure_artifacts" },
       { id: "008_codebase_scan_persistence" },
-      { id: "009_codebase_scan_dashboard_configuration" }
+      { id: "009_codebase_scan_dashboard_configuration" },
+      { id: "010_workspace_membership_audit" }
     ]);
   });
 

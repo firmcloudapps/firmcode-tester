@@ -87,6 +87,9 @@ Required Clerk dashboard configuration:
 - After sign-up URL: `/`
 - Organization settings enabled if team workspaces are supported in the environment.
 - Clerk webhook endpoint configured only after the API endpoint exists and `CLERK_WEBHOOK_SECRET` is set.
+- Optional trusted JWT role metadata for organization memberships can be exposed as `firmcode_role`, `org_firmcode_role`, `firmcode.role`, `organization_metadata.firmcode_role`, `public_metadata.firmcode_role`, or `metadata.firmcode_role`. Firmcode maps `admin`/legacy `owner` to Admin and `developer`/`member` to Developer; if absent, Clerk org admin/owner maps to Admin and org member maps to Developer.
+
+Clerk webhook sync boundary: the API currently repairs the active workspace and membership at request time. A future Clerk webhook endpoint should consume user, organization, and organization-membership lifecycle events, set removed memberships inactive, and record elevated role changes in `workspace_audit_events`. Until that endpoint is deployed, support/admin sync must mark deleted or removed memberships inactive; request-time repair will not reactivate inactive memberships.
 
 ## GitHub App
 

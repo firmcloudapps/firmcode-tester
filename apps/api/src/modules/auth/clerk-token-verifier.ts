@@ -10,6 +10,7 @@ export interface VerifiedClerkToken {
   readonly clerkOrgId: string | null;
   readonly sessionId: string | null;
   readonly orgRole: string | null;
+  readonly firmcodeRole: string | null;
   readonly billingCapabilities: readonly string[];
 }
 
@@ -38,6 +39,7 @@ export class ClerkBackendTokenVerifier implements ClerkTokenVerifier {
         clerkOrgId: readStringClaim(payload, "org_id") ?? readV2OrgId(payload),
         sessionId: readStringClaim(payload, "sid"),
         orgRole: readStringClaim(payload, "org_role") ?? readV2OrgRole(payload),
+        firmcodeRole: readFirmcodeRoleClaim(payload),
         billingCapabilities: readBillingCapabilities(payload)
       };
     } catch (error) {
@@ -66,6 +68,25 @@ function readV2OrgRole(payload: Record<string, unknown>): string | null {
   const organization = payload.o;
   return organization !== null && typeof organization === "object" && "rol" in organization
     ? readStringClaim(organization as Record<string, unknown>, "rol")
+    : null;
+}
+
+function readFirmcodeRoleClaim(payload: Record<string, unknown>): string | null {
+  return (
+    readStringClaim(payload, "firmcode_role") ??
+    readStringClaim(payload, "org_firmcode_role") ??
+    readNestedStringClaim(payload, "firmcode", "role") ??
+    readNestedStringClaim(payload, "organization_metadata", "firmcode_role") ??
+    readNestedStringClaim(payload, "public_metadata", "firmcode_role") ??
+    readNestedStringClaim(payload, "metadata", "firmcode_role")
+  );
+}
+
+function readNestedStringClaim(payload: Record<string, unknown>, objectKey: string, valueKey: string): string | null {
+  const object = payload[objectKey];
+
+  return object !== null && typeof object === "object"
+    ? readStringClaim(object as Record<string, unknown>, valueKey)
     : null;
 }
 
