@@ -10,8 +10,10 @@ from firmcode_worker.pipeline import (
     DeterministicReviewPipeline,
     GitHubFile,
     ReviewContext,
+    _code_review_summary_lines,
     _inline_review_body,
     _partition_existing_inline_comments,
+    _render_changed_component_patch,
     _render_resolution_bullets,
     _render_semgrep_fix_diff,
     normalize_private_key,
@@ -281,6 +283,11 @@ def test_deterministic_pipeline_publishes_actual_analysis_summary() -> None:
     assert store.summary_body is not None
     assert "FirmcodeAI reviewed this PR and found 1 actionable issue(s)." in store.summary_body
     assert "### Code Review" in store.summary_body
+    assert "FirmcodeAI generated this actionable-issue summary from 1 grounded finding:" in store.summary_body
+    assert "- High: Avoid eval on untrusted input at `src/widget.ts:2`." in store.summary_body
+    assert "Suggested action: Validate and parse trusted input instead of evaluating it." in store.summary_body
+    assert "No actionable issues were found in the selected changed files." not in store.summary_body
+    assert "**Actionable findings**" in store.summary_body
     assert "⚠️ Potential issue | 🟠 Major | ⚡ Quick win" in store.summary_body
     assert "<summary>Analysis chain</summary>" in store.summary_body
     assert "- Evidence: changed line `src/widget.ts:2` contains `const value = eval(input);`." in store.summary_body
@@ -292,14 +299,18 @@ def test_deterministic_pipeline_publishes_actual_analysis_summary() -> None:
     assert "<summary>🛠 Suggested resolution</summary>" in store.summary_body
     assert "```text\nValidate and parse trusted input instead of evaluating it." not in store.summary_body
     assert "- Validate and parse trusted input instead of evaluating it." in store.summary_body
-    assert "<summary>Risk</summary>" in store.summary_body
-    assert "<summary>Changed Components</summary>" in store.summary_body
+    assert "### Risk" in store.summary_body
+    assert "### Changed Components" in store.summary_body
+    assert "<summary>Risk</summary>" not in store.summary_body
+    assert "<summary>Changed Components</summary>" not in store.summary_body
     assert "**Changed code**" in store.summary_body
     assert "**`src/widget.ts`** (+2/-0)" in store.summary_body
     assert "@@ -1,2 +1,4 @@" in store.summary_body
-    assert "!   const value = eval(input);" in store.summary_body
-    assert "!   return value;" in store.summary_body
-    assert "<summary>Suggested Tests</summary>" in store.summary_body
+    assert "+   const value = eval(input);" in store.summary_body
+    assert "+   return value;" in store.summary_body
+    assert "!   const value = eval(input);" not in store.summary_body
+    assert "### Suggested Tests" in store.summary_body
+    assert "<summary>Suggested Tests</summary>" not in store.summary_body
     assert "<summary>Analysis Coverage</summary>" not in store.summary_body
     assert "<summary>Review Activity</summary>" not in store.summary_body
     assert "Repository:" not in store.summary_body
@@ -342,6 +353,37 @@ def test_deterministic_pipeline_publishes_actual_analysis_summary() -> None:
     assert "<details open>" not in "\n".join(github.scanning_bodies)
     assert "Semgrep" not in "\n".join(github.scanning_bodies)
     assert "Tree-sitter" not in "\n".join(github.scanning_bodies)
+
+
+def test_changed_component_patch_uses_github_diff_markers() -> None:
+    rendered = _render_changed_component_patch(
+        "\n".join(
+            [
+                "@@ -1,2 +1,2 @@",
+                "-old label",
+                "+new label",
+                " unchanged",
+            ]
+        )
+    )
+
+    assert "@@ -1,2 +1,2 @@" in rendered
+    assert "- old label" in rendered
+    assert "+ new label" in rendered
+    assert "! new label" not in rendered
+    assert "  unchanged" in rendered
+
+
+def test_code_review_summary_replaces_empty_actionable_placeholder() -> None:
+    lines = _code_review_summary_lines([], [])
+
+    assert lines == [
+        (
+            "FirmcodeAI did not generate actionable issue summaries because the current "
+            "evidence set did not contain grounded findings."
+        )
+    ]
+    assert "No actionable issues were found in the selected changed files." not in "\n".join(lines)
 
 
 def _stub_semgrep_runner(**_kwargs: Any) -> StubSemgrepResult:
