@@ -10,6 +10,10 @@ from firmcode_worker.schemas.contracts import (
     ContractValidationError,
     CiFailureExplanationArtifact,
     CiLogArtifact,
+    CodebaseScanArtifactMetadata,
+    CodebaseScanFinding,
+    CodebaseScanJobInput,
+    CodebaseScanReviewEnrichment,
     DiffArtifact,
     LlmReviewOutput,
     PublishPayload,
@@ -37,6 +41,10 @@ def read_fixture(name: str) -> Mapping[str, Any]:
         (CiFailureExplanationArtifact, "ci-failure-explanation.v1.json"),
         (LlmReviewOutput, "llm-review-output.v1.json"),
         (PublishPayload, "publish-payload.v1.json"),
+        (CodebaseScanJobInput, "codebase-scan-job-input.v1.json"),
+        (CodebaseScanArtifactMetadata, "codebase-scan-artifact-metadata.v1.json"),
+        (CodebaseScanFinding, "codebase-scan-finding.v1.json"),
+        (CodebaseScanReviewEnrichment, "codebase-scan-review-enrichment.v1.json"),
     ],
 )
 def test_worker_contract_models_accept_current_fixtures(model: Any, fixture_name: str) -> None:
@@ -60,3 +68,18 @@ def test_worker_contract_models_reject_invalid_payloads_with_field_paths() -> No
 
     assert "schemaVersion" in str(error.value)
     assert "inlineFindings[0].confidence" in str(error.value)
+
+
+def test_codebase_scan_finding_rejects_secret_unsafe_shape() -> None:
+    payload = dict(read_fixture("codebase-scan-finding.v1.json"))
+    payload["schemaVersion"] = "codebase-scan-finding/v0"
+    payload["evidence"] = []
+    payload["startLine"] = 50
+    payload["endLine"] = 42
+
+    with pytest.raises(ContractValidationError) as error:
+        CodebaseScanFinding.from_mapping(payload)
+
+    assert "schemaVersion" in str(error.value)
+    assert "evidence must include at least one item" in str(error.value)
+    assert "endLine must be greater than or equal to startLine" in str(error.value)

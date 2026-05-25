@@ -15,6 +15,8 @@ Firmcode processes sensitive repository data. Treat all diffs, file contents, PR
 | LLM prompts/responses | high | 14 days, configurable. |
 | Semgrep JSON output | medium/high | 30 days. |
 | Tree-sitter artifacts | medium | 30 days. |
+| Codebase scan artifact metadata | medium | 30 days or less for raw artifacts; metadata can remain with the scan run. |
+| Codebase scan findings | medium | 180 days after resolution or repository deletion request. |
 | Findings and published comment metadata | medium | 180 days. |
 | Aggregated metrics | low | 365 days. |
 
@@ -22,6 +24,8 @@ Firmcode processes sensitive repository data. Treat all diffs, file contents, PR
 
 - Redact known secret patterns from logs and CI excerpts before storage or display.
 - Truncate redacted CI logs to the configured byte limit before storage or LLM use.
+- Redact secret-like literals from codebase scan evidence before writing artifacts, findings, prompts, or review enrichment payloads.
+- Store codebase scan artifacts only through the approved artifact metadata model: storage key, digest, size, retention expiry, redaction flag, and non-sensitive metrics. Do not persist GitHub App installation tokens, OAuth tokens, private repository content, raw secrets, unredacted prompts, or raw LLM responses in `codebase_scan_runs` or `codebase_scan_findings`.
 - Never log GitHub App private keys, installation tokens, Clerk secrets, LLM keys, webhook signatures, or database URLs.
 - Store raw CI logs only when needed for debugging and always behind retention controls.
 - Show collapsed raw logs by default in the dashboard.
@@ -30,6 +34,7 @@ Firmcode processes sensitive repository data. Treat all diffs, file contents, PR
 
 - GitHub installation removal disables review automation and queues cleanup for installation-linked data.
 - Repository disable stops new reviews but can retain historical findings until retention expires.
+- Repository disable stops scheduled codebase scans. Existing unresolved codebase findings may remain visible to authorized users until resolved, suppressed, false-positive, or retention cleanup removes them.
 - Repository deletion request should remove raw artifacts immediately and metadata/findings within a bounded cleanup window.
 - Clerk user/org deletion webhook should trigger workspace access cleanup and data deletion workflow.
 

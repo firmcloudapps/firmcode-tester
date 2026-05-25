@@ -13,6 +13,10 @@ CI_LOG_ARTIFACT_SCHEMA_VERSION = "ci-log-artifact/v1"
 CI_FAILURE_EXPLANATION_SCHEMA_VERSION = "ci-failure-explanation/v1"
 LLM_REVIEW_OUTPUT_SCHEMA_VERSION = "llm-review-output/v1"
 PUBLISH_PAYLOAD_SCHEMA_VERSION = "publish-payload/v1"
+CODEBASE_SCAN_JOB_INPUT_SCHEMA_VERSION = "codebase-scan-job-input/v1"
+CODEBASE_SCAN_ARTIFACT_METADATA_SCHEMA_VERSION = "codebase-scan-artifact-metadata/v1"
+CODEBASE_SCAN_FINDING_SCHEMA_VERSION = "codebase-scan-finding/v1"
+CODEBASE_SCAN_REVIEW_ENRICHMENT_SCHEMA_VERSION = "codebase-scan-review-enrichment/v1"
 
 FILE_STATUSES = {"added", "deleted", "modified", "renamed", "copied", "unknown"}
 SEVERITIES = {"info", "low", "medium", "high", "critical"}
@@ -27,6 +31,11 @@ FINDING_CATEGORIES = {
     "infrastructure",
     "documentation",
 }
+CODEBASE_SCAN_TRIGGERS = {"install", "scheduled", "manual", "push"}
+CODEBASE_SCAN_ARTIFACT_TYPES = {"semgrep", "tree_sitter", "context_pack", "llm_raw", "scan_summary"}
+CODEBASE_SCAN_FINDING_CATEGORIES = {"bug", "security", "performance", "maintainability", "test", "infra", "ci"}
+CODEBASE_SCAN_FINDING_CONFIDENCES = {"low", "medium", "high"}
+CODEBASE_SCAN_FINDING_STATUSES = {"open", "resolved", "suppressed", "false_positive"}
 CI_LOG_UNAVAILABLE_REASONS = {
     "checks_unavailable",
     "github_request_failed",
@@ -81,6 +90,37 @@ class ReviewJobInput:
             pull_request_number=_read_positive_int(value, "pullRequestNumber", errors),
             head_sha=_read_non_empty_str(value, "headSha", errors),
             trigger_event=_read_non_empty_str(value, "triggerEvent", errors),
+        )
+        _raise_if_errors(errors)
+        return payload
+
+
+@dataclass(frozen=True)
+class CodebaseScanJobInput:
+    schema_version: str
+    scan_run_id: str
+    repository_id: str
+    installation_id: int
+    repository_full_name: str
+    default_branch: str
+    commit_sha: str
+    trigger: str
+    requested_by_clerk_user_id: str | None
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> "CodebaseScanJobInput":
+        errors: list[str] = []
+        _read_literal(value, "schemaVersion", CODEBASE_SCAN_JOB_INPUT_SCHEMA_VERSION, errors)
+        payload = cls(
+            schema_version=CODEBASE_SCAN_JOB_INPUT_SCHEMA_VERSION,
+            scan_run_id=_read_non_empty_str(value, "scanRunId", errors),
+            repository_id=_read_non_empty_str(value, "repositoryId", errors),
+            installation_id=_read_positive_int(value, "installationId", errors),
+            repository_full_name=_read_non_empty_str(value, "repositoryFullName", errors),
+            default_branch=_read_non_empty_str(value, "defaultBranch", errors),
+            commit_sha=_read_non_empty_str(value, "commitSha", errors),
+            trigger=_read_literal_from_set(value, "trigger", CODEBASE_SCAN_TRIGGERS, errors),
+            requested_by_clerk_user_id=_read_nullable_str(value, "requestedByClerkUserId", errors),
         )
         _raise_if_errors(errors)
         return payload
@@ -466,6 +506,176 @@ class FindingEvidence:
     path: str | None
     line_range: LineRange | None
     excerpt: str
+
+
+@dataclass(frozen=True)
+class CodebaseScanArtifactMetadataItem:
+    artifact_type: str
+    storage_key: str
+    size_bytes: int
+    sha256: str
+    redacted: bool
+    retention_expires_at: str
+    metadata: Mapping[str, Any]
+
+
+@dataclass(frozen=True)
+class CodebaseScanArtifactMetadata:
+    schema_version: str
+    scan_run_id: str
+    repository_id: str
+    repository_full_name: str
+    default_branch: str
+    commit_sha: str
+    artifacts: list[CodebaseScanArtifactMetadataItem]
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> "CodebaseScanArtifactMetadata":
+        errors: list[str] = []
+        _read_literal(value, "schemaVersion", CODEBASE_SCAN_ARTIFACT_METADATA_SCHEMA_VERSION, errors)
+        payload = cls(
+            schema_version=CODEBASE_SCAN_ARTIFACT_METADATA_SCHEMA_VERSION,
+            scan_run_id=_read_non_empty_str(value, "scanRunId", errors),
+            repository_id=_read_non_empty_str(value, "repositoryId", errors),
+            repository_full_name=_read_non_empty_str(value, "repositoryFullName", errors),
+            default_branch=_read_non_empty_str(value, "defaultBranch", errors),
+            commit_sha=_read_non_empty_str(value, "commitSha", errors),
+            artifacts=[
+                _read_codebase_scan_artifact_metadata_item(artifact, f"artifacts[{index}]", errors)
+                for index, artifact in enumerate(_read_list(value, "artifacts", errors))
+            ],
+        )
+        _raise_if_errors(errors)
+        return payload
+
+
+@dataclass(frozen=True)
+class CodebaseScanFindingEvidence:
+    source: str
+    artifact_type: str | None
+    path: str | None
+    line_range: LineRange | None
+    excerpt: str
+    redacted: bool
+
+
+@dataclass(frozen=True)
+class CodebaseScanFinding:
+    schema_version: str
+    scan_run_id: str
+    repository_id: str
+    repository_full_name: str
+    default_branch: str
+    commit_sha: str
+    source: str
+    category: str
+    severity: str
+    confidence: str
+    file_path: str | None
+    start_line: int | None
+    end_line: int | None
+    title: str
+    body: str
+    evidence: list[CodebaseScanFindingEvidence]
+    recommendation: str | None
+    dedupe_key: str
+    status: str
+    first_seen_at: str | None
+    last_seen_at: str | None
+    resolved_at: str | None
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> "CodebaseScanFinding":
+        errors: list[str] = []
+        _read_literal(value, "schemaVersion", CODEBASE_SCAN_FINDING_SCHEMA_VERSION, errors)
+        evidence = [
+            _read_codebase_scan_finding_evidence(item, f"evidence[{index}]", errors)
+            for index, item in enumerate(_read_list(value, "evidence", errors))
+        ]
+        if not evidence:
+            errors.append("evidence must include at least one item")
+        start_line = _read_nullable_positive_int(value, "startLine", errors)
+        end_line = _read_nullable_positive_int(value, "endLine", errors)
+        _validate_nullable_line_bounds(start_line, end_line, "startLine", "endLine", errors)
+        payload = cls(
+            schema_version=CODEBASE_SCAN_FINDING_SCHEMA_VERSION,
+            scan_run_id=_read_non_empty_str(value, "scanRunId", errors),
+            repository_id=_read_non_empty_str(value, "repositoryId", errors),
+            repository_full_name=_read_non_empty_str(value, "repositoryFullName", errors),
+            default_branch=_read_non_empty_str(value, "defaultBranch", errors),
+            commit_sha=_read_non_empty_str(value, "commitSha", errors),
+            source=_read_literal_from_set(value, "source", FINDING_SOURCES, errors),
+            category=_read_literal_from_set(value, "category", CODEBASE_SCAN_FINDING_CATEGORIES, errors),
+            severity=_read_literal_from_set(value, "severity", SEVERITIES, errors),
+            confidence=_read_literal_from_set(value, "confidence", CODEBASE_SCAN_FINDING_CONFIDENCES, errors),
+            file_path=_read_nullable_str(value, "filePath", errors),
+            start_line=start_line,
+            end_line=end_line,
+            title=_read_non_empty_str(value, "title", errors),
+            body=_read_non_empty_str(value, "body", errors),
+            evidence=evidence,
+            recommendation=_read_nullable_str(value, "recommendation", errors),
+            dedupe_key=_read_non_empty_str(value, "dedupeKey", errors),
+            status=_read_literal_from_set(value, "status", CODEBASE_SCAN_FINDING_STATUSES, errors),
+            first_seen_at=_read_nullable_str(value, "firstSeenAt", errors),
+            last_seen_at=_read_nullable_str(value, "lastSeenAt", errors),
+            resolved_at=_read_nullable_str(value, "resolvedAt", errors),
+        )
+        _raise_if_errors(errors)
+        return payload
+
+
+@dataclass(frozen=True)
+class CodebaseScanReviewEnrichmentFinding:
+    finding_id: str
+    dedupe_key: str
+    source: str
+    category: str
+    severity: str
+    confidence: str
+    file_path: str | None
+    start_line: int | None
+    end_line: int | None
+    title: str
+    evidence: list[CodebaseScanFindingEvidence]
+    recommendation: str | None
+    first_seen_at: str
+    last_seen_at: str
+
+
+@dataclass(frozen=True)
+class CodebaseScanReviewEnrichment:
+    schema_version: str
+    review_run_id: str
+    repository_id: str
+    repository_full_name: str
+    pull_request_number: int
+    head_sha: str
+    touched_file_paths: list[str]
+    findings: list[CodebaseScanReviewEnrichmentFinding]
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> "CodebaseScanReviewEnrichment":
+        errors: list[str] = []
+        _read_literal(value, "schemaVersion", CODEBASE_SCAN_REVIEW_ENRICHMENT_SCHEMA_VERSION, errors)
+        payload = cls(
+            schema_version=CODEBASE_SCAN_REVIEW_ENRICHMENT_SCHEMA_VERSION,
+            review_run_id=_read_non_empty_str(value, "reviewRunId", errors),
+            repository_id=_read_non_empty_str(value, "repositoryId", errors),
+            repository_full_name=_read_non_empty_str(value, "repositoryFullName", errors),
+            pull_request_number=_read_positive_int(value, "pullRequestNumber", errors),
+            head_sha=_read_non_empty_str(value, "headSha", errors),
+            touched_file_paths=[
+                _read_value_non_empty_str(path, f"touchedFilePaths[{index}]", errors)
+                for index, path in enumerate(_read_list(value, "touchedFilePaths", errors))
+            ],
+            findings=[
+                _read_codebase_scan_review_enrichment_finding(finding, f"findings[{index}]", errors)
+                for index, finding in enumerate(_read_list(value, "findings", errors))
+            ],
+        )
+        _raise_if_errors(errors)
+        return payload
 
 
 @dataclass(frozen=True)
@@ -871,6 +1081,68 @@ def _read_finding_evidence(value: Any, path: str, errors: list[str]) -> FindingE
     )
 
 
+def _read_codebase_scan_artifact_metadata_item(
+    value: Any, path: str, errors: list[str]
+) -> CodebaseScanArtifactMetadataItem:
+    item = _as_object(value, path, errors)
+    metadata = item.get("metadata")
+    if not isinstance(metadata, Mapping):
+        errors.append(f"{path}.metadata must be an object")
+        metadata = {}
+    return CodebaseScanArtifactMetadataItem(
+        artifact_type=_read_literal_from_set(item, "artifactType", CODEBASE_SCAN_ARTIFACT_TYPES, errors, path),
+        storage_key=_read_non_empty_str(item, "storageKey", errors, path),
+        size_bytes=_read_non_negative_int(item, "sizeBytes", errors, path),
+        sha256=_read_non_empty_str(item, "sha256", errors, path),
+        redacted=_read_bool(item, "redacted", errors, path),
+        retention_expires_at=_read_non_empty_str(item, "retentionExpiresAt", errors, path),
+        metadata=metadata,
+    )
+
+
+def _read_codebase_scan_finding_evidence(value: Any, path: str, errors: list[str]) -> CodebaseScanFindingEvidence:
+    item = _as_object(value, path, errors)
+    return CodebaseScanFindingEvidence(
+        source=_read_literal_from_set(item, "source", FINDING_SOURCES, errors, path),
+        artifact_type=_read_nullable_literal_from_set(item, "artifactType", CODEBASE_SCAN_ARTIFACT_TYPES, errors, path),
+        path=_read_nullable_str(item, "path", errors, path),
+        line_range=_read_nullable_line_range(item.get("lineRange"), f"{path}.lineRange", errors),
+        excerpt=_read_non_empty_str(item, "excerpt", errors, path),
+        redacted=_read_bool(item, "redacted", errors, path),
+    )
+
+
+def _read_codebase_scan_review_enrichment_finding(
+    value: Any, path: str, errors: list[str]
+) -> CodebaseScanReviewEnrichmentFinding:
+    item = _as_object(value, path, errors)
+    evidence = [
+        _read_codebase_scan_finding_evidence(evidence, f"{path}.evidence[{index}]", errors)
+        for index, evidence in enumerate(_read_list(item, "evidence", errors, f"{path}.evidence"))
+    ]
+    if not evidence:
+        errors.append(f"{path}.evidence must include at least one item")
+    start_line = _read_nullable_positive_int(item, "startLine", errors, path)
+    end_line = _read_nullable_positive_int(item, "endLine", errors, path)
+    _validate_nullable_line_bounds(start_line, end_line, f"{path}.startLine", f"{path}.endLine", errors)
+    return CodebaseScanReviewEnrichmentFinding(
+        finding_id=_read_non_empty_str(item, "findingId", errors, path),
+        dedupe_key=_read_non_empty_str(item, "dedupeKey", errors, path),
+        source=_read_literal_from_set(item, "source", FINDING_SOURCES, errors, path),
+        category=_read_literal_from_set(item, "category", CODEBASE_SCAN_FINDING_CATEGORIES, errors, path),
+        severity=_read_literal_from_set(item, "severity", SEVERITIES, errors, path),
+        confidence=_read_literal_from_set(item, "confidence", CODEBASE_SCAN_FINDING_CONFIDENCES, errors, path),
+        file_path=_read_nullable_str(item, "filePath", errors, path),
+        start_line=start_line,
+        end_line=end_line,
+        title=_read_non_empty_str(item, "title", errors, path),
+        evidence=evidence,
+        recommendation=_read_nullable_str(item, "recommendation", errors, path),
+        first_seen_at=_read_non_empty_str(item, "firstSeenAt", errors, path),
+        last_seen_at=_read_non_empty_str(item, "lastSeenAt", errors, path),
+    )
+
+
 def _read_publish_inline_comment(value: Any, path: str, errors: list[str]) -> PublishInlineComment:
     item = _as_object(value, path, errors)
     return PublishInlineComment(
@@ -922,6 +1194,19 @@ def _read_literal_from_set(
         return actual
     errors.append(f"{path} must be one of {', '.join(sorted(expected))}")
     return ""
+
+
+def _read_nullable_literal_from_set(
+    value: Mapping[str, Any], key: str, expected: set[str], errors: list[str], prefix: str | None = None
+) -> str | None:
+    actual = value.get(key)
+    path = _join(prefix, key)
+    if actual is None:
+        return None
+    if isinstance(actual, str) and actual in expected:
+        return actual
+    errors.append(f"{path} must be one of {', '.join(sorted(expected))} or null")
+    return None
 
 
 def _read_object(value: Mapping[str, Any], key: str, errors: list[str], prefix: str | None = None) -> Mapping[str, Any]:
@@ -1041,6 +1326,18 @@ def _read_confidence(value: Mapping[str, Any], key: str, errors: list[str], pref
         return float(actual)
     errors.append(f"{path} must be a number between 0 and 1")
     return 0.0
+
+
+def _validate_nullable_line_bounds(
+    start_line: int | None, end_line: int | None, start_path: str, end_path: str, errors: list[str]
+) -> None:
+    if start_line is None and end_line is None:
+        return
+    if start_line is None or end_line is None:
+        errors.append(f"{start_path} and {end_path} must both be set or both be null")
+        return
+    if end_line < start_line:
+        errors.append(f"{end_path} must be greater than or equal to {start_path}")
 
 
 def _join(prefix: str | None, key: str) -> str:

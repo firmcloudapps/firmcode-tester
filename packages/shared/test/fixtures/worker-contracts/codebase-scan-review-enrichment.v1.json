@@ -1,0 +1,39 @@
+{
+  "schemaVersion": "codebase-scan-review-enrichment/v1",
+  "reviewRunId": "00000000-0000-4000-8000-000000000006",
+  "repositoryId": "00000000-0000-4000-8000-000000000002",
+  "repositoryFullName": "openclaw/firmcode",
+  "pullRequestNumber": 7,
+  "headSha": "head-sha",
+  "touchedFilePaths": ["apps/api/src/server.ts"],
+  "findings": [
+    {
+      "findingId": "00000000-0000-4000-8000-000000000902",
+      "dedupeKey": "semgrep:typescript.lang.security.audit.detect-child-process:apps/api/src/server.ts:42",
+      "source": "semgrep",
+      "category": "security",
+      "severity": "high",
+      "confidence": "high",
+      "filePath": "apps/api/src/server.ts",
+      "startLine": 42,
+      "endLine": 42,
+      "title": "Avoid shell execution with request data",
+      "evidence": [
+        {
+          "source": "semgrep",
+          "artifactType": "semgrep",
+          "path": "apps/api/src/server.ts",
+          "lineRange": {
+            "startLine": 42,
+            "endLine": 42
+          },
+          "excerpt": "exec(redactedUserInput)",
+          "redacted": true
+        }
+      ],
+      "recommendation": "Route the operation through an allowlisted command wrapper.",
+      "firstSeenAt": "2026-05-25T10:00:00.000Z",
+      "lastSeenAt": "2026-05-25T10:00:00.000Z"
+    }
+  ]
+}
