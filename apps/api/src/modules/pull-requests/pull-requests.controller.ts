@@ -2,12 +2,10 @@ import {
   BadRequestException,
   Controller,
   Get,
-  Headers,
   Inject,
   NotFoundException,
   Param,
   Query,
-  UnauthorizedException,
   UseGuards
 } from "@nestjs/common";
 import {
@@ -16,6 +14,11 @@ import {
   type PullRequestListFilters,
   type PullRequestListResponse
 } from "@firmcode/shared";
+import {
+  DashboardAuth,
+  resolveDashboardMembership,
+  type DashboardAuthParam
+} from "../auth/dashboard-auth.context";
 import { DashboardAuthGuard } from "../auth/dashboard-auth.guard";
 import {
   DASHBOARD_AUTH_STORE,
@@ -35,10 +38,10 @@ export class PullRequestsController {
   @Get()
   async listPullRequests(
     @Query() query: Record<string, string | string[] | undefined>,
-    @Headers("x-firmcode-workspace-id") workspaceIdHeader?: string | string[],
-    @Headers("x-firmcode-user-id") userIdHeader?: string | string[]
+    @DashboardAuth() auth: DashboardAuthParam,
+    userIdHeader?: string | string[]
   ): Promise<PullRequestListResponse> {
-    const membership = await this.requireMembership(workspaceIdHeader, userIdHeader);
+    const membership = await this.requireMembership(auth, userIdHeader);
 
     return this.pullRequestsStore.listPullRequests({
       workspaceId: membership.workspaceId,
@@ -49,11 +52,11 @@ export class PullRequestsController {
   @Get(":id")
   async getPullRequestDetail(
     @Param("id") id: string,
-    @Headers("x-firmcode-workspace-id") workspaceIdHeader?: string | string[],
-    @Headers("x-firmcode-user-id") userIdHeader?: string | string[]
+    @DashboardAuth() auth: DashboardAuthParam,
+    userIdHeader?: string | string[]
   ): Promise<PullRequestDetailResponse> {
     assertUuid("pull request ID", id);
-    const membership = await this.requireMembership(workspaceIdHeader, userIdHeader);
+    const membership = await this.requireMembership(auth, userIdHeader);
     const detail = await this.pullRequestsStore.getPullRequestDetail({
       workspaceId: membership.workspaceId,
       pullRequestId: id
@@ -67,24 +70,11 @@ export class PullRequestsController {
   }
 
   private async requireMembership(
-    workspaceIdHeader: string | string[] | undefined,
+    auth: DashboardAuthParam,
     userIdHeader: string | string[] | undefined
   ): Promise<DashboardMembership> {
-    const workspaceId = readSingleValue(workspaceIdHeader) ?? null;
-    const clerkUserId = readSingleValue(userIdHeader) ?? null;
-
-    if (workspaceId === null || clerkUserId === null) {
-      throw new UnauthorizedException("Dashboard authentication is required");
-    }
-
-    assertUuid("workspace ID", workspaceId);
-
-    const membership = await this.dashboardAuthStore.findActiveMembership({ workspaceId, clerkUserId });
-
-    if (membership === null) {
-      throw new NotFoundException("Pull request not found");
-    }
-
+    const membership = await resolveDashboardMembership(auth, userIdHeader, this.dashboardAuthStore, "Pull request not found");
+    assertUuid("workspace ID", membership.workspaceId);
     return membership;
   }
 }

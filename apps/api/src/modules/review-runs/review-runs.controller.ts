@@ -3,7 +3,6 @@ import {
   Controller,
   ForbiddenException,
   Get,
-  Headers,
   Inject,
   NotFoundException,
   Param,
@@ -21,10 +20,18 @@ import {
   type ReviewRunRetryResponse
 } from "@firmcode/shared";
 import { ReviewRunRetryService } from "./review-run-retry.service";
+import {
+  DashboardAuth,
+  hasDashboardCapability,
+  isDashboardRequestContext,
+  resolveDashboardMembership,
+  toDashboardServiceAuth,
+  type DashboardAuthParam,
+  type DashboardRequestContext
+} from "../auth/dashboard-auth.context";
 import { DashboardAuthGuard } from "../auth/dashboard-auth.guard";
 import {
   DASHBOARD_AUTH_STORE,
-  roleHasDashboardCapability,
   type DashboardAuthStore,
   type DashboardMembership
 } from "./dashboard-auth.store";
@@ -40,22 +47,28 @@ export class ReviewRunsController {
   ) {}
 
   @Get()
-  async listReviewRuns(@Query() query: Record<string, string | string[] | undefined>): Promise<ReviewRunListResponse> {
-    return this.reviewRunsStore.listReviewRuns(parseReviewRunListFilters(query));
+  async listReviewRuns(
+    @Query() query: Record<string, string | string[] | undefined>,
+    @DashboardAuth() auth?: DashboardAuthParam
+  ): Promise<ReviewRunListResponse> {
+    return this.reviewRunsStore.listReviewRuns({
+      ...parseReviewRunListFilters(query),
+      workspaceId: isDashboardRequestContext(auth) ? auth.workspaceId : undefined
+    });
   }
 
   @Get(":id")
   async getReviewRunDetail(
     @Param("id") id: string,
-    @Headers("x-firmcode-workspace-id") workspaceIdHeader?: string | string[],
-    @Headers("x-firmcode-user-id") userIdHeader?: string | string[]
+    @DashboardAuth() auth: DashboardAuthParam,
+    userIdHeader?: string | string[]
   ): Promise<ReviewRunDetail> {
     assertUuid("review run ID", id);
-    const membership = await this.requireMembership(workspaceIdHeader, userIdHeader);
+    const membership = await this.requireMembership(auth, userIdHeader);
     const detail = await this.reviewRunsStore.getReviewRunDetail(id, {
       workspaceId: membership.workspaceId,
-      canRetryReviewRun: roleHasDashboardCapability(membership.role, "retry_review_run"),
-      canAccessRawArtifacts: roleHasDashboardCapability(membership.role, "access_raw_artifacts")
+      canRetryReviewRun: hasMembershipCapability(membership, "retry_review_run"),
+      canAccessRawArtifacts: hasMembershipCapability(membership, "access_raw_artifacts")
     });
 
     if (detail === null) {
@@ -69,14 +82,14 @@ export class ReviewRunsController {
   async getRawArtifactAccess(
     @Param("id") id: string,
     @Param("artifactId") artifactId: string,
-    @Headers("x-firmcode-workspace-id") workspaceIdHeader?: string | string[],
-    @Headers("x-firmcode-user-id") userIdHeader?: string | string[]
+    @DashboardAuth() auth: DashboardAuthParam,
+    userIdHeader?: string | string[]
   ): Promise<RawReviewRunArtifactAccess> {
     assertUuid("review run ID", id);
     assertUuid("artifact ID", artifactId);
-    const membership = await this.requireMembership(workspaceIdHeader, userIdHeader);
+    const membership = await this.requireMembership(auth, userIdHeader);
 
-    if (!roleHasDashboardCapability(membership.role, "access_raw_artifacts")) {
+    if (!hasMembershipCapability(membership, "access_raw_artifacts")) {
       throw new ForbiddenException("Workspace role cannot access raw analysis artifacts");
     }
 
@@ -96,8 +109,8 @@ export class ReviewRunsController {
   @Post(":id/retry")
   async retryReviewRun(
     @Param("id") id: string,
-    @Headers("x-firmcode-workspace-id") workspaceIdHeader: string | string[] | undefined,
-    @Headers("x-firmcode-user-id") userIdHeader: string | string[] | undefined
+    @DashboardAuth() auth: DashboardAuthParam,
+    userIdHeader?: string | string[]
   ): Promise<ReviewRunRetryResponse> {
     if (this.retryService === undefined) {
       throw new NotFoundException("Review run not found");
@@ -105,32 +118,47 @@ export class ReviewRunsController {
 
     return this.retryService.retryReviewRun({
       reviewRunId: id,
-      workspaceId: readSingleValue(workspaceIdHeader) ?? null,
-      clerkUserId: readSingleValue(userIdHeader) ?? null
+      ...readServiceAuth(auth, userIdHeader)
     });
   }
 
   private async requireMembership(
-    workspaceIdHeader: string | string[] | undefined,
+    auth: DashboardAuthParam,
     userIdHeader: string | string[] | undefined
   ): Promise<DashboardMembership> {
-    const workspaceId = readSingleValue(workspaceIdHeader) ?? null;
-    const clerkUserId = readSingleValue(userIdHeader) ?? null;
-
-    if (workspaceId === null || clerkUserId === null) {
-      throw new UnauthorizedException("Dashboard authentication is required");
-    }
-
-    assertUuid("workspace ID", workspaceId);
-
-    const membership = await this.dashboardAuthStore.findActiveMembership({ workspaceId, clerkUserId });
-
-    if (membership === null) {
-      throw new NotFoundException("Review run not found");
-    }
-
+    const membership = await resolveDashboardMembership(auth, userIdHeader, this.dashboardAuthStore, "Review run not found");
+    assertUuid("workspace ID", membership.workspaceId);
     return membership;
   }
+}
+
+function readServiceAuth(auth: DashboardAuthParam, userIdHeader: string | string[] | undefined) {
+  if (typeof auth === "object" && auth !== null && !Array.isArray(auth) && "workspaceId" in auth) {
+    return toDashboardServiceAuth(auth as DashboardRequestContext);
+  }
+
+  return {
+    workspaceId: readSingleValue(auth) ?? null,
+    clerkUserId: readSingleValue(userIdHeader) ?? null
+  };
+}
+
+function hasMembershipCapability(
+  membership: DashboardMembership,
+  capability: Parameters<typeof hasDashboardCapability>[1]
+): boolean {
+  return hasDashboardCapability(
+    {
+      workspaceId: membership.workspaceId,
+      clerkUserId: membership.clerkUserId,
+      clerkOrgId: null,
+      sessionId: null,
+      role: membership.role,
+      capabilities: [],
+      clerkCapabilities: []
+    },
+    capability
+  );
 }
 
 function parseReviewRunListFilters(query: Record<string, string | string[] | undefined>): ReviewRunListFilters {

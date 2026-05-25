@@ -13,6 +13,17 @@ describe("DashboardAuthGuard", () => {
     await expect(guard.canActivate(createHttpContext({}))).rejects.toBeInstanceOf(UnauthorizedException);
   });
 
+  it("rejects malformed authorization headers", async () => {
+    const guard = createGuard();
+
+    await expect(guard.canActivate(createHttpContext({ authorization: "Basic abc" }))).rejects.toBeInstanceOf(
+      UnauthorizedException
+    );
+    await expect(guard.canActivate(createHttpContext({ authorization: "Bearer" }))).rejects.toBeInstanceOf(
+      UnauthorizedException
+    );
+  });
+
   it("rejects invalid bearer tokens", async () => {
     const guard = createGuard({
       verifier: {
@@ -41,20 +52,35 @@ describe("DashboardAuthGuard", () => {
     );
   });
 
-  it("resolves a valid personal workspace token into trusted request context headers", async () => {
+  it("rejects tokens with the wrong audience", async () => {
+    const guard = createGuard({
+      verifier: {
+        async verify() {
+          throw new UnauthorizedException("wrong audience");
+        }
+      }
+    });
+
+    await expect(
+      guard.canActivate(createHttpContext({ authorization: "Bearer wrong-audience" }))
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it("resolves a valid personal workspace token into trusted request context", async () => {
     const request = createRequest({ authorization: "Bearer personal-token" });
     const guard = createGuard();
 
     await expect(guard.canActivate(createHttpContext(request.headers, request))).resolves.toBe(true);
 
-    expect(request.headers["x-firmcode-user-id"]).toBe("user_personal");
-    expect(request.headers["x-firmcode-workspace-id"]).toBe("00000000-0000-4000-8000-000000000101");
+    expect(request.headers["x-firmcode-user-id"]).toBeUndefined();
+    expect(request.headers["x-firmcode-workspace-id"]).toBeUndefined();
     expect(request).toMatchObject({
       dashboardAuth: {
         clerkUserId: "user_personal",
         clerkOrgId: null,
         workspaceId: "00000000-0000-4000-8000-000000000101",
-        role: "developer"
+        role: "developer",
+        capabilities: expect.arrayContaining(["retry_review_run", "trigger_codebase_scan"])
       }
     });
   });
@@ -77,15 +103,16 @@ describe("DashboardAuthGuard", () => {
 
     await expect(guard.canActivate(createHttpContext(request.headers, request))).resolves.toBe(true);
 
-    expect(request.headers["x-firmcode-user-id"]).toBe("user_admin");
-    expect(request.headers["x-firmcode-workspace-id"]).toBe("00000000-0000-4000-8000-000000000202");
-    expect(request.headers["x-firmcode-clerk-billing-capability"]).toBe("manage_billing");
+    expect(request.headers["x-firmcode-user-id"]).toBeUndefined();
+    expect(request.headers["x-firmcode-workspace-id"]).toBeUndefined();
+    expect(request.headers["x-firmcode-clerk-billing-capability"]).toBeUndefined();
     expect(request).toMatchObject({
       dashboardAuth: {
         clerkUserId: "user_admin",
         clerkOrgId: "org_firmcode",
         workspaceId: "00000000-0000-4000-8000-000000000202",
-        role: "admin"
+        role: "admin",
+        capabilities: expect.arrayContaining(["manage_billing", "manage_github_installations"])
       }
     });
   });

@@ -25,8 +25,10 @@ import { randomUUID } from "crypto";
 
 export const REVIEW_RUNS_STORE = Symbol("REVIEW_RUNS_STORE");
 
+type ReviewRunListLookup = ReviewRunListFilters & { readonly workspaceId?: string };
+
 export interface ReviewRunsStore {
-  listReviewRuns(filters: ReviewRunListFilters): Promise<ReviewRunListResponse>;
+  listReviewRuns(filters: ReviewRunListLookup): Promise<ReviewRunListResponse>;
   getReviewRunDetail(reviewRunId: string, options?: ReviewRunDetailOptions): Promise<ReviewRunDetail | null>;
   getRawArtifactAccess(input: RawArtifactAccessLookup): Promise<RawReviewRunArtifactAccess | null>;
   createRetryReviewRun(input: CreateRetryReviewRunInput): Promise<ReviewRunRetryCreateResult>;
@@ -180,7 +182,7 @@ interface PublishedCommentRow {
 }
 
 export class EmptyReviewRunsStore implements ReviewRunsStore {
-  async listReviewRuns(filters: ReviewRunListFilters): Promise<ReviewRunListResponse> {
+  async listReviewRuns(filters: ReviewRunListLookup): Promise<ReviewRunListResponse> {
     return { reviewRuns: [], filters };
   }
 
@@ -207,7 +209,7 @@ export class PostgresReviewRunsStore implements ReviewRunsStore {
     private readonly createId: () => string = randomUUID
   ) {}
 
-  async listReviewRuns(filters: ReviewRunListFilters): Promise<ReviewRunListResponse> {
+  async listReviewRuns(filters: ReviewRunListLookup): Promise<ReviewRunListResponse> {
     const { whereSql, values } = buildReviewRunListWhereClause(filters);
     const result = await this.database.query<ReviewRunRow>(
       `
@@ -231,6 +233,7 @@ SELECT
   rr.updated_at
 FROM review_runs rr
 JOIN repositories r ON r.id = rr.repository_id
+JOIN github_installations gi ON gi.id = r.installation_id
 JOIN pull_requests pr ON pr.id = rr.pull_request_id
 ${whereSql}
 ORDER BY rr.created_at DESC
@@ -708,9 +711,14 @@ function getRetryability(
   return { retryable: true };
 }
 
-function buildReviewRunListWhereClause(filters: ReviewRunListFilters): { whereSql: string; values: unknown[] } {
+function buildReviewRunListWhereClause(filters: ReviewRunListLookup): { whereSql: string; values: unknown[] } {
   const conditions: string[] = [];
   const values: unknown[] = [];
+
+  if (filters.workspaceId !== undefined) {
+    values.push(filters.workspaceId);
+    conditions.push(`gi.workspace_id = $${values.length}`);
+  }
 
   if (filters.status !== undefined) {
     values.push(filters.status);

@@ -2,19 +2,22 @@ import {
   BadRequestException,
   Controller,
   Get,
-  Headers,
   Inject,
   NotFoundException,
   Param,
   Query,
-  UnauthorizedException,
   UseGuards
 } from "@nestjs/common";
 import { REVIEW_RUN_STATUSES, type CiFailureDetailResponse, type CiFailureListFilters, type CiFailureListResponse } from "@firmcode/shared";
+import {
+  DashboardAuth,
+  hasDashboardCapability,
+  resolveDashboardMembership,
+  type DashboardAuthParam
+} from "../auth/dashboard-auth.context";
 import { DashboardAuthGuard } from "../auth/dashboard-auth.guard";
 import {
   DASHBOARD_AUTH_STORE,
-  roleHasDashboardCapability,
   type DashboardAuthStore,
   type DashboardMembership
 } from "../review-runs/dashboard-auth.store";
@@ -31,14 +34,14 @@ export class CiFailuresController {
   @Get()
   async listCiFailures(
     @Query() query: Record<string, string | string[] | undefined>,
-    @Headers("x-firmcode-workspace-id") workspaceIdHeader?: string | string[],
-    @Headers("x-firmcode-user-id") userIdHeader?: string | string[]
+    @DashboardAuth() auth: DashboardAuthParam,
+    userIdHeader?: string | string[]
   ): Promise<CiFailureListResponse> {
-    const membership = await this.requireMembership(workspaceIdHeader, userIdHeader);
+    const membership = await this.requireMembership(auth, userIdHeader);
 
     return this.ciFailuresStore.listCiFailures({
       workspaceId: membership.workspaceId,
-      canAccessRawArtifacts: roleHasDashboardCapability(membership.role, "access_raw_artifacts"),
+      canAccessRawArtifacts: hasMembershipCapability(membership, "access_raw_artifacts"),
       filters: parseCiFailureListFilters(query)
     });
   }
@@ -46,15 +49,15 @@ export class CiFailuresController {
   @Get(":id")
   async getCiFailureDetail(
     @Param("id") id: string,
-    @Headers("x-firmcode-workspace-id") workspaceIdHeader?: string | string[],
-    @Headers("x-firmcode-user-id") userIdHeader?: string | string[]
+    @DashboardAuth() auth: DashboardAuthParam,
+    userIdHeader?: string | string[]
   ): Promise<CiFailureDetailResponse> {
     assertCiFailureId(id);
-    const membership = await this.requireMembership(workspaceIdHeader, userIdHeader);
+    const membership = await this.requireMembership(auth, userIdHeader);
     const detail = await this.ciFailuresStore.getCiFailureDetail({
       workspaceId: membership.workspaceId,
       ciFailureId: id,
-      canAccessRawArtifacts: roleHasDashboardCapability(membership.role, "access_raw_artifacts")
+      canAccessRawArtifacts: hasMembershipCapability(membership, "access_raw_artifacts")
     });
 
     if (detail === null) {
@@ -65,26 +68,31 @@ export class CiFailuresController {
   }
 
   private async requireMembership(
-    workspaceIdHeader: string | string[] | undefined,
+    auth: DashboardAuthParam,
     userIdHeader: string | string[] | undefined
   ): Promise<DashboardMembership> {
-    const workspaceId = readSingleValue(workspaceIdHeader) ?? null;
-    const clerkUserId = readSingleValue(userIdHeader) ?? null;
-
-    if (workspaceId === null || clerkUserId === null) {
-      throw new UnauthorizedException("Dashboard authentication is required");
-    }
-
-    assertUuid("workspace ID", workspaceId);
-
-    const membership = await this.dashboardAuthStore.findActiveMembership({ workspaceId, clerkUserId });
-
-    if (membership === null) {
-      throw new NotFoundException("CI failure not found");
-    }
-
+    const membership = await resolveDashboardMembership(auth, userIdHeader, this.dashboardAuthStore, "CI failure not found");
+    assertUuid("workspace ID", membership.workspaceId);
     return membership;
   }
+}
+
+function hasMembershipCapability(
+  membership: DashboardMembership,
+  capability: Parameters<typeof hasDashboardCapability>[1]
+): boolean {
+  return hasDashboardCapability(
+    {
+      workspaceId: membership.workspaceId,
+      clerkUserId: membership.clerkUserId,
+      clerkOrgId: null,
+      sessionId: null,
+      role: membership.role,
+      capabilities: [],
+      clerkCapabilities: []
+    },
+    capability
+  );
 }
 
 function parseCiFailureListFilters(query: Record<string, string | string[] | undefined>): CiFailureListFilters {

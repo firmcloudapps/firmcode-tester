@@ -3,7 +3,6 @@ import {
   Body,
   Controller,
   Get,
-  Headers,
   Inject,
   NotFoundException,
   Optional,
@@ -22,11 +21,19 @@ import type {
   RepositoryListResponse,
   RepositoryReviewConfiguration
 } from "@firmcode/shared";
+import {
+  DashboardAuth,
+  hasDashboardCapability,
+  isDashboardRequestContext,
+  resolveDashboardMembership,
+  toDashboardServiceAuth,
+  type DashboardAuthParam,
+  type DashboardRequestContext
+} from "../auth/dashboard-auth.context";
 import { DashboardAuthGuard } from "../auth/dashboard-auth.guard";
 import {
   DASHBOARD_AUTH_STORE,
   EmptyDashboardAuthStore,
-  roleHasDashboardCapability,
   type DashboardAuthStore,
   type DashboardMembership
 } from "../review-runs/dashboard-auth.store";
@@ -64,27 +71,33 @@ export class RepositoriesController {
   }
 
   @Get()
-  async listRepositories(@Query() query: Record<string, string | string[] | undefined>): Promise<RepositoryListResponse> {
-    return this.repositoriesStore.listRepositories(parseRepositoryListFilters(query));
+  async listRepositories(
+    @Query() query: Record<string, string | string[] | undefined>,
+    @DashboardAuth() auth?: DashboardAuthParam
+  ): Promise<RepositoryListResponse> {
+    return this.repositoriesStore.listRepositories({
+      ...parseRepositoryListFilters(query),
+      workspaceId: isDashboardRequestContext(auth) ? auth.workspaceId : undefined
+    });
   }
 
   @Get(":id")
   async getRepositoryDetail(
     @Param("id") id: string,
-    @Headers("x-firmcode-workspace-id") workspaceIdHeader: string | string[] | undefined,
-    @Headers("x-firmcode-user-id") userIdHeader: string | string[] | undefined
+    @DashboardAuth() auth: DashboardAuthParam,
+    userIdHeader?: string | string[]
   ): Promise<RepositoryDetailResponse> {
     assertUuid("repository ID", id);
-    const membership = await this.requireMembership(workspaceIdHeader, userIdHeader);
+    const membership = await this.requireMembership(auth, userIdHeader);
     const detail = await this.repositoriesStore.getRepositoryDetail({
       repositoryId: id,
       workspaceId: membership.workspaceId,
       permissions: {
-        canManageConfiguration: roleHasDashboardCapability(membership.role, "manage_repository_configuration"),
-        canRetryReviewRuns: roleHasDashboardCapability(membership.role, "retry_review_run"),
-        canAccessRawArtifacts: roleHasDashboardCapability(membership.role, "access_raw_artifacts"),
-        canTriggerCodebaseScans: roleHasDashboardCapability(membership.role, "trigger_codebase_scan"),
-        canManageCodebaseScans: roleHasDashboardCapability(membership.role, "manage_codebase_scan_findings")
+        canManageConfiguration: hasMembershipCapability(membership, "manage_repository_configuration"),
+        canRetryReviewRuns: hasMembershipCapability(membership, "retry_review_run"),
+        canAccessRawArtifacts: hasMembershipCapability(membership, "access_raw_artifacts"),
+        canTriggerCodebaseScans: hasMembershipCapability(membership, "trigger_codebase_scan"),
+        canManageCodebaseScans: hasMembershipCapability(membership, "manage_codebase_scan_findings")
       }
     });
 
@@ -98,11 +111,11 @@ export class RepositoriesController {
   @Get(":id/activity")
   async getRepositoryActivity(
     @Param("id") id: string,
-    @Headers("x-firmcode-workspace-id") workspaceIdHeader: string | string[] | undefined,
-    @Headers("x-firmcode-user-id") userIdHeader: string | string[] | undefined
+    @DashboardAuth() auth: DashboardAuthParam,
+    userIdHeader?: string | string[]
   ): Promise<RepositoryActivityResponse> {
     assertUuid("repository ID", id);
-    const membership = await this.requireMembership(workspaceIdHeader, userIdHeader);
+    const membership = await this.requireMembership(auth, userIdHeader);
     const activity = await this.repositoriesStore.listRepositoryActivity({
       repositoryId: id,
       workspaceId: membership.workspaceId
@@ -118,8 +131,8 @@ export class RepositoriesController {
   @Get(":id/configuration")
   async getRepositoryConfiguration(
     @Param("id") id: string,
-    @Headers("x-firmcode-workspace-id") workspaceIdHeader: string | string[] | undefined,
-    @Headers("x-firmcode-user-id") userIdHeader: string | string[] | undefined
+    @DashboardAuth() auth: DashboardAuthParam,
+    userIdHeader?: string | string[]
   ): Promise<RepositoryReviewConfiguration> {
     if (this.configurationService === undefined) {
       throw new NotFoundException("Repository not found");
@@ -127,8 +140,7 @@ export class RepositoriesController {
 
     return this.configurationService.getRepositoryConfiguration({
       repositoryId: id,
-      workspaceId: readSingleValue(workspaceIdHeader) ?? null,
-      clerkUserId: readSingleValue(userIdHeader) ?? null
+      ...readServiceAuth(auth, userIdHeader)
     });
   }
 
@@ -136,8 +148,8 @@ export class RepositoriesController {
   async updateRepositoryConfiguration(
     @Param("id") id: string,
     @Body() body: unknown,
-    @Headers("x-firmcode-workspace-id") workspaceIdHeader: string | string[] | undefined,
-    @Headers("x-firmcode-user-id") userIdHeader: string | string[] | undefined
+    @DashboardAuth() auth: DashboardAuthParam,
+    userIdHeader?: string | string[]
   ): Promise<RepositoryReviewConfiguration> {
     if (this.configurationService === undefined) {
       throw new NotFoundException("Repository not found");
@@ -145,8 +157,7 @@ export class RepositoriesController {
 
     return this.configurationService.updateRepositoryConfiguration({
       repositoryId: id,
-      workspaceId: readSingleValue(workspaceIdHeader) ?? null,
-      clerkUserId: readSingleValue(userIdHeader) ?? null,
+      ...readServiceAuth(auth, userIdHeader),
       body
     });
   }
@@ -154,8 +165,8 @@ export class RepositoriesController {
   @Post(":id/codebase-scans")
   async enqueueCodebaseScan(
     @Param("id") id: string,
-    @Headers("x-firmcode-workspace-id") workspaceIdHeader: string | string[] | undefined,
-    @Headers("x-firmcode-user-id") userIdHeader: string | string[] | undefined
+    @DashboardAuth() auth: DashboardAuthParam,
+    userIdHeader?: string | string[]
   ): Promise<CodebaseScanEnqueueResponse> {
     if (this.codebaseScanEnqueueService === undefined) {
       throw new NotFoundException("Repository not found");
@@ -163,32 +174,47 @@ export class RepositoriesController {
 
     return this.codebaseScanEnqueueService.enqueueManualScan({
       repositoryId: id,
-      workspaceId: readSingleValue(workspaceIdHeader) ?? null,
-      clerkUserId: readSingleValue(userIdHeader) ?? null
+      ...readServiceAuth(auth, userIdHeader)
     });
   }
 
   private async requireMembership(
-    workspaceIdHeader: string | string[] | undefined,
+    auth: DashboardAuthParam,
     userIdHeader: string | string[] | undefined
   ): Promise<DashboardMembership> {
-    const workspaceId = readSingleValue(workspaceIdHeader) ?? null;
-    const clerkUserId = readSingleValue(userIdHeader) ?? null;
-
-    if (workspaceId === null || clerkUserId === null) {
-      throw new UnauthorizedException("Dashboard authentication is required");
-    }
-
-    assertUuid("workspace ID", workspaceId);
-
-    const membership = await this.dashboardAuthStore.findActiveMembership({ workspaceId, clerkUserId });
-
-    if (membership === null) {
-      throw new NotFoundException("Repository not found");
-    }
-
+    const membership = await resolveDashboardMembership(auth, userIdHeader, this.dashboardAuthStore, "Repository not found");
+    assertUuid("workspace ID", membership.workspaceId);
     return membership;
   }
+}
+
+function readServiceAuth(auth: DashboardAuthParam, userIdHeader: string | string[] | undefined) {
+  if (typeof auth === "object" && auth !== null && !Array.isArray(auth) && "workspaceId" in auth) {
+    return toDashboardServiceAuth(auth as DashboardRequestContext);
+  }
+
+  return {
+    workspaceId: readSingleValue(auth) ?? null,
+    clerkUserId: readSingleValue(userIdHeader) ?? null
+  };
+}
+
+function hasMembershipCapability(
+  membership: DashboardMembership,
+  capability: Parameters<typeof hasDashboardCapability>[1]
+): boolean {
+  return hasDashboardCapability(
+    {
+      workspaceId: membership.workspaceId,
+      clerkUserId: membership.clerkUserId,
+      clerkOrgId: null,
+      sessionId: null,
+      role: membership.role,
+      capabilities: [],
+      clerkCapabilities: []
+    },
+    capability
+  );
 }
 
 function parseRepositoryListFilters(query: Record<string, string | string[] | undefined>): DashboardRepositoryListFilters {
