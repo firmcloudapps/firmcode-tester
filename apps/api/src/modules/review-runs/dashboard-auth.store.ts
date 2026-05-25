@@ -1,18 +1,19 @@
 import type { DatabaseExecutor } from "../../infrastructure/database/migrations";
+import type { DashboardRole } from "../auth/dashboard-authorization.policy";
 
 export const DASHBOARD_AUTH_STORE = Symbol("DASHBOARD_AUTH_STORE");
 
-export type DashboardRole = "owner" | "admin" | "developer" | "viewer";
-export type DashboardCapability =
-  | "retry_review_run"
-  | "trigger_codebase_scan"
-  | "manage_codebase_scan_findings"
-  | "manage_repository_configuration"
-  | "manage_review_policies"
-  | "manage_sensitive_settings"
-  | "access_raw_artifacts"
-  | "manage_billing"
-  | "manage_github_installations";
+export {
+  DASHBOARD_APP_ROLES,
+  DASHBOARD_CAPABILITIES,
+  DASHBOARD_ROLE_CAPABILITY_MATRIX,
+  hasClerkManagedBillingCapability,
+  normalizeDashboardAppRole,
+  roleHasDashboardCapability,
+  type DashboardAppRole,
+  type DashboardCapability,
+  type DashboardRole
+} from "../auth/dashboard-authorization.policy";
 
 export interface DashboardMembership {
   workspaceId: string;
@@ -28,43 +29,6 @@ interface DashboardMembershipRow {
   readonly workspace_id: string;
   readonly clerk_user_id: string;
   readonly role: DashboardRole;
-}
-
-export function roleHasDashboardCapability(
-  role: DashboardRole,
-  capability: DashboardCapability,
-  options: { hasClerkBillingCapability?: boolean } = {}
-): boolean {
-  switch (capability) {
-    case "retry_review_run":
-      return role === "owner" || role === "admin" || role === "developer";
-    case "trigger_codebase_scan":
-      return role === "owner" || role === "admin" || role === "developer";
-    case "manage_codebase_scan_findings":
-      return role === "owner" || role === "admin";
-    case "manage_repository_configuration":
-      return role === "owner" || role === "admin" || role === "developer";
-    case "manage_review_policies":
-      return role === "owner" || role === "admin";
-    case "manage_sensitive_settings":
-      return role === "owner" || role === "admin";
-    case "access_raw_artifacts":
-      return role === "owner" || role === "admin" || role === "developer";
-    case "manage_billing":
-      return role === "owner" || role === "admin" || options.hasClerkBillingCapability === true;
-    case "manage_github_installations":
-      return role === "owner" || role === "admin";
-  }
-}
-
-export function hasClerkManagedBillingCapability(value: string | string[] | undefined): boolean {
-  const candidate = Array.isArray(value) ? value[0] : value;
-
-  if (candidate === undefined || candidate === "") {
-    return false;
-  }
-
-  return ["manage_billing", "billing_admin", "org:billing:manage", "true"].includes(candidate);
 }
 
 export class EmptyDashboardAuthStore implements DashboardAuthStore {

@@ -128,6 +128,17 @@ describe("dashboard API controllers", () => {
     expect(JSON.stringify(detail)).not.toContain("artifacts/run-6");
   });
 
+  it("uses the verified dashboard auth context for repository detail even if a legacy user value is spoofed", async () => {
+    const detail = await repositoriesController.getRepositoryDetail(
+      "00000000-0000-4000-8000-000000000002",
+      dashboardAuth({ clerkUserId: DEVELOPER_USER_ID, workspaceId: WORKSPACE_ID }),
+      "user_attacker"
+    );
+
+    expect(detail.repository.id).toBe("00000000-0000-4000-8000-000000000002");
+    expect(detail.repository.fullName).toBe("openclaw/firmcode");
+  });
+
   it("returns repository activity independently from detail data", async () => {
     const response = await repositoriesController.getRepositoryActivity(
       "00000000-0000-4000-8000-000000000002",
