@@ -18,6 +18,7 @@ export type GitHubAppInstallConfig =
 
 const INSTALL_URL_VARIABLES = ["GITHUB_APP_INSTALL_URL", "NEXT_PUBLIC_GITHUB_APP_INSTALL_URL"] as const;
 const SLUG_VARIABLES = ["GITHUB_APP_SLUG", "NEXT_PUBLIC_GITHUB_APP_SLUG"] as const;
+const GITHUB_APP_INSTALL_PATH = /^\/apps\/[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\/installations\/new\/?$/i;
 
 export function loadGitHubAppInstallConfig(env: EnvironmentVariables = process.env): GitHubAppInstallConfig {
   const configuredUrl = readFirst(env, INSTALL_URL_VARIABLES);
@@ -42,11 +43,19 @@ function toInstallUrlConfig(variable: string, value: string): GitHubAppInstallCo
   try {
     const url = new URL(value);
 
-    if (url.protocol !== "https:" && url.protocol !== "http:") {
+    if (url.protocol !== "https:") {
       return {
         status: "invalid",
         variable,
-        message: "must be an absolute HTTP or HTTPS URL"
+        message: "must be an absolute HTTPS GitHub App installation URL"
+      };
+    }
+
+    if (url.hostname.toLowerCase() !== "github.com" || !GITHUB_APP_INSTALL_PATH.test(url.pathname)) {
+      return {
+        status: "invalid",
+        variable,
+        message: "must point to https://github.com/apps/<slug>/installations/new"
       };
     }
 

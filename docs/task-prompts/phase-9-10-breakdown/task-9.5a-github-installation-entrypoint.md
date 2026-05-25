@@ -1,6 +1,6 @@
 # Task 9.5a: GitHub Installation Entry Point
 
-```text
+Ensure you read the existing code on this task before you make any change
 Read AGENTS.md first and follow it strictly.
 Relevant planning docs: docs/TASKS.md Task 9.0 and Task 9.5, docs/TASK_PROMPTS.md Task 9.0 and Task 9.5, docs/PRD.md, docs/DASHBOARD_DESIGN.md, docs/DASHBOARD_PROMPTS.md, docs/AUTHORIZATION.md, docs/ENVIRONMENT.md, docs/DEPLOYMENT.md.
 Code context requirement: Before implementing, inspect the current dashboard shell, topbar Connect GitHub action, settings GitHub App tab, Next.js route tree, Clerk auth helpers, environment config, and tests.
@@ -21,4 +21,3 @@ Acceptance criteria:
 - Connect GitHub and PR Review reach real implemented destinations or explicit disabled states.
 - Missing config is handled without leaking secrets.
 - Tests pass through the documented local command, or inability to run them is documented with exact command and failure.
-```

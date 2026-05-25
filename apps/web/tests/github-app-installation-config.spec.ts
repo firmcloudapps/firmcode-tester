@@ -43,4 +43,28 @@ describe("GitHub App installation config", () => {
       message: "must be an absolute GitHub App installation URL"
     });
   });
+
+  it("rejects a non-GitHub install URL without echoing secret config", () => {
+    expect(
+      loadGitHubAppInstallConfig({
+        GITHUB_APP_INSTALL_URL: "https://example.com/apps/firmcode/installations/new"
+      })
+    ).toEqual({
+      status: "invalid",
+      variable: "GITHUB_APP_INSTALL_URL",
+      message: "must point to https://github.com/apps/<slug>/installations/new"
+    });
+  });
+
+  it("rejects non-HTTPS GitHub install URLs", () => {
+    expect(
+      loadGitHubAppInstallConfig({
+        GITHUB_APP_INSTALL_URL: "http://github.com/apps/firmcode/installations/new"
+      })
+    ).toEqual({
+      status: "invalid",
+      variable: "GITHUB_APP_INSTALL_URL",
+      message: "must be an absolute HTTPS GitHub App installation URL"
+    });
+  });
 });
