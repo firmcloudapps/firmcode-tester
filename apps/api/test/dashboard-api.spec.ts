@@ -9,6 +9,7 @@ import { PostgresFindingsStore } from "../src/modules/review-runs/findings.store
 import { PostgresDashboardAuthStore } from "../src/modules/review-runs/dashboard-auth.store";
 import { ReviewRunsController } from "../src/modules/review-runs/review-runs.controller";
 import { PostgresReviewRunsStore } from "../src/modules/review-runs/review-runs.store";
+import type { DashboardRequestContext } from "../src/modules/auth/dashboard-auth.context";
 
 interface PgPoolLike {
   query<Row = unknown>(sql: string, values?: readonly unknown[]): Promise<{ rows: Row[] }>;
@@ -55,7 +56,7 @@ describe("dashboard API controllers", () => {
   });
 
   it("lists repositories with enabled status, findings, and last review", async () => {
-    const response = await repositoriesController.listRepositories({});
+    const response = await repositoriesController.listRepositories({}, dashboardAuth());
 
     expect(response.repositories).toHaveLength(2);
     expect(response.repositories[0]).toMatchObject({
@@ -78,7 +79,7 @@ describe("dashboard API controllers", () => {
       enabled: "true",
       private: "false",
       language: "typescript"
-    });
+    }, dashboardAuth());
 
     expect(response.repositories.map((repository) => repository.fullName)).toEqual(["openclaw/firmcode"]);
   });
@@ -166,7 +167,7 @@ describe("dashboard API controllers", () => {
       repository: "openclaw/firmcode",
       dateFrom: "2026-05-22T00:00:00.000Z",
       dateTo: "2026-05-23T00:00:00.000Z"
-    });
+    }, dashboardAuth());
 
     expect(response.reviewRuns).toHaveLength(1);
     expect(response.reviewRuns[0]).toMatchObject({
@@ -349,7 +350,7 @@ describe("dashboard API controllers", () => {
   });
 
   it("rejects invalid filters and missing review run details", async () => {
-    await expect(reviewRunsController.listReviewRuns({ status: "done" })).rejects.toThrow(BadRequestException);
+    await expect(reviewRunsController.listReviewRuns({ status: "done" }, dashboardAuth())).rejects.toThrow(BadRequestException);
     await expect(findingsController.listFindings({ severity: "urgent" }, WORKSPACE_ID, DEVELOPER_USER_ID)).rejects.toThrow(BadRequestException);
     await expect(findingsController.listFindings({ postedInline: "sometimes" }, WORKSPACE_ID, DEVELOPER_USER_ID)).rejects.toThrow(BadRequestException);
     await expect(
@@ -357,6 +358,21 @@ describe("dashboard API controllers", () => {
     ).rejects.toThrow(NotFoundException);
   });
 });
+
+function dashboardAuth(
+  overrides: Partial<DashboardRequestContext> = {}
+): DashboardRequestContext {
+  return {
+    workspaceId: WORKSPACE_ID,
+    clerkUserId: DEVELOPER_USER_ID,
+    clerkOrgId: "org_firmcode",
+    sessionId: "sess_test",
+    role: "developer",
+    capabilities: ["retry_review_run", "trigger_codebase_scan", "access_raw_artifacts"],
+    clerkCapabilities: [],
+    ...overrides
+  };
+}
 
 async function seedDashboardData(pool: PgPoolLike): Promise<void> {
   await pool.query(

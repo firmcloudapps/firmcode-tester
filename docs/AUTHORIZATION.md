@@ -61,7 +61,7 @@ The MVP must ship with real Clerk-backed authentication before any dashboard dat
 - Clerk Organizations enabled:
   - Map each Clerk organization to one `workspaces` row by `clerk_org_id`.
   - Map Clerk organization memberships to `workspace_memberships`.
-  - Prefer explicit Firmcode role metadata when configured.
+  - Prefer explicit Firmcode role metadata when configured in trusted Clerk JWT claims. The API reads `firmcode_role`, `org_firmcode_role`, `firmcode.role`, `organization_metadata.firmcode_role`, `public_metadata.firmcode_role`, or `metadata.firmcode_role`; `admin`/legacy `owner` resolve to Admin and `developer`/`member` resolve to Developer.
   - Fallback role mapping:
     - Clerk organization admin/owner -> `admin`.
     - Clerk member -> `developer`.
@@ -70,6 +70,8 @@ The MVP must ship with real Clerk-backed authentication before any dashboard dat
   - The owning user is `developer` by default unless an internal seed or support flow explicitly grants `admin`.
 - Sync membership from Clerk webhooks and also repair/ensure the active workspace on authenticated requests so first login does not require manual seed data.
 - Persist role changes with `updated_at` and write audit events for admin grants or removals.
+
+Current sync boundary: until a dedicated Clerk webhook endpoint is added, authenticated API requests are the repair boundary for the active personal or organization workspace. Request-time resolution creates missing personal/org workspace rows, creates missing active memberships, updates role changes derived from trusted Clerk organization claims, refuses memberships already marked inactive, and writes `workspace_audit_events` for Admin grants/removals. Clerk user, organization, and membership deletion/deactivation events must be reflected by an internal support/admin sync or the future Clerk webhook before the next request; the resolver will not reactivate an inactive membership.
 
 ### Authenticated Request Flow
 
@@ -171,7 +173,7 @@ Every dashboard API should enforce workspace access by `workspace_id`. Do not tr
 
 Codebase scan run and finding APIs must enforce ownership through the scan run repository and GitHub installation workspace before exposing scan artifacts, unresolved repository findings, or review enrichment data.
 
-Production dashboard APIs must not accept caller identity from `x-firmcode-user-id`, `FIRMCODE_DASHBOARD_CLERK_USER_ID`, or any equivalent client-controlled value. Isolated web tests may use `FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN` as a clearly named bearer-token fixture, but it must not be treated as production auth.
+Production dashboard APIs must not accept caller identity from `x-firmcode-user-id`, `FIRMCODE_DASHBOARD_CLERK_USER_ID`, or any equivalent client-controlled value. Isolated web tests may use `FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN` as a clearly named bearer-token fixture, but it must not be treated as production auth. Direct controller unit tests may still pass legacy workspace/user strings only under `NODE_ENV=test`; the same fallback throws `401` outside tests.
 
 ## Implementation Acceptance Criteria
 

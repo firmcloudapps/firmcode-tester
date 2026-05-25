@@ -4,6 +4,7 @@ import { runDatabaseMigrations } from "../src/infrastructure/database/migrations
 import { BillingController } from "../src/modules/billing/billing.controller";
 import { BillingService } from "../src/modules/billing/billing.service";
 import { PostgresDashboardAuthStore } from "../src/modules/review-runs/dashboard-auth.store";
+import type { DashboardRequestContext } from "../src/modules/auth/dashboard-auth.context";
 
 interface PgPoolLike {
   query<Row = unknown>(sql: string, values?: readonly unknown[]): Promise<{ rows: Row[] }>;
@@ -65,7 +66,26 @@ describe("billing dashboard API", () => {
       UnauthorizedException
     );
   });
+
+  it("does not let spoofed billing capability headers elevate a verified Clerk developer context", async () => {
+    await expect(
+      controller.getWorkspaceBilling(dashboardAuth({ role: "developer" }), undefined, "manage_billing")
+    ).rejects.toThrow(ForbiddenException);
+  });
 });
+
+function dashboardAuth(overrides: Partial<DashboardRequestContext> = {}): DashboardRequestContext {
+  return {
+    workspaceId: WORKSPACE_ID,
+    clerkUserId: DEVELOPER_USER_ID,
+    clerkOrgId: "org_firmcode",
+    sessionId: "sess_test",
+    role: "developer",
+    capabilities: ["retry_review_run"],
+    clerkCapabilities: [],
+    ...overrides
+  };
+}
 
 async function seedBillingData(pool: PgPoolLike): Promise<void> {
   await pool.query(

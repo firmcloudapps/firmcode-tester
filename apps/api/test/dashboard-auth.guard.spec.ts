@@ -95,6 +95,7 @@ describe("DashboardAuthGuard", () => {
             clerkOrgId: "org_firmcode",
             sessionId: "sess_org",
             orgRole: "org:admin",
+            firmcodeRole: null,
             billingCapabilities: ["org:billing:manage"]
           };
         }
@@ -164,6 +165,7 @@ class FakeVerifier implements ClerkTokenVerifier {
       clerkOrgId: null,
       sessionId: "sess_personal",
       orgRole: null,
+      firmcodeRole: null,
       billingCapabilities: []
     };
   }

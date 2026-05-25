@@ -73,7 +73,7 @@ The production dashboard authentication flow is:
 2. Web server code reads Clerk auth state with `auth()` and obtains a Clerk session token for `CLERK_JWT_AUDIENCE`.
 3. Web-to-API calls send `Authorization: Bearer <Clerk session token>`.
 4. The NestJS API verifies the token with Clerk, derives the Clerk user and organization claims, resolves the Firmcode workspace/membership, and then applies role/capability checks.
-5. The API must ignore client-provided user identity headers. Web tests may use `FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN` as an isolated bearer-token fixture, but production and normal local development must use Clerk sessions.
+5. The API must ignore client-provided user identity headers. Web tests may use `FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN` as an isolated bearer-token fixture, but production and normal local development must use Clerk sessions. Any legacy workspace/user shortcut is gated to `NODE_ENV=test` for direct controller tests only; setting `FIRMCODE_DASHBOARD_*` or sending `x-firmcode-user-id` is not a supported runtime authentication path.
 
 Required Clerk dashboard configuration:
 
@@ -87,6 +87,9 @@ Required Clerk dashboard configuration:
 - After sign-up URL: `/`
 - Organization settings enabled if team workspaces are supported in the environment.
 - Clerk webhook endpoint configured only after the API endpoint exists and `CLERK_WEBHOOK_SECRET` is set.
+- Optional trusted JWT role metadata for organization memberships can be exposed as `firmcode_role`, `org_firmcode_role`, `firmcode.role`, `organization_metadata.firmcode_role`, `public_metadata.firmcode_role`, or `metadata.firmcode_role`. Firmcode maps `admin`/legacy `owner` to Admin and `developer`/`member` to Developer; if absent, Clerk org admin/owner maps to Admin and org member maps to Developer.
+
+Clerk webhook sync boundary: the API currently repairs the active workspace and membership at request time. A future Clerk webhook endpoint should consume user, organization, and organization-membership lifecycle events, set removed memberships inactive, and record elevated role changes in `workspace_audit_events`. Until that endpoint is deployed, support/admin sync must mark deleted or removed memberships inactive; request-time repair will not reactivate inactive memberships.
 
 ## GitHub App
 

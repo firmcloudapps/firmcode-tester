@@ -105,6 +105,9 @@ Run these checks before enabling real GitHub publishing:
 - The dashboard shell shows Clerk account controls.
 - Dashboard requests reach the Coolify API through `NEXT_PUBLIC_API_URL`.
 - Dashboard API requests include a Clerk bearer token.
+- GitHub OAuth start/callback routes require the signed-in Clerk browser session and redirect to `/sign-in` when it is missing.
+- Billing management is visible only to Admins or users whose Clerk token includes the billing management capability.
+- No production dashboard path depends on `FIRMCODE_DASHBOARD_*` or `x-firmcode-user-id`.
 - Coolify API CORS allows the Vercel production origin.
 - Preview deployment can call the API if preview deployments are enabled.
 

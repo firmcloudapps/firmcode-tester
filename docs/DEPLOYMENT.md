@@ -215,9 +215,13 @@ infra/deploy/coolify.md
 - Clerk user menu works.
 - Clerk organization/workspace switcher works where enabled.
 - Vercel dashboard can call Coolify API.
+- Dashboard API requests include `Authorization: Bearer <Clerk token>`.
 - Direct Coolify dashboard API calls without a Clerk token return `401`.
 - Spoofed user/workspace headers cannot impersonate another user.
 - Cross-workspace resource requests are denied.
+- Admin and Developer role gates match `docs/AUTHORIZATION.md`.
+- GitHub OAuth start/callback require a signed-in Clerk user.
+- Billing management requires Admin or a verified Clerk Billing capability.
 - API health/readiness checks pass.
 - Worker is connected to Redis.
 - API and worker can reach NeonDB.

@@ -25,6 +25,8 @@ Action:
 - If only API calls fail, compare the token audience/template used by web with the audience expected by the API.
 - Confirm server logs include a correlation ID and auth error class, but do not log token contents.
 - Treat production fallback to `FIRMCODE_DASHBOARD_CLERK_USER_ID` or `x-firmcode-user-id` as a security incident; remove the bypass and redeploy.
+- If a dashboard API succeeds only when `FIRMCODE_DASHBOARD_*` or `x-firmcode-user-id` is present, roll back or disable the affected route. Those values are never production auth; only `NODE_ENV=test` controller tests may use legacy workspace/user shortcuts.
+- For billing failures, inspect the resolved workspace role and Clerk billing capability claims. Do not accept a caller-provided billing capability header as proof.
 
 ## Workspace Or Role Mapping Failure
 
