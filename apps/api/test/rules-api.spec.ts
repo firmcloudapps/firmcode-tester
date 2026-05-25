@@ -95,11 +95,14 @@ describe("rules and policies dashboard API", () => {
 
   it("allows Developer and Viewer roles to read policies as read-only", async () => {
     const developer = await controller.getRules(undefined, WORKSPACE_ID, DEVELOPER_USER_ID);
+    const developerRepository = await controller.getRules(REPOSITORY_ID, WORKSPACE_ID, DEVELOPER_USER_ID);
     const viewer = await controller.getRules(undefined, WORKSPACE_ID, VIEWER_USER_ID);
 
     expect(developer.permissions.canManagePolicies).toBe(false);
+    expect(developerRepository.permissions.canManagePolicies).toBe(true);
     expect(viewer.permissions.canManagePolicies).toBe(false);
     expect(developer.workspacePolicy.commentPolicy.severityThreshold).toBe("medium");
+    expect(developerRepository.selectedRepositoryPolicy?.repositoryId).toBe(REPOSITORY_ID);
     expect(viewer.workspacePolicy.commentPolicy.maxInlineComments).toBe(10);
   });
 
@@ -201,6 +204,33 @@ describe("rules and policies dashboard API", () => {
     expect(response.repositoryPolicies[0]).toMatchObject({
       repositoryId: REPOSITORY_ID,
       fullName: "openclaw/firmcode"
+    });
+
+    const developerResponse = await controller.updateRules(
+      {
+        repositoryId: REPOSITORY_ID,
+        semgrep: {
+          includeInfrastructureRules: false
+        },
+        infrastructureSecurity: {
+          securityReviewEnabled: false
+        }
+      },
+      WORKSPACE_ID,
+      DEVELOPER_USER_ID
+    );
+
+    expect(developerResponse.selectedRepositoryPolicy).toMatchObject({
+      repositoryId: REPOSITORY_ID,
+      semgrep: {
+        enabled: true,
+        includeInfrastructureRules: false
+      },
+      infrastructureSecurity: {
+        securityReviewEnabled: false,
+        dependencyReviewEnabled: true
+      },
+      updatedByClerkUserId: DEVELOPER_USER_ID
     });
   });
 
