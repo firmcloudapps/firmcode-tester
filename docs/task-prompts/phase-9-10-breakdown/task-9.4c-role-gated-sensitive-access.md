@@ -1,6 +1,6 @@
 # Task 9.4c: Role-Gated Sensitive Access
 
-```text
+Ensure you read the existing code on this task before you make any change
 Read AGENTS.md first and follow it strictly.
 Relevant planning docs: docs/TASKS.md Task 9.4, docs/TASK_PROMPTS.md Task 9.4, docs/AUTHORIZATION.md, docs/PRIVACY_RETENTION.md, docs/DASHBOARD_DESIGN.md.
 Code context requirement: Before implementing, inspect existing authorization policies, dashboard routes, settings and billing APIs, artifact access paths, review run detail UI, and tests.
@@ -21,4 +21,4 @@ Acceptance criteria:
 - Raw artifact access is role-gated.
 - UI does not offer unauthorized sensitive actions as active controls.
 - Tests pass through the documented local command, or inability to run them is documented with exact command and failure.
-```
+
