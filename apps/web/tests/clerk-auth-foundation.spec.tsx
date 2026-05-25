@@ -6,7 +6,7 @@ import { clerkAppearance } from "../components/auth/auth-page";
 import { DashboardShell } from "../components/dashboard/dashboard-shell";
 import { forwardDashboardApiMutation } from "../lib/dashboard-api-proxy";
 import { isProtectedDashboardPath, PROTECTED_DASHBOARD_ROUTES } from "../lib/protected-routes";
-import middlewareConfig, { protectDashboardRequest } from "../middleware";
+import middlewareConfig, { hasClerkMiddlewareConfig, protectDashboardRequest } from "../middleware";
 import { config as nextMiddlewareConfig } from "../middleware";
 
 describe("Clerk route protection", () => {
@@ -33,9 +33,7 @@ describe("Clerk route protection", () => {
 
     await protectDashboardRequest(auth, new Request("https://firmcode.test/repositories"));
 
-    expect(auth.protect).toHaveBeenCalledWith({
-      unauthenticatedUrl: "https://firmcode.test/sign-in"
-    });
+    expect(auth.protect).toHaveBeenCalledWith();
   });
 
   it("does not invoke Clerk protect for public auth pages or static assets", async () => {
@@ -47,6 +45,28 @@ describe("Clerk route protection", () => {
     await protectDashboardRequest(auth, new Request("https://firmcode.test/assets/logo.svg"));
 
     expect(auth.protect).not.toHaveBeenCalled();
+  });
+
+  it("fails closed for protected routes when Clerk middleware keys are unavailable", async () => {
+    const originalPublishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+    const originalSecretKey = process.env.CLERK_SECRET_KEY;
+
+    delete process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+    delete process.env.CLERK_SECRET_KEY;
+
+    try {
+      expect(hasClerkMiddlewareConfig()).toBe(false);
+
+      const pageResponse = await middlewareConfig(new Request("https://firmcode.test/") as never, {} as never);
+      const apiResponse = await middlewareConfig(new Request("https://firmcode.test/api/rules") as never, {} as never);
+
+      expect(pageResponse?.headers.get("location")).toBe("https://firmcode.test/sign-in");
+      expect(apiResponse?.status).toBe(401);
+      await expect(apiResponse?.json()).resolves.toMatchObject({ message: expect.stringContaining("Clerk session") });
+    } finally {
+      restoreEnv("NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY", originalPublishableKey);
+      restoreEnv("CLERK_SECRET_KEY", originalSecretKey);
+    }
   });
 });
 
@@ -137,3 +157,12 @@ describe("dashboard to API Clerk token integration", () => {
     await expect(response.json()).resolves.toMatchObject({ message: expect.stringContaining("Clerk session") });
   });
 });
+
+function restoreEnv(name: string, value: string | undefined): void {
+  if (value === undefined) {
+    delete process.env[name];
+    return;
+  }
+
+  process.env[name] = value;
+}
