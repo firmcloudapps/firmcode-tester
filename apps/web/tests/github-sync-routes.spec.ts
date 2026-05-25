@@ -5,6 +5,7 @@ import { GET as readCiFailure } from "../app/api/ci-failures/[id]/route";
 import { POST as syncInstallations } from "../app/api/github/installations/sync/route";
 import { GET as readRules, PATCH as saveRules } from "../app/api/rules/route";
 import { POST as syncRepository } from "../app/api/repositories/[id]/sync/route";
+import { parseGitHubInstallationsNotice } from "../lib/github-installations-notice";
 
 describe("GitHub sync routes", () => {
   const originalApiUrl = process.env.NEXT_PUBLIC_API_URL;
@@ -86,6 +87,14 @@ describe("GitHub sync routes", () => {
     expect(headers.get("x-firmcode-workspace-id")).toBe("workspace-1");
     expect(headers.get("x-firmcode-user-id")).toBeNull();
     expect(response.headers.get("location")).toBe("https://firmcode.firmoncloud.com/github/installations?github_oauth=connected");
+  });
+
+  it("parses safe GitHub setup callback notices from query params", () => {
+    expect(parseGitHubInstallationsNotice({ github_oauth: "connected" })).toBe("oauth-connected");
+    expect(parseGitHubInstallationsNotice({ github_oauth: "error" })).toBe("oauth-error");
+    expect(parseGitHubInstallationsNotice({ github_installation: "connected" })).toBe("installation-connected");
+    expect(parseGitHubInstallationsNotice({ github_installation: "error" })).toBe("installation-error");
+    expect(parseGitHubInstallationsNotice({ github_oauth: "oauth-code", github_installation: "raw-payload" })).toBeNull();
   });
 
   it("redirects GitHub OAuth callback to sign-in before calling the API when Clerk auth is missing", async () => {

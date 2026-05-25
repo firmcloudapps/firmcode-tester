@@ -103,6 +103,56 @@ describe("GitHubInstallationsView", () => {
     expect(html).toContain("Run");
   });
 
+  it("renders installation instructions in the setup workspace", () => {
+    const html = renderToString(
+      <GitHubInstallationsView
+        state={{ status: "populated", data: syncData(developerSettings, true) }}
+        installConfig={{
+          status: "configured",
+          installUrl: "https://github.com/apps/firmcode/installations/new",
+          source: "GITHUB_APP_INSTALL_URL"
+        }}
+      />
+    );
+
+    expect(html).toContain("GitHub setup instructions");
+    expect(html).toContain("1. Connect GitHub OAuth");
+    expect(html).toContain("2. Install the GitHub App");
+    expect(html).toContain("3. Sync repositories");
+  });
+
+  it("renders OAuth callback success and retry error notices without raw payloads", () => {
+    const successHtml = renderToString(
+      <GitHubInstallationsView
+        state={{ status: "empty", data: syncData(emptySettings, true) }}
+        installConfig={{
+          status: "configured",
+          installUrl: "https://github.com/apps/firmcode/installations/new",
+          source: "GITHUB_APP_INSTALL_URL"
+        }}
+        notice="oauth-connected"
+      />
+    );
+    const errorHtml = renderToString(
+      <GitHubInstallationsView
+        state={{ status: "empty", data: syncData(emptySettings, false) }}
+        installConfig={{
+          status: "configured",
+          installUrl: "https://github.com/apps/firmcode/installations/new",
+          source: "GITHUB_APP_INSTALL_URL"
+        }}
+        notice="oauth-error"
+      />
+    );
+
+    expect(successHtml).toContain("GitHub account connected");
+    expect(errorHtml).toContain("GitHub OAuth did not complete");
+    expect(errorHtml).toContain("Retry the GitHub account connection");
+    expect(`${successHtml}\n${errorHtml}`).not.toContain("oauth-code");
+    expect(`${successHtml}\n${errorHtml}`).not.toContain("oauth-state");
+    expect(`${successHtml}\n${errorHtml}`).not.toContain("access_token");
+  });
+
   it("renders missing install config as a disabled setup state", () => {
     const html = renderToString(
       <GitHubInstallationsView

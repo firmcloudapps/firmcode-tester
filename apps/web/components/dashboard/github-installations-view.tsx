@@ -8,6 +8,7 @@ import {
 import type { GitHubAppInstallConfig } from "../../config/github-app-installation";
 import type { GitHubInstallationsState, GitHubSyncDashboardData } from "../../lib/dashboard-data";
 import { isAllowedExternalDashboardUrl } from "../../lib/dashboard-route-readiness";
+import type { GitHubInstallationsNotice } from "../../lib/github-installations-notice";
 import { formatDateTime, shortSha } from "./format";
 import { GitHubInstallationSyncButton, GitHubRepositorySyncButton } from "./github-sync-controls";
 import { RepositoryAutomationToggle } from "./repository-automation-toggle";
@@ -17,9 +18,10 @@ import { BooleanBadge, StatusBadge } from "./status-badge";
 interface GitHubInstallationsViewProps {
   state: GitHubInstallationsState;
   installConfig: GitHubAppInstallConfig;
+  notice?: GitHubInstallationsNotice | null;
 }
 
-export function GitHubInstallationsView({ state, installConfig }: GitHubInstallationsViewProps) {
+export function GitHubInstallationsView({ state, installConfig, notice = null }: GitHubInstallationsViewProps) {
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -53,6 +55,7 @@ export function GitHubInstallationsView({ state, installConfig }: GitHubInstalla
       </div>
 
       <ProviderTabs />
+      {notice === null ? null : <SetupNotice notice={notice} />}
 
       {state.status === "loading" ? <InstallLoadingState /> : null}
       {state.status === "signed-out" ? <SignedOutState installConfig={installConfig} /> : null}
@@ -60,6 +63,42 @@ export function GitHubInstallationsView({ state, installConfig }: GitHubInstalla
       {state.status === "empty" ? <InstallContent data={state.data} installConfig={installConfig} /> : null}
       {state.status === "populated" ? <InstallContent data={state.data} installConfig={installConfig} /> : null}
     </div>
+  );
+}
+
+function SetupNotice({ notice }: { notice: GitHubInstallationsNotice }) {
+  const content = {
+    "oauth-connected": {
+      tone: "success",
+      title: "GitHub account connected",
+      body: "Your GitHub OAuth account is connected. Install or sync the Firmcode GitHub App to enable repository workflows."
+    },
+    "oauth-error": {
+      tone: "error",
+      title: "GitHub OAuth did not complete",
+      body: "Retry the GitHub account connection from this page. Firmcode will bind the OAuth state to your signed-in Clerk workspace."
+    },
+    "installation-connected": {
+      tone: "success",
+      title: "GitHub App installation connected",
+      body: "Firmcode mapped the GitHub App installation to this workspace. Sync GitHub to refresh repository metadata."
+    },
+    "installation-error": {
+      tone: "error",
+      title: "GitHub App installation did not complete",
+      body: "Retry the GitHub App installation from this page after confirming the app install URL is configured."
+    }
+  }[notice];
+  const classes =
+    content.tone === "success"
+      ? "border-green-200 bg-green-50 text-success"
+      : "border-red-200 bg-red-50 text-red-800";
+
+  return (
+    <section className={`rounded-lg border p-4 ${classes}`} role={content.tone === "error" ? "alert" : "status"}>
+      <h2 className="text-sm font-semibold">{content.title}</h2>
+      <p className="mt-2 text-sm leading-6">{content.body}</p>
+    </section>
   );
 }
 
@@ -157,6 +196,8 @@ function InstallContent({
         />
       </section>
 
+      <SetupInstructions hasInstallations={hasInstallations} hasOAuth={oauth.connected} />
+
       <section className="rounded-lg border border-border bg-surface p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -191,6 +232,30 @@ function InstallContent({
 
       <InstallConfigPanel installConfig={installConfig} />
     </div>
+  );
+}
+
+function SetupInstructions({ hasInstallations, hasOAuth }: { hasInstallations: boolean; hasOAuth: boolean }) {
+  return (
+    <section className="rounded-lg border border-border bg-surface p-5" aria-label="GitHub setup instructions">
+      <h2 className="text-base font-semibold text-primary">Setup order</h2>
+      <ol className="mt-3 grid gap-2 text-sm leading-6 text-secondary md:grid-cols-3">
+        <li className="rounded-md border border-border bg-subtle p-3">
+          <span className="font-medium text-primary">1. Connect GitHub OAuth</span>
+          <span className="mt-1 block">{hasOAuth ? "Your user account is connected." : "Required for the signed-in Clerk user."}</span>
+        </li>
+        <li className="rounded-md border border-border bg-subtle p-3">
+          <span className="font-medium text-primary">2. Install the GitHub App</span>
+          <span className="mt-1 block">
+            {hasInstallations ? "An installation is mapped to this workspace." : "Choose the repositories Firmcode can review."}
+          </span>
+        </li>
+        <li className="rounded-md border border-border bg-subtle p-3">
+          <span className="font-medium text-primary">3. Sync repositories</span>
+          <span className="mt-1 block">Refresh repository metadata, then enable automation per repository.</span>
+        </li>
+      </ol>
+    </section>
   );
 }
 
