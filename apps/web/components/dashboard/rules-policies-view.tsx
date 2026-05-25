@@ -122,7 +122,7 @@ function RulesHeader({ data, empty }: { data: RulesPolicyResponse; empty: boolea
             data.permissions.canManagePolicies ? "bg-green-50 text-success" : "bg-slate-100 text-secondary"
           }`}
         >
-          {data.permissions.canManagePolicies ? "Owner/Admin editing" : "Read-only policy"}
+          {data.permissions.canManagePolicies ? "Admin editing" : "Read-only policy"}
         </span>
         <span className="rounded-full bg-subtle px-2 py-1 text-xs font-medium text-secondary">
           {activePolicy.scope === "workspace" ? "Workspace default" : "Repository override"}
@@ -451,7 +451,7 @@ export function RulesPolicyForm({ data }: { data: RulesPolicyResponse }) {
             className="w-full rounded-md bg-accent px-4 py-2 text-sm font-medium text-white transition hover:bg-accentPressed disabled:cursor-not-allowed disabled:bg-mist disabled:text-secondary sm:w-auto"
             type="submit"
             disabled={blocked}
-            title={readOnly ? "Owner or Admin required." : "Save review policy"}
+            title={readOnly ? "Admin required." : "Save review policy"}
           >
             {pending ? "Saving..." : "Save policy"}
           </button>

@@ -235,7 +235,7 @@ function ScansTab({ data }: { data: RepositoryDetailResponse }) {
           <ManualCodebaseScanButton
             repositoryId={data.repository.id}
             disabled={!data.permissions.canTriggerCodebaseScans || !data.configuration.automationEnabled || !(data.configuration.codebaseScanEnabled ?? true)}
-            disabledReason="Developer, Admin, or Owner access and enabled scan configuration are required."
+            disabledReason="Developer or Admin access and enabled scan configuration are required."
           />
         </div>
       </section>
@@ -308,7 +308,7 @@ function ConfigurationTab({ data }: { data: RepositoryDetailResponse }) {
         <div>
           <h2 className="text-sm font-semibold text-primary">Review configuration</h2>
           <p className="mt-1 text-sm leading-6 text-secondary">
-            {canManage ? "Owner/Admin controls are enabled for this repository." : "Read-only configuration for this workspace role."}
+            {canManage ? "Developer/Admin controls are enabled for this repository." : "Read-only configuration for this workspace role."}
           </p>
         </div>
         {canManage ? (
@@ -318,7 +318,7 @@ function ConfigurationTab({ data }: { data: RepositoryDetailResponse }) {
             className="rounded-md border border-border bg-subtle px-3 py-2 text-sm font-medium text-secondary"
             disabled
             type="button"
-            title="Owner or Admin required."
+            title="Developer or Admin required."
           >
             Read-only
           </button>

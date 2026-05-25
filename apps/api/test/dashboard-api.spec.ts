@@ -24,6 +24,7 @@ function createTestPool(): PgPoolLike {
 }
 
 const WORKSPACE_ID = "00000000-0000-4000-8000-000000000101";
+const ADMIN_USER_ID = "user_admin";
 const DEVELOPER_USER_ID = "user_developer";
 const VIEWER_USER_ID = "user_viewer";
 
@@ -121,7 +122,7 @@ describe("dashboard API controllers", () => {
     expect(detail.permissions).toEqual({
       canManageConfiguration: true,
       canRetryReviewRuns: true,
-      canAccessRawArtifacts: true,
+      canAccessRawArtifacts: false,
       canTriggerCodebaseScans: true,
       canManageCodebaseScans: false
     });
@@ -197,7 +198,7 @@ describe("dashboard API controllers", () => {
     const detail = await reviewRunsController.getReviewRunDetail(
       "00000000-0000-4000-8000-000000000006",
       WORKSPACE_ID,
-      DEVELOPER_USER_ID
+      ADMIN_USER_ID
     );
 
     expect(detail).toMatchObject({
@@ -277,11 +278,11 @@ describe("dashboard API controllers", () => {
     });
   });
 
-  it("redacts raw artifact locators for viewers and denies raw artifact access", async () => {
+  it("redacts raw artifact locators for Developers and denies raw artifact access", async () => {
     const detail = await reviewRunsController.getReviewRunDetail(
       "00000000-0000-4000-8000-000000000006",
       WORKSPACE_ID,
-      VIEWER_USER_ID
+      DEVELOPER_USER_ID
     );
 
     expect(detail.artifacts[0]).toMatchObject({
@@ -296,17 +297,17 @@ describe("dashboard API controllers", () => {
         "00000000-0000-4000-8000-000000000006",
         "00000000-0000-4000-8000-000000000040",
         WORKSPACE_ID,
-        VIEWER_USER_ID
+        DEVELOPER_USER_ID
       )
     ).rejects.toMatchObject({ status: 403 });
   });
 
-  it("allows developer and elevated roles to request raw artifact access metadata", async () => {
+  it("allows Admin roles to request raw artifact access metadata", async () => {
     const artifact = await reviewRunsController.getRawArtifactAccess(
       "00000000-0000-4000-8000-000000000006",
       "00000000-0000-4000-8000-000000000041",
       WORKSPACE_ID,
-      DEVELOPER_USER_ID
+      ADMIN_USER_ID
     );
 
     expect(artifact).toMatchObject({
@@ -379,7 +380,7 @@ function dashboardAuth(
     clerkOrgId: "org_firmcode",
     sessionId: "sess_test",
     role: "developer",
-    capabilities: ["retry_review_run", "trigger_codebase_scan", "access_raw_artifacts"],
+    capabilities: ["retry_review_run", "trigger_codebase_scan"],
     clerkCapabilities: [],
     ...overrides
   };
@@ -392,6 +393,7 @@ INSERT INTO workspaces (id, clerk_org_id, name) VALUES
 ('${WORKSPACE_ID}', 'org_firmcode', 'Firmcode');
 
 INSERT INTO workspace_memberships (workspace_id, clerk_user_id, role, active) VALUES
+('${WORKSPACE_ID}', '${ADMIN_USER_ID}', 'admin', true),
 ('${WORKSPACE_ID}', '${DEVELOPER_USER_ID}', 'developer', true),
 ('${WORKSPACE_ID}', '${VIEWER_USER_ID}', 'viewer', true);
 

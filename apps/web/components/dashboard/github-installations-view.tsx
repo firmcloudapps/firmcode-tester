@@ -140,7 +140,7 @@ function InstallContent({
   installConfig: GitHubAppInstallConfig;
 }) {
   const { settings, oauth, repositories } = data;
-  const canManageInstallations = settings.workspace.canManageSensitiveSettings;
+  const canManageInstallations = canManageRepositoryConfiguration(settings.workspace.role);
   const hasInstallations = settings.githubApp.installations.length > 0;
   const canManageRepositories = canManageRepositoryConfiguration(settings.workspace.role);
   const canRetry = canRetryReviewRuns(settings.workspace.role);
@@ -248,7 +248,7 @@ function GitHubAppCard({
         <div>
           <h2 className="text-base font-semibold text-primary">Firmcode GitHub App</h2>
           <p className="mt-2 text-sm leading-6 text-secondary">
-            Owners and Admins install or manage repository access after their GitHub account is connected.
+            Developers and Admins install or manage repository access after their GitHub account is connected.
           </p>
         </div>
         <ConnectionPill tone={hasInstallations ? "success" : "warning"}>{hasInstallations ? "Installed" : "Missing"}</ConnectionPill>
@@ -302,9 +302,9 @@ function InstallAction({
         className="rounded-md bg-slate-200 px-3 py-2 text-sm font-medium text-secondary"
         type="button"
         disabled
-        title="Owner or Admin required to install the GitHub App."
+        title="Developer or Admin required to install the GitHub App."
       >
-        Owner or Admin required
+        Developer or Admin required
       </button>
     );
   }
@@ -514,13 +514,13 @@ function ConnectionPill({ children, tone }: { children: React.ReactNode; tone: "
 }
 
 function canSyncGitHub(data: GitHubSyncDashboardData): boolean {
-  return data.oauth.connected && data.settings.workspace.canManageSensitiveSettings && data.settings.githubApp.installations.length > 0;
+  return data.oauth.connected && canManageRepositoryConfiguration(data.settings.workspace.role) && data.settings.githubApp.installations.length > 0;
 }
 
 function syncDisabledReason(data: GitHubSyncDashboardData): string | undefined {
   return installationSyncDisabledReason({
     hasOAuth: data.oauth.connected,
-    canManage: data.settings.workspace.canManageSensitiveSettings,
+    canManage: canManageRepositoryConfiguration(data.settings.workspace.role),
     hasInstallations: data.settings.githubApp.installations.length > 0
   });
 }
@@ -531,7 +531,7 @@ function installationSyncDisabledReason(input: { hasOAuth: boolean; canManage: b
   }
 
   if (!input.canManage) {
-    return "Owner or Admin required to sync GitHub installations.";
+    return "Developer or Admin required to sync GitHub installations.";
   }
 
   if (!input.hasInstallations) {
@@ -547,7 +547,7 @@ function rowSyncDisabledReason(input: { hasOAuth: boolean; canManageRepositories
   }
 
   if (!input.canManageRepositories) {
-    return "Owner or Admin required.";
+    return "Developer or Admin required.";
   }
 
   if (!input.hasInstallations) {

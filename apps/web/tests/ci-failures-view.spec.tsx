@@ -195,7 +195,7 @@ const ciFailureDetail: CiFailureDetailResponse = {
       storageKey: "artifacts/run-401/ci-failure-explanation.json",
       metadata: { schemaVersion: "ci-failure-explanation/v1" },
       rawAccessAllowed: true,
-      rawAccessRequiredRole: "developer",
+      rawAccessRequiredRole: "admin",
       rawAccessUrl:
         "/api/review-runs/00000000-0000-4000-8000-000000000401/artifacts/00000000-0000-4000-8000-000000000501/raw",
       createdAt: "2026-05-23T10:06:00.000Z"
@@ -206,7 +206,7 @@ const ciFailureDetail: CiFailureDetailResponse = {
       storageKey: "artifacts/run-401/ci-log.json",
       metadata: { schemaVersion: "ci-log-artifact/v1", redacted: true, logsCount: 1 },
       rawAccessAllowed: true,
-      rawAccessRequiredRole: "developer",
+      rawAccessRequiredRole: "admin",
       rawAccessUrl:
         "/api/review-runs/00000000-0000-4000-8000-000000000401/artifacts/00000000-0000-4000-8000-000000000502/raw",
       createdAt: "2026-05-23T10:05:00.000Z"

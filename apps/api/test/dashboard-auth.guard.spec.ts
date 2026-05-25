@@ -274,7 +274,10 @@ class FakeWorkspaceResolver implements DashboardWorkspaceResolver {
   }
 }
 
-function createHttpContext(headers: Record<string, string | string[] | undefined>, request: Record<string, unknown> = { headers }): ExecutionContext {
+function createHttpContext(
+  headers: Record<string, string | string[] | undefined>,
+  request: DashboardAuthenticatedRequest | Record<string, unknown> = { headers }
+): ExecutionContext {
   return {
     switchToHttp: () => ({
       getRequest: () => request

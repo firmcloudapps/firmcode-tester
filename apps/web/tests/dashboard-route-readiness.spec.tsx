@@ -155,7 +155,7 @@ describe("dashboard route readiness guard", () => {
         }}
       />
     );
-    const billingHtml = renderToString(<BillingView state={{ status: "populated", data: viewerBilling }} billingPortalUrl={null} />);
+    const billingHtml = renderToString(<BillingView state={{ status: "populated", data: developerBilling }} billingPortalUrl={null} />);
 
     expect(settingsHtml).toContain("Workspace API keys are planned and not enabled in the MVP.");
     expect(settingsHtml).toContain("disabled=\"\"");
@@ -320,7 +320,7 @@ const externalSettings: WorkspaceSettingsResponse = {
     id: "workspace-1",
     name: "Firmcode",
     clerkOrgId: "org_firmcode",
-    role: "owner",
+    role: "admin",
     canManageSensitiveSettings: true
   },
   clerk: {
@@ -376,7 +376,7 @@ const internalClerkSettings: WorkspaceSettingsResponse = {
 const billing: WorkspaceBillingResponse = {
   workspace: {
     id: "workspace-1",
-    role: "owner",
+    role: "admin",
     canManageBilling: true,
     source: "clerk"
   },
@@ -392,11 +392,11 @@ const billing: WorkspaceBillingResponse = {
   }
 };
 
-const viewerBilling: WorkspaceBillingResponse = {
+const developerBilling: WorkspaceBillingResponse = {
   ...billing,
   workspace: {
     ...billing.workspace,
-    role: "viewer",
+    role: "developer",
     canManageBilling: false
   }
 };

@@ -23,7 +23,7 @@ describe("RepositoriesView", () => {
           status: "ready",
           data: {
             oauth: connectedOAuth,
-            settings: ownerSettings
+            settings: adminSettings
           }
         }}
       />
@@ -47,7 +47,7 @@ describe("RepositoriesView", () => {
           status: "ready",
           data: {
             oauth: { connected: false, user: null },
-            settings: viewerSettings
+            settings: developerSettings
           }
         }}
       />
@@ -129,7 +129,7 @@ describe("ReviewRunDetailView", () => {
     const html = renderToString(<ReviewRunDetailView state={{ status: "populated", data: viewerDetail }} />);
 
     expect(html).toContain("Your workspace role cannot retry review runs.");
-    expect(html).toContain("Raw artifact access requires Developer, Admin, or Owner.");
+    expect(html).toContain("Raw artifact access requires Admin.");
     expect(html).not.toContain("artifacts/run-6/semgrep.json");
   });
 });
@@ -222,12 +222,12 @@ const connectedOAuth = {
   }
 };
 
-const ownerSettings = {
+const adminSettings = {
   workspace: {
     id: "workspace-1",
     name: "Firmcode",
     clerkOrgId: "org_firmcode",
-    role: "owner" as const,
+    role: "admin" as const,
     canManageSensitiveSettings: true
   },
   clerk: {
@@ -271,11 +271,11 @@ const ownerSettings = {
   }
 };
 
-const viewerSettings = {
-  ...ownerSettings,
+const developerSettings = {
+  ...adminSettings,
   workspace: {
-    ...ownerSettings.workspace,
-    role: "viewer" as const,
+    ...adminSettings.workspace,
+    role: "developer" as const,
     canManageSensitiveSettings: false
   }
 };
@@ -378,7 +378,7 @@ const reviewRunDetail: ReviewRunDetail = {
       storageKey: "artifacts/run-6/semgrep.json",
       metadata: { findings: 1 },
       rawAccessAllowed: true,
-      rawAccessRequiredRole: "developer",
+      rawAccessRequiredRole: "admin",
       rawAccessUrl: "/api/review-runs/00000000-0000-4000-8000-000000000006/artifacts/artifact-1/raw",
       createdAt: "2026-05-22T10:00:00.000Z"
     }

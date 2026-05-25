@@ -223,7 +223,7 @@ function ArtifactsSection({ detail }: { detail: ReviewRunDetail }) {
                 {artifact.storageKey}
               </a>
             ) : (
-              <p className="mt-2 text-xs leading-5 text-secondary">Raw artifact access requires Developer, Admin, or Owner.</p>
+              <p className="mt-2 text-xs leading-5 text-secondary">Raw artifact access requires Admin.</p>
             )}
             <pre className="mt-3 max-h-32 overflow-auto rounded-md border border-border bg-surface p-3 text-xs text-primary">
               {JSON.stringify(artifact.metadata, null, 2)}

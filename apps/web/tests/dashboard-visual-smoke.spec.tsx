@@ -113,8 +113,8 @@ describe("dashboard visual navigation smoke", () => {
   it("keeps planned controls visibly disabled with accessible titles", () => {
     const html = [
       renderToString(<GitHubInstallationsView state={{ status: "empty", data: syncData }} installConfig={installConfig} />),
-      renderToString(<SettingsView state={{ status: "populated", data: viewerSettings }} activeTab="api-keys" />),
-      renderToString(<BillingView state={{ status: "populated", data: viewerBilling }} billingPortalUrl={null} />)
+      renderToString(<SettingsView state={{ status: "populated", data: developerSettings }} activeTab="api-keys" />),
+      renderToString(<BillingView state={{ status: "populated", data: developerBilling }} billingPortalUrl={null} />)
     ].join("\n");
 
     expect(html).toContain('aria-disabled="true"');
@@ -140,12 +140,12 @@ const installConfig = {
   source: "GITHUB_APP_INSTALL_URL" as const
 };
 
-const viewerSettings = {
+const developerSettings = {
   workspace: {
     id: "workspace-1",
     name: "Firmcode",
     clerkOrgId: "org_firmcode",
-    role: "viewer" as const,
+    role: "developer" as const,
     canManageSensitiveSettings: false
   },
   clerk: {
@@ -180,7 +180,7 @@ const viewerSettings = {
 };
 
 const syncData = {
-  settings: viewerSettings,
+  settings: developerSettings,
   oauth: { connected: false, user: null },
   repositories: {
     filters: {},
@@ -188,10 +188,10 @@ const syncData = {
   }
 };
 
-const viewerBilling = {
+const developerBilling = {
   workspace: {
     id: "workspace-1",
-    role: "viewer" as const,
+    role: "developer" as const,
     canManageBilling: false,
     source: "clerk" as const
   },

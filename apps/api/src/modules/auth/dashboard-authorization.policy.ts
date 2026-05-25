@@ -24,7 +24,7 @@ export const DASHBOARD_ROLE_CAPABILITY_MATRIX: Readonly<Record<DashboardAppRole,
     "retry_review_run",
     "trigger_codebase_scan",
     "manage_repository_configuration",
-    "access_raw_artifacts"
+    "manage_github_installations"
   ]
 } as const;
 

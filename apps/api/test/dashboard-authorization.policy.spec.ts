@@ -23,7 +23,7 @@ describe("dashboard authorization policy", () => {
       "retry_review_run",
       "trigger_codebase_scan",
       "manage_repository_configuration",
-      "access_raw_artifacts"
+      "manage_github_installations"
     ];
 
     expect(DASHBOARD_ROLE_CAPABILITY_MATRIX.developer).toEqual(allowed);
@@ -35,6 +35,7 @@ describe("dashboard authorization policy", () => {
 
   it("allows Clerk-managed billing capability without broadening the workspace role", () => {
     expect(roleHasDashboardCapability("developer", "manage_billing")).toBe(false);
+    expect(roleHasDashboardCapability("developer", "access_raw_artifacts")).toBe(false);
     expect(roleHasDashboardCapability("developer", "manage_billing", { hasClerkBillingCapability: true })).toBe(true);
     expect(roleHasDashboardCapability("developer", "manage_sensitive_settings", { hasClerkBillingCapability: true })).toBe(false);
   });

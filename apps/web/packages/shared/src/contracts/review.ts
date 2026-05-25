@@ -260,7 +260,7 @@ export const DASHBOARD_WORKSPACE_ROLES = ["owner", "admin", "developer", "viewer
 export type DashboardWorkspaceRole = (typeof DASHBOARD_WORKSPACE_ROLES)[number];
 
 export function canManageSensitiveWorkspaceSettings(role: DashboardWorkspaceRole): boolean {
-  return role === "owner" || role === "admin";
+  return role === "admin";
 }
 
 export function canRetryReviewRuns(role: DashboardWorkspaceRole): boolean {
@@ -268,7 +268,7 @@ export function canRetryReviewRuns(role: DashboardWorkspaceRole): boolean {
 }
 
 export function canManageRepositoryConfiguration(role: DashboardWorkspaceRole): boolean {
-  return role === "owner" || role === "admin";
+  return role === "admin" || role === "developer";
 }
 
 export function canTriggerCodebaseScans(role: DashboardWorkspaceRole): boolean {
@@ -280,11 +280,11 @@ export function canManageCodebaseScans(role: DashboardWorkspaceRole): boolean {
 }
 
 export function canAccessRawReviewArtifacts(role: DashboardWorkspaceRole): boolean {
-  return role === "owner" || role === "admin" || role === "developer";
+  return role === "admin";
 }
 
 export function canManageBilling(role: DashboardWorkspaceRole, hasClerkBillingCapability = false): boolean {
-  return role === "owner" || role === "admin" || hasClerkBillingCapability;
+  return role === "admin" || hasClerkBillingCapability;
 }
 
 export const REPOSITORY_REVIEW_SEVERITY_THRESHOLDS = ["info", "low", "medium", "high", "critical"] as const;
@@ -783,7 +783,7 @@ export interface ReviewRunArtifact {
   storageKey: string | null;
   metadata: Record<string, unknown>;
   rawAccessAllowed: boolean;
-  rawAccessRequiredRole: "developer";
+  rawAccessRequiredRole: "admin";
   rawAccessUrl: string | null;
   createdAt: string;
 }

@@ -1,5 +1,6 @@
 import React from "react";
 import {
+  canManageRepositoryConfiguration,
   canManageSensitiveWorkspaceSettings,
   type DashboardWorkspaceRole,
   type WorkspaceSettingsResponse
@@ -187,7 +188,7 @@ function GeneralPanel({ data }: { data: WorkspaceSettingsResponse }) {
 }
 
 function GitHubAppPanel({ data }: { data: WorkspaceSettingsResponse }) {
-  const canManage = data.workspace.canManageSensitiveSettings;
+  const canManage = canManageRepositoryConfiguration(data.workspace.role);
 
   return (
     <SettingsPanel
@@ -202,7 +203,7 @@ function GitHubAppPanel({ data }: { data: WorkspaceSettingsResponse }) {
             className="rounded-md bg-mist px-3 py-2 text-sm font-medium text-secondary"
             type="button"
             disabled
-            title="Owner or Admin required to connect the GitHub App."
+            title="Developer or Admin required to connect the GitHub App."
           >
             Connect GitHub App
           </button>
@@ -253,7 +254,7 @@ function MembersPanel({ data }: { data: WorkspaceSettingsResponse }) {
             className="rounded-md bg-slate-200 px-3 py-2 text-sm font-medium text-secondary"
             type="button"
             disabled
-            title="Owner or Admin required to manage Clerk members."
+            title="Admin required to manage Clerk members."
           >
             Open Clerk members
           </button>
@@ -280,7 +281,7 @@ function ApiKeysPanel({ data }: { data: WorkspaceSettingsResponse }) {
         title={
           canManage
             ? "Workspace API keys are planned and not enabled in the MVP."
-            : "Owner or Admin required to create workspace API keys."
+            : "Admin required to create workspace API keys."
         }
       >
         Create API key

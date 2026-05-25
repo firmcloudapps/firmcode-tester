@@ -14,6 +14,7 @@ interface PgPoolLike {
 
 const WORKSPACE_ID = "00000000-0000-4000-8000-000000000101";
 const OTHER_WORKSPACE_ID = "00000000-0000-4000-8000-000000000102";
+const ADMIN_USER_ID = "user_admin";
 const DEVELOPER_USER_ID = "user_developer";
 const VIEWER_USER_ID = "user_viewer";
 const OTHER_VIEWER_USER_ID = "user_other_viewer";
@@ -170,7 +171,7 @@ describe("CI failures dashboard API", () => {
   });
 
   it("keeps raw logs out of default detail responses even for raw-artifact-capable roles", async () => {
-    const detail = await controller.getCiFailureDetail(CI_FAILURE_ID, WORKSPACE_ID, DEVELOPER_USER_ID);
+    const detail = await controller.getCiFailureDetail(CI_FAILURE_ID, WORKSPACE_ID, ADMIN_USER_ID);
 
     expect(detail.relatedArtifacts.find((artifact) => artifact.artifactType === "ci_log")).toMatchObject({
       storageKey: "artifacts/run-401/ci-log.json",
@@ -391,6 +392,7 @@ INSERT INTO workspaces (id, clerk_org_id, name) VALUES
 ('${OTHER_WORKSPACE_ID}', 'org_other', 'Other');
 
 INSERT INTO workspace_memberships (workspace_id, clerk_user_id, role, active) VALUES
+('${WORKSPACE_ID}', '${ADMIN_USER_ID}', 'admin', true),
 ('${WORKSPACE_ID}', '${DEVELOPER_USER_ID}', 'developer', true),
 ('${WORKSPACE_ID}', '${VIEWER_USER_ID}', 'viewer', true),
 ('${OTHER_WORKSPACE_ID}', '${OTHER_VIEWER_USER_ID}', 'viewer', true);

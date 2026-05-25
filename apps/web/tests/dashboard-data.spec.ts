@@ -349,7 +349,7 @@ const settingsResponse = {
     id: "workspace-1",
     name: "Firmcode",
     clerkOrgId: "org_firmcode",
-    role: "owner",
+    role: "admin",
     canManageSensitiveSettings: true
   },
   clerk: {
@@ -564,7 +564,7 @@ const reviewRunDetailResponse = {
 const billingResponse = {
   workspace: {
     id: "workspace-1",
-    role: "developer",
+    role: "admin",
     canManageBilling: true,
     source: "clerk"
   },

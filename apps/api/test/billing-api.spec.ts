@@ -13,10 +13,8 @@ interface PgPoolLike {
 }
 
 const WORKSPACE_ID = "00000000-0000-4000-8000-000000000101";
-const OWNER_USER_ID = "user_owner";
 const ADMIN_USER_ID = "user_admin";
 const DEVELOPER_USER_ID = "user_developer";
-const VIEWER_USER_ID = "user_viewer";
 
 function createTestPool(): PgPoolLike {
   const db = newDb({ autoCreateForeignKeyIndices: true, noAstCoverageCheck: true });
@@ -42,13 +40,10 @@ describe("billing dashboard API", () => {
     await pool.end();
   });
 
-  it("allows Owner and Admin roles to load Clerk-managed billing context", async () => {
-    await expect(controller.getWorkspaceBilling(WORKSPACE_ID, OWNER_USER_ID, undefined)).resolves.toMatchObject({
-      workspace: { role: "owner", canManageBilling: true },
-      plan: { status: "managed_by_clerk" }
-    });
+  it("allows Admin roles to load Clerk-managed billing context", async () => {
     await expect(controller.getWorkspaceBilling(WORKSPACE_ID, ADMIN_USER_ID, undefined)).resolves.toMatchObject({
-      workspace: { role: "admin", canManageBilling: true }
+      workspace: { role: "admin", canManageBilling: true },
+      plan: { status: "managed_by_clerk" }
     });
   });
 
@@ -58,20 +53,8 @@ describe("billing dashboard API", () => {
     });
   });
 
-  it("lets Developers view plan and usage context without subscription management", async () => {
-    await expect(controller.getWorkspaceBilling(WORKSPACE_ID, DEVELOPER_USER_ID, undefined)).resolves.toMatchObject({
-      workspace: { role: "developer", canManageBilling: false },
-      usage: {
-        reviewRunsThisMonth: 2,
-        aiTokensThisMonth: 1500,
-        repositoriesMonitored: 1,
-        seats: 4
-      }
-    });
-  });
-
-  it("denies lower roles without Clerk billing capability", async () => {
-    await expect(controller.getWorkspaceBilling(WORKSPACE_ID, VIEWER_USER_ID, undefined)).rejects.toThrow(
+  it("denies Developers without Clerk billing capability", async () => {
+    await expect(controller.getWorkspaceBilling(WORKSPACE_ID, DEVELOPER_USER_ID, undefined)).rejects.toThrow(
       ForbiddenException
     );
     await expect(controller.getWorkspaceBilling(WORKSPACE_ID, undefined, undefined)).rejects.toThrow(
@@ -82,9 +65,7 @@ describe("billing dashboard API", () => {
   it("does not let spoofed billing capability headers elevate a verified Clerk developer context", async () => {
     await expect(
       controller.getWorkspaceBilling(dashboardAuth({ role: "developer" }), undefined, "manage_billing")
-    ).resolves.toMatchObject({
-      workspace: { role: "developer", canManageBilling: false }
-    });
+    ).rejects.toThrow(ForbiddenException);
   });
 });
 
@@ -108,10 +89,8 @@ INSERT INTO workspaces (id, clerk_org_id, name) VALUES
 ('${WORKSPACE_ID}', 'org_firmcode', 'Firmcode');
 
 INSERT INTO workspace_memberships (workspace_id, clerk_user_id, role, active) VALUES
-('${WORKSPACE_ID}', '${OWNER_USER_ID}', 'owner', true),
 ('${WORKSPACE_ID}', '${ADMIN_USER_ID}', 'admin', true),
-('${WORKSPACE_ID}', '${DEVELOPER_USER_ID}', 'developer', true),
-('${WORKSPACE_ID}', '${VIEWER_USER_ID}', 'viewer', true);
+('${WORKSPACE_ID}', '${DEVELOPER_USER_ID}', 'developer', true);
 
 INSERT INTO github_installations (id, installation_id, account_login, account_type, workspace_id) VALUES
 ('00000000-0000-4000-8000-000000000201', 101, 'openclaw', 'Organization', '${WORKSPACE_ID}');

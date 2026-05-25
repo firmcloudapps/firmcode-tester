@@ -104,7 +104,7 @@ const settings = {
     id: "workspace-1",
     name: "Firmcode",
     clerkOrgId: "org_firmcode",
-    role: "owner" as const,
+    role: "admin" as const,
     canManageSensitiveSettings: true
   },
   clerk: {
