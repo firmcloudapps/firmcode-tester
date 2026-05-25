@@ -10,9 +10,9 @@ Firmcode should use typed configuration validation in every runtime. Missing req
 | `APP_URL` | yes | Public web app URL. The API uses this to build the GitHub OAuth callback URL. |
 | `API_URL` | yes | Public API URL for webhooks and dashboard calls. |
 | `NEXT_PUBLIC_API_URL` | web | Public API URL used by the Vercel dashboard. |
-| `FIRMCODE_DASHBOARD_WORKSPACE_ID` | web server, temporary | Internal workspace ID forwarded by dashboard mutation proxy routes until Clerk-backed API session validation replaces the local header shim. |
-| `FIRMCODE_DASHBOARD_CLERK_USER_ID` | web server, temporary | Clerk user ID forwarded by dashboard mutation proxy routes until Clerk-backed API session validation replaces the local header shim. |
-| `FIRMCODE_DASHBOARD_CLERK_BILLING_CAPABILITY` | web server, temporary | Optional Clerk Billing capability forwarded by dashboard API proxy routes; use `manage_billing` only for local/staging users Clerk has authorized for billing management. |
+| `FIRMCODE_DASHBOARD_WORKSPACE_ID` | test/local bypass only | Internal workspace ID for isolated tests or seed-only local workflows. This must not be used in production request authentication. |
+| `FIRMCODE_DASHBOARD_CLERK_USER_ID` | test/local bypass only | Clerk user ID for isolated tests or seed-only local workflows. This must not be used in production request authentication. |
+| `FIRMCODE_DASHBOARD_CLERK_BILLING_CAPABILITY` | test/local bypass only | Optional local/test billing capability fixture. Production billing capability must come from verified Clerk session/organization/billing state. |
 | `CORS_ALLOWED_ORIGINS` | api | Comma-separated Vercel production, Vercel preview, and local web origins. |
 | `VERCEL_URL` | Vercel | Auto-provided Vercel deployment URL, useful for preview handling. |
 | `LOG_LEVEL` | no | `debug`, `info`, `warn`, or `error`. Default `info`. |
@@ -59,8 +59,35 @@ REDIS_URL=redis://redis:6379
 | `CLERK_SECRET_KEY` | api/web server | Clerk secret key for server-side auth. |
 | `CLERK_WEBHOOK_SECRET` | api | Clerk webhook signing secret if syncing users/orgs. |
 | `CLERK_BILLING_PORTAL_URL` | web | Clerk-managed subscription portal or account billing entry point shown from the dashboard Billing page. |
+| `NEXT_PUBLIC_CLERK_SIGN_IN_URL` | web | Clerk sign-in route. Use `/sign-in` locally and in production unless Clerk hosted pages require a different URL. |
+| `NEXT_PUBLIC_CLERK_SIGN_UP_URL` | web | Clerk sign-up route. Use `/sign-up` locally and in production unless Clerk hosted pages require a different URL. |
+| `NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL` | web | Post sign-in dashboard destination. Default `/`. |
+| `NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL` | web | Post sign-up onboarding/dashboard destination. Default `/`. |
+| `CLERK_JWT_AUDIENCE` | api/web server | Audience/template used for Clerk session tokens sent from Vercel web to the Coolify API. Required for production API token verification. |
+| `CLERK_ISSUER` | api | Optional expected Clerk issuer when not inferred by the Clerk backend SDK. |
 
 Clerk owns SaaS sign-in, sign-up, sessions, user profile, organizations/workspaces where enabled, member lifecycle where enabled, and Billing. Firmcode should validate Clerk session tokens in the API, map Clerk user/org IDs to internal workspaces, cache only the plan/capability/usage metadata needed for app authorization and display, and route subscription management to Clerk Billing instead of storing payment state locally.
+
+The production dashboard authentication flow is:
+
+1. Next.js middleware requires a Clerk session before rendering dashboard pages or dashboard route handlers.
+2. Web server code reads Clerk auth state with `auth()` and obtains a Clerk session token for `CLERK_JWT_AUDIENCE`.
+3. Web-to-API calls send `Authorization: Bearer <Clerk session token>`.
+4. The NestJS API verifies the token with Clerk, derives the Clerk user and organization claims, resolves the Firmcode workspace/membership, and then applies role/capability checks.
+5. The API must ignore client-provided user identity headers outside explicit test/local bypass code paths.
+
+Required Clerk dashboard configuration:
+
+- Allowed application URLs:
+  - local dashboard, for example `http://localhost:3000`
+  - Vercel production dashboard URL
+  - Vercel preview URLs if previews are enabled
+- Sign-in URL: `/sign-in`
+- Sign-up URL: `/sign-up`
+- After sign-in URL: `/`
+- After sign-up URL: `/`
+- Organization settings enabled if team workspaces are supported in the environment.
+- Clerk webhook endpoint configured only after the API endpoint exists and `CLERK_WEBHOOK_SECRET` is set.
 
 ## GitHub App
 
@@ -161,7 +188,7 @@ Implementation should add:
 
 No secrets should be committed.
 
-The API validates `NODE_ENV`, `DATABASE_URL`, `DATABASE_SSL`, `CLERK_SECRET_KEY`, and GitHub App credentials during startup. GitHub private keys may be raw PEM, escaped-newline PEM, or base64-encoded PEM. The web package has Clerk config validation for `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_BILLING_PORTAL_URL`; the current provider boundary is ready to be replaced with `ClerkProvider` from `@clerk/nextjs` once the dependency is added.
+The API validates `NODE_ENV`, `DATABASE_URL`, `DATABASE_SSL`, `CLERK_SECRET_KEY`, `CLERK_JWT_AUDIENCE`, and GitHub App credentials during startup. GitHub private keys may be raw PEM, escaped-newline PEM, or base64-encoded PEM. The web package validates Clerk publishable key, sign-in/sign-up URLs, after-auth redirects, API URL, and billing portal configuration. The dashboard provider boundary must use `ClerkProvider` from `@clerk/nextjs`; a no-op provider is acceptable only before Task 9.0 is started and must not satisfy release criteria.
 
 ## Deployment Targets
 

@@ -158,6 +158,8 @@ Clerk should own:
 
 The Next.js app should wrap the dashboard in a Clerk provider boundary. Until `@clerk/nextjs` is installed, the boundary remains a no-op scaffold so the rest of the dashboard can compile while the environment and route contracts are tested.
 
+For the complete MVP, the no-op boundary must be replaced by a real `ClerkProvider`, Clerk middleware, sign-in/sign-up pages, `UserButton`, and `OrganizationSwitcher` where enabled. Dashboard pages and route handlers must be inaccessible without a Clerk session. The web app must call the API with a Clerk bearer token; static env-based user/workspace headers are a test-only scaffold and do not satisfy the dashboard authentication requirement.
+
 Firmcode should store Clerk-linked metadata:
 
 - `clerk_user_id`

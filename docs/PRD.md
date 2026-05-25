@@ -107,6 +107,7 @@ Supporting production-planning docs:
 - Light-mode TypeScript/Tailwind dashboard with repositories, repository detail/configuration, pull requests, review runs, findings, CI failures, rules/policies, settings, billing, GitHub App setup, and raw/redacted artifacts.
 - GitHub App install entry point, installation status, and repository metadata sync controls that are functional or explicitly disabled until backend support exists.
 - Clerk-backed sign-in, user menu, organizations/workspaces where enabled, and billing portal.
+- Clerk session-token verification for every dashboard API; production APIs must never trust client-provided user identity headers or environment-provided dashboard user IDs as authentication.
 - Webhook idempotency, superseded-run protection, and delivery replay handling.
 - Large-PR handling with prioritized and summary-only modes.
 - Configurable data retention and raw artifact redaction.

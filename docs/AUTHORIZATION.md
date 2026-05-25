@@ -2,6 +2,102 @@
 
 Firmcode is a multi-tenant SaaS product. Clerk handles identity, sessions, organizations, member lifecycle where enabled, and billing. Firmcode owns application authorization, workspace resource ownership, GitHub OAuth connection state, and GitHub installation access rules.
 
+## Complete Authentication Flow Implementation Plan
+
+The MVP must ship with real Clerk-backed authentication before any dashboard data is considered protected. Environment-provided user/workspace headers are only a local test shim and must not be accepted as the production authentication path.
+
+### Web Application
+
+- Install `@clerk/nextjs` in `apps/web`.
+- Replace the no-op Clerk provider boundary with `ClerkProvider`.
+- Add Clerk pages:
+  - `/sign-in/[[...sign-in]]`
+  - `/sign-up/[[...sign-up]]`
+- Add Next.js middleware using Clerk route matching:
+  - Protect every dashboard page: `/`, `/repositories`, `/repositories/:path*`, `/review-runs/:path*`, `/findings`, `/pull-requests/:path*`, `/ci-failures/:path*`, `/rules`, `/settings`, `/billing`, and `/github/installations`.
+  - Protect dashboard API proxy routes under `/api/*` except any intentionally public health/static routes.
+  - Keep GitHub OAuth callback routes protected because the returning browser session is required to bind the OAuth state to the signed-in Clerk user.
+- Update the dashboard shell:
+  - Use `UserButton` for the account menu.
+  - Use `OrganizationSwitcher` when Clerk Organizations are enabled.
+  - Show the active Clerk organization or personal workspace name instead of static placeholder text.
+  - Redirect unauthenticated users to `/sign-in`.
+- Replace `FIRMCODE_DASHBOARD_WORKSPACE_ID` and `FIRMCODE_DASHBOARD_CLERK_USER_ID` forwarding with Clerk server auth:
+  - Server components and route handlers call Clerk `auth()`.
+  - Route handlers obtain a Clerk session token with the configured API audience/template.
+  - Calls from web to API include `Authorization: Bearer <clerk-session-token>`.
+  - Optional workspace selection is conveyed as `x-firmcode-workspace-id` or query/body input only after the API has verified the Clerk token and confirmed membership. The user ID must always come from Clerk claims, never from a client-provided header.
+
+### API Application
+
+- Install Clerk's server-side verification package, such as `@clerk/backend`, in `apps/api`.
+- Add an API auth module with:
+  - A Nest guard for dashboard routes.
+  - Clerk JWT/session token verification against Clerk issuer/JWKS or the Clerk backend SDK.
+  - Request context containing `clerkUserId`, `clerkOrgId`, `sessionId`, `workspaceId`, `role`, and derived capabilities.
+  - Shared decorators/helpers for controllers to require membership and capabilities.
+- Apply the guard to every dashboard API:
+  - repositories
+  - repository configuration and activity
+  - pull requests
+  - review runs and raw artifacts
+  - findings
+  - CI failures
+  - rules/policies
+  - settings
+  - billing
+  - GitHub OAuth/install/sync endpoints
+  - codebase scan dashboard actions
+- Do not apply Clerk auth to GitHub webhook endpoints. Webhooks remain protected by GitHub signature verification and installation ownership lookup.
+- Remove controller-level trust in `x-firmcode-user-id`. That header may exist only in tests. Production identity must be read from the verified Clerk token.
+- Keep `x-firmcode-workspace-id` as an optional workspace selector only if the verified Clerk user belongs to that workspace. If omitted, resolve from the active Clerk organization claim or the user's personal workspace.
+- Return:
+  - `401` when the Clerk token is missing, expired, malformed, or invalid.
+  - `403` when the user is authenticated but lacks the role/capability.
+  - `404` when the resource is outside the caller workspace and revealing existence would leak tenant data.
+
+### Workspace And Role Resolution
+
+- Clerk Organizations enabled:
+  - Map each Clerk organization to one `workspaces` row by `clerk_org_id`.
+  - Map Clerk organization memberships to `workspace_memberships`.
+  - Prefer explicit Firmcode role metadata when configured.
+  - Fallback role mapping:
+    - Clerk organization admin/owner -> `admin`, with the workspace creator or explicit metadata owner mapped to `owner`.
+    - Clerk member -> `developer`.
+    - Explicit read-only metadata -> `viewer`.
+- Clerk Organizations disabled:
+  - Create one personal workspace per Clerk user.
+  - The owning user is `owner`.
+- Sync membership from Clerk webhooks and also repair/ensure the active workspace on authenticated requests so first login does not require manual seed data.
+- Persist role changes with `updated_at` and write audit events for elevated role changes.
+
+### Authenticated Request Flow
+
+```text
+Browser
+  -> Clerk hosted/session UI
+  -> Next.js middleware verifies route access
+  -> Next.js server component/route handler reads Clerk auth()
+  -> Next.js sends Authorization: Bearer <Clerk token> to API
+  -> NestJS Clerk guard verifies token
+  -> Workspace resolver maps Clerk user/org to Firmcode workspace
+  -> Capability guard checks Owner/Admin/Developer/Viewer permissions
+  -> Controller/service checks resource ownership by workspace_id
+  -> Response contains only tenant-scoped, role-allowed data
+```
+
+### Required Auth Pages And Routes
+
+| Route | Requirement |
+| --- | --- |
+| `/sign-in/[[...sign-in]]` | Clerk sign-in page. |
+| `/sign-up/[[...sign-up]]` | Clerk sign-up page. |
+| `/` | Protected dashboard overview or redirect to sign-in. |
+| `/github/installations` | Protected setup page; requires Clerk auth, then GitHub OAuth for GitHub-backed workflows. |
+| `/auth/github` | Protected route that starts GitHub OAuth for the signed-in Clerk user. |
+| `/api/auth/github/callback` | Protected route that completes GitHub OAuth for the signed-in Clerk user and validates OAuth state. |
+
 ## Identity Model
 
 Firmcode should map Clerk identities to internal workspace records:
@@ -71,6 +167,22 @@ Each GitHub installation must be mapped to a workspace. API requests must verify
 Every dashboard API should enforce workspace access by `workspace_id`. Do not trust repository IDs, review run IDs, or finding IDs without checking ownership.
 
 Codebase scan run and finding APIs must enforce ownership through the scan run repository and GitHub installation workspace before exposing scan artifacts, unresolved repository findings, or review enrichment data.
+
+Production dashboard APIs must not accept caller identity from `x-firmcode-user-id`, `FIRMCODE_DASHBOARD_CLERK_USER_ID`, or any equivalent client-controlled value. Those values are allowed only in isolated tests or local seed workflows that are explicitly marked as bypassing production auth.
+
+## Implementation Acceptance Criteria
+
+- Unauthenticated users visiting any dashboard page are redirected to Clerk sign-in.
+- Authenticated users without a workspace receive an onboarding/personal-workspace creation path, not raw dashboard data.
+- Dashboard API requests without a valid Clerk token return `401`.
+- A valid Clerk user can access only resources owned by their resolved workspace.
+- Cross-workspace repository, review run, finding, CI failure, artifact, billing, settings, and policy requests are denied.
+- Owner/Admin/Developer/Viewer capabilities match the role table in this document.
+- Billing management requires Owner/Admin or a verified Clerk Billing capability.
+- GitHub OAuth cannot start or complete without a signed-in Clerk user and workspace membership.
+- GitHub App installation management requires a connected GitHub OAuth account plus Owner/Admin role.
+- Raw artifact access is role-gated and audited.
+- Tests cover sign-in route protection, API token verification, workspace resolution, role denial, cross-workspace denial, and spoofed-header rejection.
 
 ## Webhook Authorization
 
