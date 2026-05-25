@@ -2,29 +2,48 @@ import { Module } from "@nestjs/common";
 import { Pool } from "pg";
 import type { ApiRuntimeConfig } from "@firmcode/shared";
 import { API_RUNTIME_CONFIG, apiRuntimeConfigProvider } from "../../config/api-config.provider";
-import { CodebaseScansModule } from "../codebase-scans/codebase-scans.module";
+import { ReviewQueueModule } from "../queues/review-queue.module";
 import {
   DASHBOARD_AUTH_STORE,
   EmptyDashboardAuthStore,
   PostgresDashboardAuthStore
 } from "../review-runs/dashboard-auth.store";
-import { RepositoriesController } from "./repositories.controller";
-import { RepositoryConfigurationService } from "./repository-configuration.service";
-import { EmptyRepositoriesStore, PostgresRepositoriesStore, REPOSITORIES_STORE } from "./repositories.store";
+import {
+  CODEBASE_SCAN_TARGET_STORE,
+  CodebaseScanEnqueueService,
+  EmptyCodebaseScanTargetStore,
+  PostgresCodebaseScanTargetStore
+} from "./codebase-scan-enqueue.service";
+import { CODEBASE_SCAN_STORE, EmptyCodebaseScanStore, PostgresCodebaseScanStore } from "./codebase-scan.store";
 
 @Module({
-  imports: [CodebaseScansModule],
-  controllers: [RepositoriesController],
+  imports: [ReviewQueueModule],
   providers: [
     apiRuntimeConfigProvider,
     {
-      provide: REPOSITORIES_STORE,
+      provide: CODEBASE_SCAN_STORE,
       useFactory: (config: ApiRuntimeConfig) => {
         if (config.nodeEnv === "test") {
-          return new EmptyRepositoriesStore();
+          return new EmptyCodebaseScanStore();
         }
 
-        return new PostgresRepositoriesStore(
+        return new PostgresCodebaseScanStore(
+          new Pool({
+            connectionString: config.database.url,
+            ssl: config.database.ssl ? { rejectUnauthorized: false } : false
+          })
+        );
+      },
+      inject: [API_RUNTIME_CONFIG]
+    },
+    {
+      provide: CODEBASE_SCAN_TARGET_STORE,
+      useFactory: (config: ApiRuntimeConfig) => {
+        if (config.nodeEnv === "test") {
+          return new EmptyCodebaseScanTargetStore();
+        }
+
+        return new PostgresCodebaseScanTargetStore(
           new Pool({
             connectionString: config.database.url,
             ssl: config.database.ssl ? { rejectUnauthorized: false } : false
@@ -49,7 +68,8 @@ import { EmptyRepositoriesStore, PostgresRepositoriesStore, REPOSITORIES_STORE }
       },
       inject: [API_RUNTIME_CONFIG]
     },
-    RepositoryConfigurationService
-  ]
+    CodebaseScanEnqueueService
+  ],
+  exports: [CODEBASE_SCAN_STORE, CODEBASE_SCAN_TARGET_STORE, CodebaseScanEnqueueService]
 })
-export class RepositoriesModule {}
+export class CodebaseScansModule {}

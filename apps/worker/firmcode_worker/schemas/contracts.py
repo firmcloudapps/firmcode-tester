@@ -98,13 +98,14 @@ class ReviewJobInput:
 @dataclass(frozen=True)
 class CodebaseScanJobInput:
     schema_version: str
-    scan_run_id: str
+    scan_run_id: str | None
     repository_id: str
     installation_id: int
     repository_full_name: str
     default_branch: str
-    commit_sha: str
+    commit_sha: str | None
     trigger: str
+    correlation_id: str
     requested_by_clerk_user_id: str | None
 
     @classmethod
@@ -113,13 +114,14 @@ class CodebaseScanJobInput:
         _read_literal(value, "schemaVersion", CODEBASE_SCAN_JOB_INPUT_SCHEMA_VERSION, errors)
         payload = cls(
             schema_version=CODEBASE_SCAN_JOB_INPUT_SCHEMA_VERSION,
-            scan_run_id=_read_non_empty_str(value, "scanRunId", errors),
+            scan_run_id=_read_nullable_str(value, "scanRunId", errors),
             repository_id=_read_non_empty_str(value, "repositoryId", errors),
             installation_id=_read_positive_int(value, "installationId", errors),
             repository_full_name=_read_non_empty_str(value, "repositoryFullName", errors),
             default_branch=_read_non_empty_str(value, "defaultBranch", errors),
-            commit_sha=_read_non_empty_str(value, "commitSha", errors),
+            commit_sha=_read_nullable_str(value, "commitSha", errors),
             trigger=_read_literal_from_set(value, "trigger", CODEBASE_SCAN_TRIGGERS, errors),
+            correlation_id=_read_non_empty_str(value, "correlationId", errors),
             requested_by_clerk_user_id=_read_nullable_str(value, "requestedByClerkUserId", errors),
         )
         _raise_if_errors(errors)

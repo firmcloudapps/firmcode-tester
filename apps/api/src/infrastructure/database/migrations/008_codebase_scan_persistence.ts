@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS codebase_scan_runs (
   installation_id uuid NOT NULL REFERENCES github_installations(id) ON DELETE CASCADE,
   trigger text NOT NULL,
   default_branch text NOT NULL,
-  commit_sha text NOT NULL,
+  commit_sha text,
   status text NOT NULL DEFAULT 'queued',
   started_at timestamptz,
   finished_at timestamptz,
@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS codebase_scan_runs (
   updated_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT codebase_scan_runs_trigger_check CHECK (trigger IN ('install', 'scheduled', 'manual', 'push')),
   CONSTRAINT codebase_scan_runs_status_check CHECK (status IN ('queued', 'running', 'succeeded', 'failed', 'cancelled', 'superseded')),
-  CONSTRAINT codebase_scan_runs_commit_sha_check CHECK (commit_sha <> ''),
+  CONSTRAINT codebase_scan_runs_commit_sha_check CHECK (commit_sha IS NULL OR commit_sha <> ''),
   CONSTRAINT codebase_scan_runs_default_branch_check CHECK (default_branch <> '')
 );
 
@@ -67,7 +67,15 @@ CREATE INDEX IF NOT EXISTS codebase_scan_runs_repository_status_idx
 
 CREATE UNIQUE INDEX IF NOT EXISTS codebase_scan_runs_repository_successful_commit_unique
   ON codebase_scan_runs (repository_id, commit_sha)
-  WHERE status = 'succeeded';
+  WHERE status = 'succeeded' AND commit_sha IS NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS codebase_scan_runs_active_commit_unique
+  ON codebase_scan_runs (repository_id, commit_sha)
+  WHERE status IN ('queued', 'running') AND commit_sha IS NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS codebase_scan_runs_active_trigger_unknown_commit_unique
+  ON codebase_scan_runs (repository_id, trigger)
+  WHERE status IN ('queued', 'running') AND commit_sha IS NULL;
 
 CREATE INDEX IF NOT EXISTS codebase_scan_findings_scan_run_idx
   ON codebase_scan_findings (scan_run_id, severity, created_at DESC);

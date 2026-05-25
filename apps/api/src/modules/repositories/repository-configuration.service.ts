@@ -15,6 +15,7 @@ import {
   roleHasDashboardCapability,
   type DashboardAuthStore
 } from "../review-runs/dashboard-auth.store";
+import { CodebaseScanEnqueueService } from "../codebase-scans/codebase-scan-enqueue.service";
 import { REPOSITORIES_STORE, type RepositoriesStore } from "./repositories.store";
 
 export interface RepositoryConfigurationRequestContext {
@@ -46,7 +47,8 @@ const SEVERITY_THRESHOLDS = new Set<string>(["info", "low", "medium", "high", "c
 export class RepositoryConfigurationService {
   constructor(
     @Inject(REPOSITORIES_STORE) private readonly repositoriesStore: RepositoriesStore,
-    @Inject(DASHBOARD_AUTH_STORE) private readonly dashboardAuthStore: DashboardAuthStore
+    @Inject(DASHBOARD_AUTH_STORE) private readonly dashboardAuthStore: DashboardAuthStore,
+    private readonly codebaseScanEnqueueService?: CodebaseScanEnqueueService
   ) {}
 
   async getRepositoryConfiguration(input: RepositoryConfigurationRequestContext): Promise<RepositoryReviewConfiguration> {
@@ -71,6 +73,15 @@ export class RepositoryConfigurationService {
 
     if (configuration === null) {
       throw new NotFoundException("Repository not found");
+    }
+
+    if (updates.automationEnabled === true) {
+      await this.codebaseScanEnqueueService?.enqueueInitialScanForRepository({
+        repositoryId: context.repositoryId,
+        requestedByClerkUserId: context.clerkUserId
+      });
+    } else if (updates.automationEnabled === false) {
+      await this.codebaseScanEnqueueService?.removeRepositorySchedule(context.repositoryId);
     }
 
     return configuration;

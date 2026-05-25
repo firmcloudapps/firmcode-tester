@@ -4,17 +4,20 @@ import asyncio
 import signal
 from typing import Any, Mapping, Protocol
 
-from firmcode_worker.schemas.contracts import ContractValidationError, ReviewJobInput
+from firmcode_worker.schemas.contracts import CodebaseScanJobInput, ContractValidationError, ReviewJobInput
 
 
 REVIEW_QUEUE_NAME = "review-runs"
 REVIEW_PULL_REQUEST_JOB_NAME = "review.pull_request"
+CODEBASE_SCAN_QUEUE_NAME = "codebase-scans"
+CODEBASE_SCAN_JOB_NAME = "codebase.scan"
 REVIEW_WORKER_LOCK_DURATION_MS = 10 * 60 * 1000
 REVIEW_WORKER_LOCK_RENEW_TIME_MS = REVIEW_WORKER_LOCK_DURATION_MS // 2
 REVIEW_WORKER_STALLED_INTERVAL_MS = 60 * 1000
 
 
 ReviewJobPayload = ReviewJobInput
+CodebaseScanJobPayload = CodebaseScanJobInput
 
 
 class ReviewRunRepository(Protocol):
@@ -25,6 +28,11 @@ class ReviewRunRepository(Protocol):
         ...
 
     async def mark_failed(self, review_run_id: str, error_code: str, error_message: str) -> None:
+        ...
+
+
+class CodebaseScanRunRepository(Protocol):
+    async def create_queued_scan_for_scheduled_job(self, payload: CodebaseScanJobPayload) -> str:
         ...
 
 
@@ -91,11 +99,75 @@ WHERE id = %s
         )
 
     async def _update_status(self, sql: str, params: tuple[Any, ...]) -> None:
+        import uuid
+
         import psycopg
 
         async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
             async with connection.cursor() as cursor:
                 await cursor.execute(sql, params)
+
+
+class PostgresCodebaseScanRunRepository:
+    def __init__(self, database_url: str) -> None:
+        self.database_url = database_url
+
+    async def create_queued_scan_for_scheduled_job(self, payload: CodebaseScanJobPayload) -> str:
+        import psycopg
+
+        async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
+            async with connection.cursor() as cursor:
+                await cursor.execute(
+                    """
+INSERT INTO codebase_scan_runs (
+  id,
+  repository_id,
+  installation_id,
+  trigger,
+  default_branch,
+  commit_sha,
+  status,
+  metrics_json
+)
+SELECT
+  %s,
+  r.id,
+  r.installation_id,
+  %s,
+  %s,
+  %s,
+  'queued',
+  %s::jsonb
+FROM repositories r
+JOIN github_installations gi ON gi.id = r.installation_id
+WHERE r.id = %s
+  AND gi.installation_id = %s
+RETURNING id
+""",
+                    (
+                        str(uuid.uuid4()),
+                        payload.trigger,
+                        payload.default_branch,
+                        payload.commit_sha,
+                        _json_dumps(
+                            {
+                                "enqueue": {
+                                    "correlationId": payload.correlation_id,
+                                    "repositoryFullName": payload.repository_full_name,
+                                    "trigger": payload.trigger,
+                                }
+                            }
+                        ),
+                        payload.repository_id,
+                        payload.installation_id,
+                    ),
+                )
+                row = await cursor.fetchone()
+
+        if row is None:
+            raise ReviewWorkerError("codebase_scan_repository_not_found", f"Repository {payload.repository_id} was not found")
+
+        return str(row[0])
 
 
 async def process_review_pull_request_job(
@@ -113,6 +185,19 @@ async def process_review_pull_request_job(
         raise
 
     await repository.mark_succeeded(payload.review_run_id)
+
+
+async def process_codebase_scan_job(
+    payload: CodebaseScanJobPayload,
+    repository: CodebaseScanRunRepository,
+) -> str:
+    if payload.scan_run_id is not None:
+        return payload.scan_run_id
+
+    if payload.trigger != "scheduled":
+        raise ReviewWorkerError("invalid_job_payload", "scanRunId may only be null for scheduled codebase scan jobs")
+
+    return await repository.create_queued_scan_for_scheduled_job(payload)
 
 
 async def run_bullmq_review_worker(
@@ -166,6 +251,19 @@ def review_job_payload_from_mapping(value: Mapping[str, Any]) -> ReviewJobPayloa
         return ReviewJobInput.from_mapping(value)
     except ContractValidationError as error:
         raise ReviewWorkerError("invalid_job_payload", str(error)) from error
+
+
+def codebase_scan_job_payload_from_mapping(value: Mapping[str, Any]) -> CodebaseScanJobPayload:
+    try:
+        return CodebaseScanJobInput.from_mapping(value)
+    except ContractValidationError as error:
+        raise ReviewWorkerError("invalid_job_payload", str(error)) from error
+
+
+def _json_dumps(value: Mapping[str, Any]) -> str:
+    import json
+
+    return json.dumps(value, separators=(",", ":"))
 
 
 def _error_message(error: Exception) -> str:

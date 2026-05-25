@@ -107,6 +107,7 @@ Clerk owns SaaS sign-in, sign-up, sessions, user profile, organizations/workspac
 | `REVIEW_SUMMARY_ONLY_ESTIMATED_TOKENS` | no | Estimated-token threshold for summary-only mode. |
 | `REVIEW_CI_LOG_MAX_BYTES` | no | Maximum redacted CI log bytes retained per failed check for storage and LLM context. Defaults to `20000`. |
 | `ARTIFACT_RETENTION_DAYS` | no | Default artifact retention. |
+| `CODEBASE_SCAN_DEFAULT_CADENCE_HOURS` | no | Default repeat cadence for enabled repository codebase scans. Defaults to `24`. |
 
 Repository-level dashboard configuration is persisted in PostgreSQL separately from environment defaults. Owners/Admins can fetch and update repository automation and review policy fields through the dashboard API; updates are workspace-scoped, preserve unspecified fields, and record update timestamps plus the Clerk user ID that made the change.
 

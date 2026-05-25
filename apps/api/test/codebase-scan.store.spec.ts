@@ -103,6 +103,77 @@ describe("PostgresCodebaseScanStore", () => {
     expect(deliveries.rows).toEqual([]);
   });
 
+  it("reuses active scan runs for unknown commits by repository and trigger", async () => {
+    const store = new PostgresCodebaseScanStore(pool, createIdFactory([FIRST_SCAN_RUN_ID, SECOND_SCAN_RUN_ID]));
+
+    const first = await store.createOrReuseActiveScanRun({
+      repositoryId: REPOSITORY_ID,
+      trigger: "manual",
+      defaultBranch: "main",
+      commitSha: null
+    });
+    const duplicate = await store.createOrReuseActiveScanRun({
+      repositoryId: REPOSITORY_ID,
+      trigger: "manual",
+      defaultBranch: "main",
+      commitSha: null
+    });
+    await store.updateScanRun({ scanRunId: first.scanRun.id, status: "failed" });
+    const fresh = await store.createOrReuseActiveScanRun({
+      repositoryId: REPOSITORY_ID,
+      trigger: "manual",
+      defaultBranch: "main",
+      commitSha: null
+    });
+
+    expect(first).toMatchObject({
+      created: true,
+      scanRun: {
+        id: FIRST_SCAN_RUN_ID,
+        commitSha: null,
+        status: "queued"
+      }
+    });
+    expect(duplicate).toMatchObject({
+      created: false,
+      scanRun: {
+        id: FIRST_SCAN_RUN_ID
+      }
+    });
+    expect(fresh).toMatchObject({
+      created: true,
+      scanRun: {
+        id: SECOND_SCAN_RUN_ID
+      }
+    });
+  });
+
+  it("reuses active scan runs for known commits across triggers", async () => {
+    const store = new PostgresCodebaseScanStore(pool, createIdFactory([FIRST_SCAN_RUN_ID]));
+
+    const first = await store.createOrReuseActiveScanRun({
+      repositoryId: REPOSITORY_ID,
+      trigger: "push",
+      defaultBranch: "main",
+      commitSha: "abc123"
+    });
+    const duplicate = await store.createOrReuseActiveScanRun({
+      repositoryId: REPOSITORY_ID,
+      trigger: "manual",
+      defaultBranch: "main",
+      commitSha: "abc123"
+    });
+
+    expect(first.created).toBe(true);
+    expect(duplicate).toMatchObject({
+      created: false,
+      scanRun: {
+        id: FIRST_SCAN_RUN_ID,
+        commitSha: "abc123"
+      }
+    });
+  });
+
   it("upserts findings by repository dedupe key and keeps the original first seen timestamp", async () => {
     const store = new PostgresCodebaseScanStore(
       pool,

@@ -5,6 +5,7 @@ export const DASHBOARD_AUTH_STORE = Symbol("DASHBOARD_AUTH_STORE");
 export type DashboardRole = "owner" | "admin" | "developer" | "viewer";
 export type DashboardCapability =
   | "retry_review_run"
+  | "trigger_codebase_scan"
   | "manage_repository_configuration"
   | "manage_review_policies"
   | "manage_sensitive_settings"
@@ -35,6 +36,8 @@ export function roleHasDashboardCapability(
 ): boolean {
   switch (capability) {
     case "retry_review_run":
+      return role === "owner" || role === "admin" || role === "developer";
+    case "trigger_codebase_scan":
       return role === "owner" || role === "admin" || role === "developer";
     case "manage_repository_configuration":
       return role === "owner" || role === "admin";

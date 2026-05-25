@@ -1,9 +1,15 @@
 import { BadRequestException, ForbiddenException, NotFoundException, UnauthorizedException } from "@nestjs/common";
 import { newDb } from "pg-mem";
 import { runDatabaseMigrations } from "../src/infrastructure/database/migrations";
+import {
+  CodebaseScanEnqueueService,
+  PostgresCodebaseScanTargetStore
+} from "../src/modules/codebase-scans/codebase-scan-enqueue.service";
+import { PostgresCodebaseScanStore } from "../src/modules/codebase-scans/codebase-scan.store";
 import { RepositoriesController } from "../src/modules/repositories/repositories.controller";
 import { RepositoryConfigurationService } from "../src/modules/repositories/repository-configuration.service";
 import { PostgresRepositoriesStore } from "../src/modules/repositories/repositories.store";
+import { InMemoryCodebaseScanQueueProducer } from "../src/modules/queues/codebase-scan-queue";
 import { PostgresDashboardAuthStore } from "../src/modules/review-runs/dashboard-auth.store";
 
 interface PgPoolLike {
@@ -30,6 +36,7 @@ function createTestPool(): PgPoolLike {
 describe("repository automation configuration dashboard API", () => {
   let pool: PgPoolLike;
   let controller: RepositoriesController;
+  let scanQueue: InMemoryCodebaseScanQueueProducer;
 
   beforeEach(async () => {
     pool = createTestPool();
@@ -37,9 +44,20 @@ describe("repository automation configuration dashboard API", () => {
     await seedRepositoryConfigurationData(pool);
 
     const repositoriesStore = new PostgresRepositoriesStore(pool);
+    const dashboardAuthStore = new PostgresDashboardAuthStore(pool);
+    scanQueue = new InMemoryCodebaseScanQueueProducer();
+    const codebaseScanEnqueueService = new CodebaseScanEnqueueService(
+      new PostgresCodebaseScanStore(pool, deterministicScanId()),
+      new PostgresCodebaseScanTargetStore(pool),
+      scanQueue,
+      dashboardAuthStore,
+      testConfig,
+      deterministicCorrelationId()
+    );
     controller = new RepositoriesController(
       repositoriesStore,
-      new RepositoryConfigurationService(repositoriesStore, new PostgresDashboardAuthStore(pool))
+      new RepositoryConfigurationService(repositoriesStore, dashboardAuthStore, codebaseScanEnqueueService),
+      codebaseScanEnqueueService
     );
   });
 
@@ -109,6 +127,62 @@ describe("repository automation configuration dashboard API", () => {
       updatedByClerkUserId: ADMIN_USER_ID
     });
     expect(repositoryRows.rows).toEqual([{ enabled: true }]);
+    expect(scanQueue.jobs).toHaveLength(1);
+    expect(scanQueue.schedules).toHaveLength(1);
+    expect(scanQueue.jobs.values().next().value).toMatchObject({
+      repositoryId: REPOSITORY_ID,
+      trigger: "install",
+      commitSha: null
+    });
+  });
+
+  it("allows owner, admin, and developer roles to manually enqueue one active scan while viewers are read-only", async () => {
+    const ownerResponse = await controller.enqueueCodebaseScan(REPOSITORY_ID, WORKSPACE_ID, OWNER_USER_ID);
+    const duplicateResponse = await controller.enqueueCodebaseScan(REPOSITORY_ID, WORKSPACE_ID, DEVELOPER_USER_ID);
+    const scanRows = await pool.query<{ count: string }>(
+      "SELECT count(*)::text AS count FROM codebase_scan_runs WHERE repository_id = $1 AND trigger = 'manual'",
+      [REPOSITORY_ID]
+    );
+
+    expect(ownerResponse).toMatchObject({
+      repositoryId: REPOSITORY_ID,
+      repositoryFullName: "openclaw/firmcode",
+      trigger: "manual",
+      status: "queued",
+      commitSha: null,
+      created: true,
+      duplicate: false
+    });
+    expect(duplicateResponse).toMatchObject({
+      scanRunId: ownerResponse.scanRunId,
+      jobId: ownerResponse.jobId,
+      created: false,
+      duplicate: true
+    });
+    expect(scanRows.rows).toEqual([{ count: "1" }]);
+    expect(scanQueue.jobs).toHaveLength(1);
+
+    await expect(controller.enqueueCodebaseScan(REPOSITORY_ID, WORKSPACE_ID, ADMIN_USER_ID)).resolves.toMatchObject({
+      duplicate: true
+    });
+    await expect(controller.enqueueCodebaseScan(REPOSITORY_ID, WORKSPACE_ID, VIEWER_USER_ID)).rejects.toThrow(
+      ForbiddenException
+    );
+  });
+
+  it("enforces manual scan authentication, ownership, and repository enabled state", async () => {
+    await expect(controller.enqueueCodebaseScan(REPOSITORY_ID, WORKSPACE_ID, undefined)).rejects.toThrow(
+      UnauthorizedException
+    );
+    await expect(controller.enqueueCodebaseScan(OTHER_REPOSITORY_ID, WORKSPACE_ID, OWNER_USER_ID)).rejects.toThrow(
+      NotFoundException
+    );
+
+    await controller.updateRepositoryConfiguration(REPOSITORY_ID, { automationEnabled: false }, WORKSPACE_ID, OWNER_USER_ID);
+
+    await expect(controller.enqueueCodebaseScan(REPOSITORY_ID, WORKSPACE_ID, OWNER_USER_ID)).rejects.toThrow(
+      ForbiddenException
+    );
   });
 
   it("persists partial configuration changes and preserves existing review policy fields", async () => {
@@ -177,6 +251,59 @@ describe("repository automation configuration dashboard API", () => {
     ).rejects.toThrow(NotFoundException);
   });
 });
+
+const testConfig = {
+  nodeEnv: "test" as const,
+  port: 3001,
+  corsAllowedOrigins: [],
+  database: {
+    url: "postgres://firmcode:secret@localhost:5432/firmcode",
+    ssl: false,
+    redactedUrl: "postgres://firmcode:REDACTED@localhost:5432/firmcode"
+  },
+  queue: {
+    redisUrl: "redis://localhost:6379",
+    redactedRedisUrl: "redis://localhost:6379/"
+  },
+  clerk: {
+    secretKey: "sk_test_example",
+    webhookSecret: null
+  },
+  github: null,
+  review: {
+    dryRun: true,
+    skipDraftPullRequests: true,
+    ciLogMaxBytes: 20_000,
+    artifactRetentionDays: 21,
+    largePullRequest: {
+      maxChangedFiles: 30,
+      maxDiffBytes: 120_000,
+      maxChangedLines: 2_000,
+      maxEstimatedTokens: 24_000,
+      maxFilesAfterFiltering: 20,
+      maxSemgrepRuntimeMs: 60_000,
+      summaryOnlyDiffBytes: 500_000,
+      summaryOnlyChangedLines: 8_000,
+      summaryOnlyEstimatedTokens: 80_000,
+      maxFullContextFiles: 8
+    }
+  },
+  codebaseScan: {
+    defaultCadenceHours: 24
+  }
+};
+
+function deterministicScanId(): () => string {
+  let next = 950;
+
+  return () => `00000000-0000-4000-8000-${String(next++).padStart(12, "0")}`;
+}
+
+function deterministicCorrelationId(): () => string {
+  let next = 1;
+
+  return () => `scan-correlation-${next++}`;
+}
 
 async function seedRepositoryConfigurationData(pool: PgPoolLike): Promise<void> {
   await pool.query(
