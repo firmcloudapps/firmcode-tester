@@ -119,7 +119,7 @@ describe("dashboard API controllers", () => {
     expect(detail.findings.map((finding) => finding.title)).toEqual(["Guard repository access", "Keep filters stable"]);
     expect(detail.activity.map((item) => item.kind)).toContain("review_run_updated");
     expect(detail.permissions).toEqual({
-      canManageConfiguration: false,
+      canManageConfiguration: true,
       canRetryReviewRuns: true,
       canAccessRawArtifacts: true,
       canTriggerCodebaseScans: true,

@@ -101,12 +101,12 @@ describe("repository automation configuration dashboard API", () => {
     });
   });
 
-  it("allows owners and admins to disable and enable repository automation", async () => {
+  it("allows owners, admins, and developers to disable and enable repository automation", async () => {
     const disabled = await controller.updateRepositoryConfiguration(
       REPOSITORY_ID,
       { automationEnabled: false },
       WORKSPACE_ID,
-      OWNER_USER_ID
+      DEVELOPER_USER_ID
     );
     const enabled = await controller.updateRepositoryConfiguration(
       REPOSITORY_ID,
@@ -120,7 +120,7 @@ describe("repository automation configuration dashboard API", () => {
 
     expect(disabled).toMatchObject({
       automationEnabled: false,
-      updatedByClerkUserId: OWNER_USER_ID
+      updatedByClerkUserId: DEVELOPER_USER_ID
     });
     expect(enabled).toMatchObject({
       automationEnabled: true,
@@ -233,13 +233,16 @@ describe("repository automation configuration dashboard API", () => {
     ).rejects.toThrow(BadRequestException);
   });
 
-  it("enforces owner/admin repository configuration capabilities", async () => {
+  it("enforces developer repository configuration capabilities while keeping viewers read-only", async () => {
     await expect(controller.getRepositoryConfiguration(REPOSITORY_ID, WORKSPACE_ID, undefined)).rejects.toThrow(
       UnauthorizedException
     );
     await expect(
       controller.updateRepositoryConfiguration(REPOSITORY_ID, { automationEnabled: false }, WORKSPACE_ID, DEVELOPER_USER_ID)
-    ).rejects.toThrow(ForbiddenException);
+    ).resolves.toMatchObject({
+      automationEnabled: false,
+      updatedByClerkUserId: DEVELOPER_USER_ID
+    });
     await expect(
       controller.updateRepositoryConfiguration(REPOSITORY_ID, { automationEnabled: false }, WORKSPACE_ID, VIEWER_USER_ID)
     ).rejects.toThrow(ForbiddenException);

@@ -43,7 +43,7 @@ export function roleHasDashboardCapability(
     case "manage_codebase_scan_findings":
       return role === "owner" || role === "admin";
     case "manage_repository_configuration":
-      return role === "owner" || role === "admin";
+      return role === "owner" || role === "admin" || role === "developer";
     case "manage_review_policies":
       return role === "owner" || role === "admin";
     case "manage_sensitive_settings":
