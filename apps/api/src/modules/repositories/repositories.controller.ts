@@ -11,7 +11,8 @@ import {
   Patch,
   Post,
   Query,
-  UnauthorizedException
+  UnauthorizedException,
+  UseGuards
 } from "@nestjs/common";
 import type {
   CodebaseScanEnqueueResponse,
@@ -21,6 +22,7 @@ import type {
   RepositoryListResponse,
   RepositoryReviewConfiguration
 } from "@firmcode/shared";
+import { DashboardAuthGuard } from "../auth/dashboard-auth.guard";
 import {
   DASHBOARD_AUTH_STORE,
   EmptyDashboardAuthStore,
@@ -33,6 +35,7 @@ import { RepositoryConfigurationService } from "./repository-configuration.servi
 import { REPOSITORIES_STORE, type RepositoriesStore } from "./repositories.store";
 
 @Controller("api/repositories")
+@UseGuards(DashboardAuthGuard)
 export class RepositoriesController {
   private readonly dashboardAuthStore: DashboardAuthStore;
   private readonly configurationService?: RepositoryConfigurationService;

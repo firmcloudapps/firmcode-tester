@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, Param, Post, Query } from "@nestjs/common";
+import { Body, Controller, Get, Headers, Param, Post, Query, UseGuards } from "@nestjs/common";
 import type {
   GitHubInstallationListResponse,
   GitHubInstallationSyncResponse,
@@ -6,9 +6,11 @@ import type {
   GitHubOAuthStatusResponse,
   GitHubRepositorySyncResponse
 } from "@firmcode/shared";
+import { DashboardAuthGuard } from "../auth/dashboard-auth.guard";
 import { GitHubDashboardService } from "./github.service";
 
 @Controller()
+@UseGuards(DashboardAuthGuard)
 export class GitHubDashboardController {
   constructor(private readonly githubService: GitHubDashboardService) {}
 

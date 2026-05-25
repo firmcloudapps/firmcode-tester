@@ -11,6 +11,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@clerk/nextjs": "^6.39.4",
     "@firmcode/shared": "file:packages/shared",
     "next": "^14.2.15",
     "react": "^18.3.1",

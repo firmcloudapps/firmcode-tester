@@ -1,8 +1,10 @@
-import { Body, Controller, Get, Headers, Patch, Query } from "@nestjs/common";
+import { Body, Controller, Get, Headers, Patch, Query, UseGuards } from "@nestjs/common";
 import type { RulesPolicyResponse } from "@firmcode/shared";
+import { DashboardAuthGuard } from "../auth/dashboard-auth.guard";
 import { RulesService } from "./rules.service";
 
 @Controller("api/rules")
+@UseGuards(DashboardAuthGuard)
 export class RulesController {
   constructor(private readonly rulesService: RulesService) {}
 

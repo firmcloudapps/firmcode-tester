@@ -109,8 +109,8 @@ describe("repository automation controls", () => {
     expect(html).toContain("Enabled");
   });
 
-  it("forwards dashboard auth headers from the server-side proxy environment", () => {
-    const headers = createDashboardApiHeaders(
+  it("forwards dashboard auth headers from the explicit local bypass environment", async () => {
+    const headers = await createDashboardApiHeaders(
       {
         FIRMCODE_DASHBOARD_WORKSPACE_ID: "00000000-0000-4000-8000-000000000101",
         FIRMCODE_DASHBOARD_CLERK_USER_ID: "user_admin",
@@ -123,6 +123,21 @@ describe("repository automation controls", () => {
     expect(headers.get("x-firmcode-user-id")).toBe("user_admin");
     expect(headers.get("x-firmcode-clerk-billing-capability")).toBe("manage_billing");
     expect(headers.get("content-type")).toBe("application/json");
+  });
+
+  it("uses Clerk bearer tokens for server-side dashboard API calls", async () => {
+    const headers = await createDashboardApiHeaders(
+      {
+        FIRMCODE_DASHBOARD_CLERK_TOKEN: "session-token",
+        FIRMCODE_DASHBOARD_WORKSPACE_ID: "00000000-0000-4000-8000-000000000101",
+        FIRMCODE_DASHBOARD_CLERK_USER_ID: "user_admin"
+      },
+      false
+    );
+
+    expect(headers.get("authorization")).toBe("Bearer session-token");
+    expect(headers.get("x-firmcode-user-id")).toBeNull();
+    expect(headers.get("x-firmcode-workspace-id")).toBeNull();
   });
 });
 

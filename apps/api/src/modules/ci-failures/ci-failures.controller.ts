@@ -7,9 +7,11 @@ import {
   NotFoundException,
   Param,
   Query,
-  UnauthorizedException
+  UnauthorizedException,
+  UseGuards
 } from "@nestjs/common";
 import { REVIEW_RUN_STATUSES, type CiFailureDetailResponse, type CiFailureListFilters, type CiFailureListResponse } from "@firmcode/shared";
+import { DashboardAuthGuard } from "../auth/dashboard-auth.guard";
 import {
   DASHBOARD_AUTH_STORE,
   roleHasDashboardCapability,
@@ -19,6 +21,7 @@ import {
 import { CI_FAILURES_STORE, type CiFailuresStore } from "./ci-failures.store";
 
 @Controller("api/ci-failures")
+@UseGuards(DashboardAuthGuard)
 export class CiFailuresController {
   constructor(
     @Inject(CI_FAILURES_STORE) private readonly ciFailuresStore: CiFailuresStore,

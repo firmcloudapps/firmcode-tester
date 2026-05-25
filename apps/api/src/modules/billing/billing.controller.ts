@@ -1,11 +1,13 @@
-import { Controller, Get, Headers } from "@nestjs/common";
+import { Controller, Get, Headers, UseGuards } from "@nestjs/common";
 import type { WorkspaceBillingResponse } from "@firmcode/shared";
+import { DashboardAuthGuard } from "../auth/dashboard-auth.guard";
 import {
   hasClerkManagedBillingCapability
 } from "../review-runs/dashboard-auth.store";
 import { BillingService } from "./billing.service";
 
 @Controller("api/billing")
+@UseGuards(DashboardAuthGuard)
 export class BillingController {
   constructor(private readonly billingService: BillingService) {}
 
