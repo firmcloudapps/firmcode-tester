@@ -1,10 +1,13 @@
 import type {
+  CodebaseScanEnqueueResponse,
+  CodebaseScanFindingInboxItem,
   GitHubInstallationSyncResponse,
   GitHubRepositorySyncResponse,
   RepositoryReviewConfiguration,
   RulesPolicyResponse,
   ReviewRunRetryResponse,
   ReviewRunStatus,
+  UpdateRepositoryReviewConfigurationRequest,
   UpdateReviewPolicyRequest
 } from "@firmcode/shared";
 
@@ -108,16 +111,56 @@ export async function updateRepositoryAutomation(
   automationEnabled: boolean,
   fetcher: DashboardMutationFetcher = fetch
 ): Promise<RepositoryReviewConfiguration> {
+  return updateRepositoryConfiguration(repositoryId, { automationEnabled }, fetcher);
+}
+
+export async function updateRepositoryConfiguration(
+  repositoryId: string,
+  updates: UpdateRepositoryReviewConfigurationRequest,
+  fetcher: DashboardMutationFetcher = fetch
+): Promise<RepositoryReviewConfiguration> {
   const response = await fetcher(`/api/repositories/${encodeURIComponent(repositoryId)}/configuration`, {
     method: "PATCH",
     headers: {
       accept: "application/json",
       "content-type": "application/json"
     },
-    body: JSON.stringify({ automationEnabled })
+    body: JSON.stringify(updates)
   });
 
-  return readMutationResponse<RepositoryReviewConfiguration>(response, "Repository automation could not be updated.");
+  return readMutationResponse<RepositoryReviewConfiguration>(response, "Repository configuration could not be updated.");
+}
+
+export async function requestCodebaseScan(
+  repositoryId: string,
+  fetcher: DashboardMutationFetcher = fetch
+): Promise<CodebaseScanEnqueueResponse> {
+  const response = await fetcher(`/api/repositories/${encodeURIComponent(repositoryId)}/codebase-scans`, {
+    method: "POST",
+    headers: {
+      accept: "application/json"
+    }
+  });
+
+  return readMutationResponse<CodebaseScanEnqueueResponse>(response, "Codebase scan could not be queued.");
+}
+
+export async function updateCodebaseFindingStatus(
+  findingId: string,
+  status: CodebaseScanFindingInboxItem["status"],
+  reason: string | null = null,
+  fetcher: DashboardMutationFetcher = fetch
+): Promise<CodebaseScanFindingInboxItem> {
+  const response = await fetcher(`/api/codebase-findings/${encodeURIComponent(findingId)}`, {
+    method: "PATCH",
+    headers: {
+      accept: "application/json",
+      "content-type": "application/json"
+    },
+    body: JSON.stringify({ status, reason })
+  });
+
+  return readMutationResponse<CodebaseScanFindingInboxItem>(response, "Codebase finding status could not be updated.");
 }
 
 export async function updateReviewPolicy(
@@ -154,6 +197,14 @@ export function toGitHubInstallationSyncFeedbackMessage(response: GitHubInstalla
 
 export function toGitHubRepositorySyncFeedbackMessage(response: GitHubRepositorySyncResponse): string {
   return `Synced ${response.repository.fullName}.`;
+}
+
+export function toCodebaseScanFeedbackMessage(response: CodebaseScanEnqueueResponse): string {
+  if (response.duplicate) {
+    return `A codebase scan is already ${response.status} for this repository.`;
+  }
+
+  return `Codebase scan queued as ${response.scanRunId.slice(0, 8)}.`;
 }
 
 export function toReviewPolicyFeedbackMessage(response: RulesPolicyResponse): string {

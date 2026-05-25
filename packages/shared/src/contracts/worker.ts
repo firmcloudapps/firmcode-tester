@@ -386,6 +386,14 @@ export interface WorkerCodebaseScanJobInput {
   readonly trigger: WorkerCodebaseScanTrigger;
   readonly correlationId: string;
   readonly requestedByClerkUserId: string | null;
+  readonly scanConfig?: WorkerCodebaseScanJobConfig;
+}
+
+export interface WorkerCodebaseScanJobConfig {
+  readonly ignoredPaths: readonly string[];
+  readonly severityThreshold: WorkerSeverity;
+  readonly maxFiles: number;
+  readonly maxBytes: number;
 }
 
 export interface WorkerCodebaseScanArtifactMetadataItem {
@@ -474,6 +482,7 @@ const nonEmptyStringSchema = { type: "string", minLength: 1 } as const;
 const nullableStringSchema = { anyOf: [nonEmptyStringSchema, { type: "null" }] } as const;
 const nonNegativeIntegerSchema = { type: "integer", minimum: 0 } as const;
 const positiveIntegerSchema = { type: "integer", minimum: 1 } as const;
+const repositoryRelativePathSchema = { type: "string", minLength: 1, maxLength: 240 } as const;
 const confidenceSchema = { type: "number", minimum: 0, maximum: 1 } as const;
 const workerSeveritySchema = { enum: ["info", "low", "medium", "high", "critical"] } as const;
 const workerFileStatusSchema = { enum: ["added", "deleted", "modified", "renamed", "copied", "unknown"] } as const;
@@ -672,7 +681,18 @@ export const workerCodebaseScanJobInputJsonSchema = {
     commitSha: nullableStringSchema,
     trigger: codebaseScanTriggerSchema,
     correlationId: nonEmptyStringSchema,
-    requestedByClerkUserId: nullableStringSchema
+    requestedByClerkUserId: nullableStringSchema,
+    scanConfig: {
+      type: "object",
+      additionalProperties: false,
+      required: ["ignoredPaths", "severityThreshold", "maxFiles", "maxBytes"],
+      properties: {
+        ignoredPaths: { type: "array", maxItems: 100, items: repositoryRelativePathSchema },
+        severityThreshold: workerSeveritySchema,
+        maxFiles: positiveIntegerSchema,
+        maxBytes: positiveIntegerSchema
+      }
+    }
   }
 } as const;
 

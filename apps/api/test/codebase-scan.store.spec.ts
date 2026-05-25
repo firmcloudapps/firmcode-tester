@@ -8,10 +8,12 @@ interface PgPoolLike {
 }
 
 const REPOSITORY_ID = "00000000-0000-4000-8000-000000000002";
+const WORKSPACE_ID = "00000000-0000-4000-8000-000000000003";
 const FIRST_SCAN_RUN_ID = "00000000-0000-4000-8000-000000000101";
 const SECOND_SCAN_RUN_ID = "00000000-0000-4000-8000-000000000102";
 const FIRST_FINDING_ID = "00000000-0000-4000-8000-000000000201";
 const SECOND_FINDING_ID = "00000000-0000-4000-8000-000000000202";
+const FIRST_STATUS_EVENT_ID = "00000000-0000-4000-8000-000000000301";
 
 function createTestPool(): PgPoolLike {
   const db = newDb({ autoCreateForeignKeyIndices: true, noAstCoverageCheck: true });
@@ -395,6 +397,126 @@ describe("PostgresCodebaseScanStore", () => {
 
     expect(findings.map((finding) => finding.dedupeKey)).toEqual(["component-high", "direct-medium"]);
   });
+
+  it("lists dashboard scan runs and findings with workspace-scoped status audit updates", async () => {
+    const store = new PostgresCodebaseScanStore(
+      pool,
+      createIdFactory([FIRST_SCAN_RUN_ID, FIRST_FINDING_ID, FIRST_STATUS_EVENT_ID])
+    );
+    const scanRun = await store.createScanRun({
+      repositoryId: REPOSITORY_ID,
+      trigger: "manual",
+      defaultBranch: "main",
+      commitSha: "abc123",
+      metrics: { selectedFileCount: 1 }
+    });
+    await store.updateScanRun({
+      scanRunId: scanRun.id,
+      status: "succeeded",
+      startedAt: "2026-05-25T10:00:00.000Z",
+      finishedAt: "2026-05-25T10:00:15.000Z",
+      artifacts: [
+        {
+          artifactType: "semgrep",
+          storageKey: "artifacts/codebase-scans/scan-1/semgrep.json",
+          sizeBytes: 512,
+          sha256: "digest",
+          redacted: true,
+          retentionExpiresAt: "2026-06-24T10:00:00.000Z",
+          metadata: { rules: 1 }
+        }
+      ]
+    });
+    await store.upsertFinding({
+      scanRunId: scanRun.id,
+      repositoryId: REPOSITORY_ID,
+      source: "semgrep",
+      category: "security",
+      severity: "critical",
+      confidence: "high",
+      filePath: "src/server.ts",
+      startLine: 42,
+      endLine: 42,
+      title: "Avoid shell execution",
+      body: "A scanner found request-controlled data reaching shell execution.",
+      evidence: [scanEvidence("src/server.ts", 42)],
+      recommendation: "Use an allowlisted command wrapper.",
+      dedupeKey: "semgrep:dangerous-exec:src/server.ts:42"
+    });
+
+    const runs = await store.listRepositoryScanRuns({
+      repositoryId: REPOSITORY_ID,
+      workspaceId: WORKSPACE_ID,
+      filters: { status: "succeeded" }
+    });
+    const detail = await store.getScanRunDetail({
+      scanRunId: scanRun.id,
+      workspaceId: WORKSPACE_ID,
+      canManageCodebaseFindings: true
+    });
+    const findings = await store.listWorkspaceFindings({
+      workspaceId: WORKSPACE_ID,
+      filters: { repositoryId: REPOSITORY_ID, severity: "critical", source: "semgrep", status: "open" },
+      canManageCodebaseFindings: true
+    });
+    const updated = await store.updateFindingStatus({
+      findingId: FIRST_FINDING_ID,
+      workspaceId: WORKSPACE_ID,
+      actorClerkUserId: "user_owner",
+      update: {
+        status: "false_positive",
+        reason: "Confirmed generated fixture."
+      }
+    });
+    const statusEvents = await pool.query(
+      "SELECT previous_status, next_status, actor_clerk_user_id, reason FROM codebase_scan_finding_status_events WHERE finding_id = $1",
+      [FIRST_FINDING_ID]
+    );
+
+    expect(runs?.codebaseScans).toEqual([
+      expect.objectContaining({
+        id: FIRST_SCAN_RUN_ID,
+        repositoryFullName: "openclaw/firmcode",
+        status: "succeeded",
+        findingsCount: 1,
+        openFindingsCount: 1
+      })
+    ]);
+    expect(detail).toMatchObject({
+      id: FIRST_SCAN_RUN_ID,
+      metrics: { selectedFileCount: 1 },
+      artifacts: [expect.objectContaining({ artifactType: "semgrep", redacted: true })],
+      permissions: { canManageCodebaseFindings: true }
+    });
+    expect(findings.findings).toEqual([
+      expect.objectContaining({
+        id: FIRST_FINDING_ID,
+        findingType: "codebase_scan",
+        repositoryFullName: "openclaw/firmcode",
+        severity: "critical",
+        status: "open"
+      })
+    ]);
+    expect(updated).toMatchObject({
+      id: FIRST_FINDING_ID,
+      status: "false_positive"
+    });
+    expect(statusEvents.rows).toEqual([
+      {
+        previous_status: "open",
+        next_status: "false_positive",
+        actor_clerk_user_id: "user_owner",
+        reason: "Confirmed generated fixture."
+      }
+    ]);
+    await expect(
+      store.getScanRunDetail({
+        scanRunId: scanRun.id,
+        workspaceId: "00000000-0000-4000-8000-000000999999",
+        canManageCodebaseFindings: true
+      })
+    ).resolves.toBeNull();
+  });
 });
 
 function scanEvidence(path: string, line: number) {
@@ -414,13 +536,23 @@ function scanEvidence(path: string, line: number) {
 async function seedRepository(pool: PgPoolLike): Promise<void> {
   await pool.query(
     `
+INSERT INTO workspaces (
+  id,
+  name
+) VALUES (
+  '${WORKSPACE_ID}',
+  'OpenClaw'
+);
+
 INSERT INTO github_installations (
   id,
   installation_id,
+  workspace_id,
   permissions_json
 ) VALUES (
   '00000000-0000-4000-8000-000000000001',
   101,
+  '${WORKSPACE_ID}',
   '{"contents":"read"}'
 );
 

@@ -1,10 +1,15 @@
 import type {
   DashboardRepositoryListFilters,
+  CodebaseScanFindingInboxItem,
+  CodebaseScanRunListItem,
+  CodebaseScanStatus,
+  CodebaseScanTrigger,
   FindingInboxItem,
   RepositoryActivityItem,
   RepositoryActivityResponse,
   RepositoryDetailPermissions,
   RepositoryDetailResponse,
+  RepositoryCodebaseScanSummary,
   RepositoryReviewConfiguration,
   RepositoryLastReview,
   RepositoryListItem,
@@ -80,6 +85,18 @@ interface RepositoryFindingRow {
   readonly finding_id: string;
 }
 
+interface RepositoryCodebaseScanAggregateRow {
+  readonly repository_id: string;
+  readonly latest_scan_run_id: string | null;
+  readonly latest_scan_status: CodebaseScanStatus | null;
+  readonly latest_scan_trigger: CodebaseScanTrigger | null;
+  readonly latest_scan_commit_sha: string | null;
+  readonly latest_scan_started_at: Date | string | null;
+  readonly latest_scan_finished_at: Date | string | null;
+  readonly latest_scan_created_at: Date | string | null;
+  readonly open_codebase_findings_count: string | number;
+}
+
 interface RepositoryPullRequestRow {
   readonly id: string;
   readonly number: number;
@@ -152,6 +169,12 @@ interface RepositoryActivityRow {
 interface RepositoryConfigurationRow {
   readonly repository_id: string;
   readonly automation_enabled: boolean;
+  readonly codebase_scan_enabled: boolean;
+  readonly codebase_scan_cadence_hours: number;
+  readonly codebase_scan_ignored_paths_json: unknown;
+  readonly codebase_scan_severity_threshold: RepositoryReviewConfiguration["codebaseScanSeverityThreshold"];
+  readonly codebase_scan_max_files: number;
+  readonly codebase_scan_max_bytes: number;
   readonly draft_pr_reviews_enabled: boolean;
   readonly max_inline_comments: number;
   readonly severity_threshold: RepositoryReviewConfiguration["severityThreshold"];
@@ -161,6 +184,51 @@ interface RepositoryConfigurationRow {
   readonly infrastructure_review_enabled: boolean;
   readonly dry_run_enabled: boolean;
   readonly updated_by_clerk_user_id: string | null;
+  readonly created_at: Date | string | null;
+  readonly updated_at: Date | string | null;
+}
+
+interface RepositoryCodebaseScanRunRow {
+  readonly id: string;
+  readonly repository_id: string;
+  readonly repository_full_name: string;
+  readonly trigger: CodebaseScanTrigger;
+  readonly default_branch: string;
+  readonly commit_sha: string | null;
+  readonly status: CodebaseScanStatus;
+  readonly started_at: Date | string | null;
+  readonly finished_at: Date | string | null;
+  readonly error_json: unknown;
+  readonly metrics_json: unknown;
+  readonly findings_count: string | number;
+  readonly open_findings_count: string | number;
+  readonly created_at: Date | string | null;
+  readonly updated_at: Date | string | null;
+}
+
+interface RepositoryCodebaseFindingRow {
+  readonly id: string;
+  readonly scan_run_id: string;
+  readonly repository_id: string;
+  readonly repository_full_name: string;
+  readonly scan_status: CodebaseScanStatus;
+  readonly source: CodebaseScanFindingInboxItem["source"];
+  readonly category: CodebaseScanFindingInboxItem["category"];
+  readonly severity: CodebaseScanFindingInboxItem["severity"];
+  readonly confidence: CodebaseScanFindingInboxItem["confidence"];
+  readonly file_path: string | null;
+  readonly start_line: number | null;
+  readonly end_line: number | null;
+  readonly title: string;
+  readonly body: string;
+  readonly evidence_json: unknown;
+  readonly recommendation: string | null;
+  readonly dedupe_key: string;
+  readonly status: CodebaseScanFindingInboxItem["status"];
+  readonly first_seen_at: Date | string | null;
+  readonly last_seen_at: Date | string | null;
+  readonly resolved_at: Date | string | null;
+  readonly scan_created_at: Date | string | null;
   readonly created_at: Date | string | null;
   readonly updated_at: Date | string | null;
 }
@@ -246,7 +314,8 @@ FROM findings f
 JOIN review_runs rr ON rr.id = f.review_run_id
 `
     );
-    const aggregates = buildRepositoryAggregates(reviewRuns.rows, changedFiles.rows, findings.rows);
+    const scanAggregates = await this.loadCodebaseScanAggregates(result.rows.map((row) => row.id));
+    const aggregates = buildRepositoryAggregates(reviewRuns.rows, changedFiles.rows, findings.rows, scanAggregates);
     const repositories = result.rows
       .map((row) => toRepositoryListItem(row, aggregates.get(row.id)))
       .filter((repository) => {
@@ -266,11 +335,13 @@ JOIN review_runs rr ON rr.id = f.review_run_id
       return null;
     }
 
-    const [configuration, pullRequests, reviewRuns, findings, activity] = await Promise.all([
+    const [configuration, pullRequests, reviewRuns, findings, codebaseScans, codebaseFindings, activity] = await Promise.all([
       this.getRepositoryConfiguration(input),
       this.listRepositoryPullRequests(input.repositoryId),
       this.listRepositoryReviewRuns(input.repositoryId),
       this.listRepositoryFindings(input.repositoryId),
+      this.listRepositoryCodebaseScans(input.repositoryId),
+      this.listRepositoryCodebaseFindings(input.repositoryId),
       this.listRepositoryActivityItems(input.repositoryId)
     ]);
 
@@ -284,6 +355,8 @@ JOIN review_runs rr ON rr.id = f.review_run_id
       pullRequests,
       reviewRuns,
       findings,
+      codebaseScans,
+      codebaseFindings,
       activity,
       permissions: input.permissions
     };
@@ -382,7 +455,8 @@ WHERE rr.repository_id = $1
         [input.repositoryId]
       )
     ]);
-    const aggregates = buildRepositoryAggregates(reviewRuns.rows, changedFiles.rows, findings.rows);
+    const scanAggregates = await this.loadCodebaseScanAggregates([input.repositoryId]);
+    const aggregates = buildRepositoryAggregates(reviewRuns.rows, changedFiles.rows, findings.rows, scanAggregates);
 
     return toRepositoryListItem(row, aggregates.get(row.id));
   }
@@ -544,6 +618,90 @@ LIMIT 50
     return result.rows.map(toRepositoryFindingInboxItem);
   }
 
+  private async listRepositoryCodebaseScans(repositoryId: string): Promise<CodebaseScanRunListItem[]> {
+    const result = await this.database.query<RepositoryCodebaseScanRunRow>(
+      `
+SELECT
+  csr.id,
+  csr.repository_id,
+  r.full_name AS repository_full_name,
+  csr.trigger,
+  csr.default_branch,
+  csr.commit_sha,
+  csr.status,
+  csr.started_at,
+  csr.finished_at,
+  csr.error_json,
+  csr.metrics_json,
+  COUNT(csf.id) AS findings_count,
+  SUM(CASE WHEN csf.status = 'open' THEN 1 ELSE 0 END) AS open_findings_count,
+  csr.created_at,
+  csr.updated_at
+FROM codebase_scan_runs csr
+JOIN repositories r ON r.id = csr.repository_id
+LEFT JOIN codebase_scan_findings csf ON csf.scan_run_id = csr.id
+WHERE csr.repository_id = $1
+GROUP BY csr.id, r.full_name
+ORDER BY csr.created_at DESC
+LIMIT 10
+`,
+      [repositoryId]
+    );
+
+    return result.rows.map(toRepositoryCodebaseScanRunListItem);
+  }
+
+  private async listRepositoryCodebaseFindings(repositoryId: string): Promise<CodebaseScanFindingInboxItem[]> {
+    const result = await this.database.query<RepositoryCodebaseFindingRow>(
+      `
+SELECT
+  csf.id,
+  csf.scan_run_id,
+  csf.repository_id,
+  r.full_name AS repository_full_name,
+  csr.status AS scan_status,
+  csf.source,
+  csf.category,
+  csf.severity,
+  csf.confidence,
+  csf.file_path,
+  csf.start_line,
+  csf.end_line,
+  csf.title,
+  csf.body,
+  csf.evidence_json,
+  csf.recommendation,
+  csf.dedupe_key,
+  csf.status,
+  csf.first_seen_at,
+  csf.last_seen_at,
+  csf.resolved_at,
+  csr.created_at AS scan_created_at,
+  csf.created_at,
+  csf.updated_at
+FROM codebase_scan_findings csf
+JOIN codebase_scan_runs csr ON csr.id = csf.scan_run_id
+JOIN repositories r ON r.id = csf.repository_id
+WHERE csf.repository_id = $1
+  AND csf.status = 'open'
+ORDER BY
+  CASE csf.severity
+    WHEN 'critical' THEN 0
+    WHEN 'high' THEN 1
+    WHEN 'medium' THEN 2
+    WHEN 'low' THEN 3
+    ELSE 4
+  END,
+  csf.last_seen_at DESC,
+  csf.file_path ASC
+LIMIT 50
+`,
+      [repositoryId]
+    );
+
+    return result.rows.map(toRepositoryCodebaseFindingInboxItem);
+  }
+
   private async listRepositoryActivityItems(repositoryId: string): Promise<RepositoryActivityItem[]> {
     const result = await this.database.query<RepositoryActivityRow>(
       `
@@ -596,6 +754,24 @@ SELECT
 FROM findings f
 JOIN review_runs rr ON rr.id = f.review_run_id
 WHERE rr.repository_id = $1
+UNION ALL
+SELECT
+  'codebase-scan:' || csr.id::text AS id,
+  'codebase_scan_updated' AS kind,
+  'Codebase scan ' || csr.status AS title,
+  csr.trigger || ' scan for ' || COALESCE(csr.commit_sha, csr.default_branch) AS detail,
+  csr.updated_at AS created_at
+FROM codebase_scan_runs csr
+WHERE csr.repository_id = $1
+UNION ALL
+SELECT
+  'codebase-finding:' || csf.id::text AS id,
+  'codebase_finding_updated' AS kind,
+  'Codebase finding ' || csf.status || ': ' || csf.title AS title,
+  COALESCE(csf.file_path, 'Repository summary finding') AS detail,
+  csf.updated_at AS created_at
+FROM codebase_scan_findings csf
+WHERE csf.repository_id = $1
 ORDER BY created_at DESC
 LIMIT 50
 `,
@@ -681,6 +857,77 @@ GROUP BY rr.id
     }
 
     return counts;
+  }
+
+  private async loadCodebaseScanAggregates(
+    repositoryIds: readonly string[]
+  ): Promise<Map<string, RepositoryCodebaseScanSummary>> {
+    if (repositoryIds.length === 0) {
+      return new Map();
+    }
+
+    const latest = await this.database.query<RepositoryCodebaseScanAggregateRow>(
+      `
+SELECT
+  csr.repository_id,
+  csr.id AS latest_scan_run_id,
+  csr.status AS latest_scan_status,
+  csr.trigger AS latest_scan_trigger,
+  csr.commit_sha AS latest_scan_commit_sha,
+  csr.started_at AS latest_scan_started_at,
+  csr.finished_at AS latest_scan_finished_at,
+  csr.created_at AS latest_scan_created_at,
+  0 AS open_codebase_findings_count
+FROM codebase_scan_runs csr
+WHERE csr.repository_id = ANY($1)
+ORDER BY csr.repository_id ASC, csr.created_at DESC
+`,
+      [repositoryIds]
+    );
+    const openCounts = await this.database.query<{ repository_id: string; open_codebase_findings_count: string | number }>(
+      `
+SELECT repository_id, COUNT(id) AS open_codebase_findings_count
+FROM codebase_scan_findings
+WHERE repository_id = ANY($1)
+  AND status = 'open'
+GROUP BY repository_id
+`,
+      [repositoryIds]
+    );
+    const aggregates = new Map<string, RepositoryCodebaseScanSummary>();
+
+    for (const repositoryId of repositoryIds) {
+      aggregates.set(repositoryId, emptyCodebaseScanSummary());
+    }
+
+    for (const row of latest.rows) {
+      const current = aggregates.get(row.repository_id);
+
+      if (current?.latestScanRunId !== null && current?.latestScanRunId !== undefined) {
+        continue;
+      }
+
+      aggregates.set(row.repository_id, {
+        latestScanRunId: row.latest_scan_run_id,
+        latestScanStatus: row.latest_scan_status,
+        latestScanTrigger: row.latest_scan_trigger,
+        latestScanCommitSha: row.latest_scan_commit_sha,
+        latestScanStartedAt: toIsoString(row.latest_scan_started_at),
+        latestScanFinishedAt: toIsoString(row.latest_scan_finished_at),
+        latestScanCreatedAt: toIsoString(row.latest_scan_created_at),
+        openCodebaseFindingsCount: aggregates.get(row.repository_id)?.openCodebaseFindingsCount ?? 0
+      });
+    }
+
+    for (const row of openCounts.rows) {
+      const current = aggregates.get(row.repository_id) ?? emptyCodebaseScanSummary();
+      aggregates.set(row.repository_id, {
+        ...current,
+        openCodebaseFindingsCount: Number(row.open_codebase_findings_count)
+      });
+    }
+
+    return aggregates;
   }
 
   async updateRepositoryConfiguration(input: RepositoryConfigurationUpdate): Promise<RepositoryReviewConfiguration | null> {
@@ -793,6 +1040,7 @@ interface RepositoryAggregate {
   primaryLanguage: string | null;
   openFindingsCount: number;
   lastReview: RepositoryLastReview | null;
+  codebaseScan: RepositoryCodebaseScanSummary;
 }
 
 interface ReviewRunCounts {
@@ -804,7 +1052,8 @@ interface ReviewRunCounts {
 function buildRepositoryAggregates(
   reviewRuns: RepositoryReviewRunRow[],
   changedFiles: RepositoryChangedFileRow[],
-  findings: RepositoryFindingRow[]
+  findings: RepositoryFindingRow[],
+  scanAggregates: ReadonlyMap<string, RepositoryCodebaseScanSummary>
 ): Map<string, RepositoryAggregate> {
   const aggregates = new Map<string, RepositoryAggregate>();
 
@@ -835,6 +1084,10 @@ function buildRepositoryAggregates(
     ensureAggregate(aggregates, finding.repository_id).openFindingsCount += 1;
   }
 
+  for (const [repositoryId, scanAggregate] of scanAggregates) {
+    ensureAggregate(aggregates, repositoryId).codebaseScan = scanAggregate;
+  }
+
   return aggregates;
 }
 
@@ -848,7 +1101,8 @@ function ensureAggregate(aggregates: Map<string, RepositoryAggregate>, repositor
   const aggregate: RepositoryAggregate = {
     primaryLanguage: null,
     openFindingsCount: 0,
-    lastReview: null
+    lastReview: null,
+    codebaseScan: emptyCodebaseScanSummary()
   };
   aggregates.set(repositoryId, aggregate);
 
@@ -866,8 +1120,23 @@ function toRepositoryListItem(row: RepositoryListRow, aggregate: RepositoryAggre
     enabled: row.enabled,
     primaryLanguage: aggregate?.primaryLanguage ?? null,
     openFindingsCount: aggregate?.openFindingsCount ?? 0,
+    openCodebaseFindingsCount: aggregate?.codebaseScan?.openCodebaseFindingsCount ?? 0,
     lastReview: aggregate?.lastReview ?? null,
+    codebaseScan: aggregate?.codebaseScan ?? emptyCodebaseScanSummary(),
     updatedAt: toRequiredIsoString(row.updated_at)
+  };
+}
+
+function emptyCodebaseScanSummary(): RepositoryCodebaseScanSummary {
+  return {
+    latestScanRunId: null,
+    latestScanStatus: null,
+    latestScanTrigger: null,
+    latestScanCommitSha: null,
+    latestScanStartedAt: null,
+    latestScanFinishedAt: null,
+    latestScanCreatedAt: null,
+    openCodebaseFindingsCount: 0
   };
 }
 
@@ -881,6 +1150,30 @@ function buildConfigurationAssignments(updates: UpdateRepositoryReviewConfigurat
 
   if (updates.automationEnabled !== undefined) {
     append("automation_enabled", updates.automationEnabled);
+  }
+
+  if (updates.codebaseScanEnabled !== undefined) {
+    append("codebase_scan_enabled", updates.codebaseScanEnabled);
+  }
+
+  if (updates.codebaseScanCadenceHours !== undefined) {
+    append("codebase_scan_cadence_hours", updates.codebaseScanCadenceHours);
+  }
+
+  if (updates.codebaseScanIgnoredPaths !== undefined) {
+    appendJson("codebase_scan_ignored_paths_json", updates.codebaseScanIgnoredPaths);
+  }
+
+  if (updates.codebaseScanSeverityThreshold !== undefined) {
+    append("codebase_scan_severity_threshold", updates.codebaseScanSeverityThreshold);
+  }
+
+  if (updates.codebaseScanMaxFiles !== undefined) {
+    append("codebase_scan_max_files", updates.codebaseScanMaxFiles);
+  }
+
+  if (updates.codebaseScanMaxBytes !== undefined) {
+    append("codebase_scan_max_bytes", updates.codebaseScanMaxBytes);
   }
 
   if (updates.draftPullRequestReviewsEnabled !== undefined) {
@@ -915,6 +1208,11 @@ function buildConfigurationAssignments(updates: UpdateRepositoryReviewConfigurat
     append("dry_run_enabled", updates.dryRunEnabled);
   }
 
+  function appendJson(column: string, value: unknown) {
+    values.push(JSON.stringify(value));
+    assignments.push(`${column} = $${values.length + 2}::jsonb`);
+  }
+
   return {
     sql: assignments.length === 0 ? "" : `,\n    ${assignments.join(",\n    ")}`,
     values
@@ -925,6 +1223,12 @@ function toRepositoryReviewConfiguration(row: RepositoryConfigurationRow): Repos
   return {
     repositoryId: row.repository_id,
     automationEnabled: row.automation_enabled,
+    codebaseScanEnabled: row.codebase_scan_enabled,
+    codebaseScanCadenceHours: Number(row.codebase_scan_cadence_hours),
+    codebaseScanIgnoredPaths: normalizeStringArray(row.codebase_scan_ignored_paths_json),
+    codebaseScanSeverityThreshold: row.codebase_scan_severity_threshold,
+    codebaseScanMaxFiles: Number(row.codebase_scan_max_files),
+    codebaseScanMaxBytes: Number(row.codebase_scan_max_bytes),
     draftPullRequestReviewsEnabled: row.draft_pr_reviews_enabled,
     maxInlineComments: Number(row.max_inline_comments),
     severityThreshold: row.severity_threshold,
@@ -979,12 +1283,15 @@ function toRepositoryFindingInboxItem(row: RepositoryFindingInboxRow): FindingIn
   const evidence = Array.isArray(row.evidence_json) ? row.evidence_json : [];
 
   return {
+    findingType: "pull_request",
     id: row.id,
     reviewRunId: row.review_run_id,
+    scanRunId: null,
     repositoryId: row.repository_id,
     repositoryFullName: row.repository_full_name,
     pullRequestNumber: row.pull_request_number,
     pullRequestTitle: row.pull_request_title,
+    scanStatus: null,
     source: row.source,
     category: row.category,
     severity: row.severity,
@@ -1005,7 +1312,69 @@ function toRepositoryFindingInboxItem(row: RepositoryFindingInboxRow): FindingIn
     githubCommentUrl: buildGitHubCommentUrl(row.repository_full_name, row.pull_request_number, row.github_comment_id),
     postedAt: toIsoString(row.posted_at),
     createdAt: toRequiredIsoString(row.finding_created_at),
-    reviewRunCreatedAt: toRequiredIsoString(row.review_run_created_at)
+    reviewRunCreatedAt: toRequiredIsoString(row.review_run_created_at),
+    scanRunCreatedAt: null,
+    statusUpdatedAt: null
+  };
+}
+
+function toRepositoryCodebaseScanRunListItem(row: RepositoryCodebaseScanRunRow): CodebaseScanRunListItem {
+  const error = normalizeJsonObject(row.error_json);
+  return {
+    id: row.id,
+    repositoryId: row.repository_id,
+    repositoryFullName: row.repository_full_name,
+    trigger: row.trigger,
+    defaultBranch: row.default_branch,
+    commitSha: row.commit_sha,
+    status: row.status,
+    startedAt: toIsoString(row.started_at),
+    finishedAt: toIsoString(row.finished_at),
+    durationMs: deriveDurationMs(row.started_at, row.finished_at, normalizeJsonObject(row.metrics_json)),
+    findingsCount: Number(row.findings_count),
+    openFindingsCount: Number(row.open_findings_count),
+    errorCode: typeof error.code === "string" ? error.code : null,
+    errorMessage: typeof error.message === "string" ? error.message : null,
+    createdAt: toRequiredIsoString(row.created_at),
+    updatedAt: toRequiredIsoString(row.updated_at)
+  };
+}
+
+function toRepositoryCodebaseFindingInboxItem(row: RepositoryCodebaseFindingRow): CodebaseScanFindingInboxItem {
+  const evidence = Array.isArray(row.evidence_json) ? row.evidence_json : [];
+  return {
+    findingType: "codebase_scan",
+    id: row.id,
+    reviewRunId: null,
+    scanRunId: row.scan_run_id,
+    repositoryId: row.repository_id,
+    repositoryFullName: row.repository_full_name,
+    pullRequestNumber: null,
+    pullRequestTitle: null,
+    scanStatus: row.scan_status,
+    source: row.source,
+    category: row.category,
+    severity: row.severity,
+    confidence: row.confidence,
+    filePath: row.file_path,
+    startLine: row.start_line,
+    endLine: row.end_line,
+    title: row.title,
+    body: row.body,
+    evidence,
+    suggestion: row.recommendation,
+    dedupeKey: row.dedupe_key,
+    postAsInline: false,
+    postedInline: false,
+    status: row.status,
+    semgrepRuleId: findSemgrepRuleId(evidence),
+    githubCommentId: null,
+    githubCommentUrl: null,
+    postedAt: null,
+    createdAt: toRequiredIsoString(row.created_at),
+    reviewRunCreatedAt: null,
+    scanRunCreatedAt: toRequiredIsoString(row.scan_created_at),
+    statusUpdatedAt: toRequiredIsoString(row.updated_at)
   };
 }
 
@@ -1112,6 +1481,10 @@ function readNullableNumberMetric(metrics: Record<string, unknown>, key: string)
 
 function normalizeJsonObject(value: unknown): Record<string, unknown> {
   return isRecord(value) ? value : {};
+}
+
+function normalizeStringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === "string") : [];
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

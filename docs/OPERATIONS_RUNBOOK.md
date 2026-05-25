@@ -78,6 +78,132 @@ Action:
 - Record skipped/timeout artifacts.
 - Consider large-PR prioritized mode.
 
+## Codebase Scan Backlog
+
+Symptoms:
+
+- Repository detail shows queued/running codebase scans that do not advance.
+- Findings are stale even though repository automation is enabled.
+
+Check:
+
+- Dashboard: open `/repositories/{repositoryId}?tab=scans` and confirm the latest scan status, trigger, commit SHA, and correlation ID in metrics.
+- Redis/BullMQ: `docker compose exec redis redis-cli LLEN bull:codebase-scans:wait`
+- Delayed jobs: `docker compose exec redis redis-cli ZCARD bull:codebase-scans:delayed`
+- Failed jobs: `docker compose exec redis redis-cli ZCARD bull:codebase-scans:failed`
+
+Action:
+
+- Confirm the worker is healthy with `docker compose ps worker`.
+- Reduce worker concurrency or scan cadence if one installation is flooding the queue.
+- Queue one manual scan from the repository Scans tab after the backlog drains.
+
+## Codebase Scan GitHub Rate Limit
+
+Symptoms:
+
+- Scan detail error code is `github_request_failed` or scan logs mention rate limit reset headers.
+- Many repositories from one installation fail during tree or blob fetch.
+
+Check:
+
+- Dashboard: open the failed scan detail from `/repositories/{repositoryId}?tab=scans`.
+- API/worker logs: `docker compose logs worker | grep codebase_scan`
+- GitHub reset window from logs; do not log installation tokens.
+
+Action:
+
+- Wait until the GitHub reset time before retrying.
+- Temporarily increase scan cadence hours or disable scans for low-priority repositories from repository configuration.
+- Re-enable and manually scan the repository once the reset window passes.
+
+## Codebase Scan Failure
+
+Symptoms:
+
+- Latest scan status is failed.
+- Scan detail has `errorCode`, `errorMessage`, stage metrics, or missing artifacts.
+
+Check:
+
+- Dashboard: `/repositories/{repositoryId}?tab=scans`, then inspect the failed scan row and metrics.
+- Worker logs by correlation ID: `docker compose logs worker | grep <correlationId>`
+- Database status: `SELECT id, status, error_json, metrics_json FROM codebase_scan_runs WHERE repository_id = '<repository-id>' ORDER BY created_at DESC LIMIT 5;`
+
+Action:
+
+- Fix deterministic configuration errors before retrying.
+- For transient GitHub, Redis, or Semgrep failures, click Scan now from the Scans tab.
+- If a scan is stuck running after worker restart, mark it failed only after confirming no worker owns the job.
+
+## Codebase Scan Semgrep Timeout
+
+Symptoms:
+
+- Scan error mentions Semgrep timeout or scan summary has large skipped/timeout counts.
+- Worker CPU or memory is saturated during repository scans.
+
+Check:
+
+- Dashboard: open the repository Scans tab and compare selected file count, selected bytes, skipped paths, and Semgrep duration.
+- Worker logs: `docker compose logs worker | grep semgrep`
+- Repository scan configuration: cadence, ignored paths, severity threshold, max files, and max bytes.
+
+Action:
+
+- Add ignored paths for generated/vendor-heavy directories.
+- Lower max files or max bytes for the repository and save configuration.
+- Queue a manual scan from the Scans tab to verify the reduced scope.
+
+## Stale Codebase Findings
+
+Symptoms:
+
+- Findings remain open after a successful scan where the issue should be gone.
+- PR summaries mention resolved repository-level issues.
+
+Check:
+
+- Dashboard: filter Findings by Type = Codebase scan, repository, and Open status.
+- Latest successful scan: `SELECT id, status, commit_sha, finished_at FROM codebase_scan_runs WHERE repository_id = '<repository-id>' ORDER BY created_at DESC LIMIT 5;`
+- Finding state: `SELECT id, dedupe_key, status, first_seen_at, last_seen_at, resolved_at FROM codebase_scan_findings WHERE repository_id = '<repository-id>' ORDER BY last_seen_at DESC LIMIT 20;`
+
+Action:
+
+- Run a manual scan against the current default branch.
+- Owners/Admins may mark known stale items resolved from the Findings inbox.
+- If stale resolution repeatedly misses findings, inspect dedupe key generation before bulk-updating rows.
+
+## Codebase Scan Retention Cleanup
+
+Symptoms:
+
+- Scan artifacts exceed retention or storage grows unexpectedly.
+- Resolved findings remain past the retention window.
+
+Check:
+
+- Dashboard: open the scan detail and confirm artifact retention metadata before cleanup.
+- Candidate findings: `SELECT id, status, resolved_at FROM codebase_scan_findings WHERE status IN ('resolved', 'suppressed', 'false_positive') AND resolved_at < now() - interval '180 days';`
+
+Action:
+
+- Delete expired raw artifact objects according to their storage backend key and retention metadata.
+- Run the documented retention cleanup job when available; until then, use a reviewed SQL maintenance script for metadata cleanup.
+- Confirm dashboard scan detail still shows retained metadata and no raw repository contents.
+
+## Codebase Scan Manual Recovery
+
+Use when a repository needs a known-good scan after configuration or infrastructure recovery.
+
+Steps:
+
+- Dashboard: open `/repositories/{repositoryId}?tab=configuration` and confirm Review automation and Codebase scans are enabled.
+- Save reduced ignored paths or scan limits if the previous failure was scope-related.
+- Open `/repositories/{repositoryId}?tab=scans` and click Scan now.
+- Confirm the button reports queued or duplicate-job state, then refresh until status is succeeded or failed.
+- Verify Findings with Type = Codebase scan and the target repository.
+
 ## Worker Startup Semgrep Timeout
 
 Symptoms:

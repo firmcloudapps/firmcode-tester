@@ -9,7 +9,7 @@ import tempfile
 import time
 from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -107,6 +107,7 @@ class CodebaseScanConfig:
     max_total_bytes: int = DEFAULT_CODEBASE_SCAN_MAX_TOTAL_BYTES
     max_file_bytes: int = DEFAULT_CODEBASE_SCAN_MAX_FILE_BYTES
     ignored_paths: tuple[str, ...] = ()
+    severity_threshold: str = "info"
     repository_allowlist: tuple[str, ...] = ()
     artifact_dir: Path = Path(tempfile.gettempdir()) / DEFAULT_CODEBASE_SCAN_ARTIFACT_DIR
     artifact_retention_days: int = DEFAULT_CODEBASE_SCAN_ARTIFACT_RETENTION_DAYS
@@ -120,6 +121,7 @@ class CodebaseScanConfig:
             max_total_bytes=_read_positive_int(env.get("CODEBASE_SCAN_MAX_TOTAL_BYTES"), DEFAULT_CODEBASE_SCAN_MAX_TOTAL_BYTES),
             max_file_bytes=_read_positive_int(env.get("CODEBASE_SCAN_MAX_FILE_BYTES"), DEFAULT_CODEBASE_SCAN_MAX_FILE_BYTES),
             ignored_paths=_read_csv(env.get("CODEBASE_SCAN_IGNORED_PATHS")),
+            severity_threshold=(env.get("CODEBASE_SCAN_SEVERITY_THRESHOLD") or "info").strip() or "info",
             repository_allowlist=_read_csv(env.get("CODEBASE_SCAN_REPOSITORY_ALLOWLIST")),
             artifact_dir=_artifact_dir(env.get("CODEBASE_SCAN_ARTIFACT_DIR")),
             artifact_retention_days=_read_positive_int(
@@ -673,7 +675,8 @@ class CodebaseScanPipeline:
 
         try:
             await self.store.assert_repository_enabled(payload)
-            planner = CodebaseScanWorkspacePlanner(config=self.config)
+            config = self._config_for_payload(payload)
+            planner = CodebaseScanWorkspacePlanner(config=config)
             planner.assert_repository_allowed(payload.repository_full_name)
             default_branch, commit_sha = self.github.fetch_default_branch_sha(
                 installation_id=payload.installation_id,
@@ -737,6 +740,9 @@ class CodebaseScanPipeline:
                 context=context,
                 semgrep_artifact=semgrep_artifact,
                 tree_sitter_artifact=tree_sitter_artifact,
+            )
+            findings = tuple(
+                finding for finding in findings if _severity_rank(_read_str(finding.get("severity"), "info")) <= _severity_rank(config.severity_threshold)
             )
             llm_metrics = await self._maybe_enrich_with_llm(context=context, findings=findings)
             if llm_metrics:
@@ -815,6 +821,17 @@ class CodebaseScanPipeline:
             if payload.scan_run_id is not None:
                 await self.store.mark_failed(scan_run_id=payload.scan_run_id, error=error_payload, metrics=metrics)
             raise
+
+    def _config_for_payload(self, payload: CodebaseScanJobInput) -> CodebaseScanConfig:
+        if payload.scan_config is None:
+            return self.config
+
+        return replace(
+            self.config,
+            max_files=payload.scan_config.max_files,
+            max_total_bytes=payload.scan_config.max_bytes,
+            ignored_paths=payload.scan_config.ignored_paths,
+        )
 
     def _run_semgrep(self, context: CodebaseScanContext, selection: CodebaseWorkspaceSelection) -> dict[str, Any]:
         scan_inputs = [
@@ -1221,6 +1238,16 @@ def _normalize_repo_path(path: str) -> str:
 
 def _matches_any(path: str, patterns: Sequence[str]) -> bool:
     return any(fnmatch.fnmatchcase(path.lower(), pattern.lower()) for pattern in patterns)
+
+
+def _severity_rank(severity: str) -> int:
+    return {
+        "critical": 0,
+        "high": 1,
+        "medium": 2,
+        "low": 3,
+        "info": 4,
+    }.get(severity, 4)
 
 
 def _is_infra_path(path: str) -> bool:

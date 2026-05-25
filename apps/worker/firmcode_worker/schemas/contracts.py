@@ -96,6 +96,31 @@ class ReviewJobInput:
 
 
 @dataclass(frozen=True)
+class CodebaseScanJobConfig:
+    ignored_paths: tuple[str, ...]
+    severity_threshold: str
+    max_files: int
+    max_bytes: int
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any], errors: list[str]) -> "CodebaseScanJobConfig | None":
+        raw = value.get("scanConfig")
+        if raw is None:
+            return None
+        if not isinstance(raw, Mapping):
+            errors.append("scanConfig must be an object")
+            return None
+        ignored_paths = tuple(_read_string_list(raw, "ignoredPaths", errors))
+        severity_threshold = _read_literal_from_set(raw, "severityThreshold", SEVERITIES, errors)
+        return cls(
+            ignored_paths=ignored_paths,
+            severity_threshold=severity_threshold,
+            max_files=_read_positive_int(raw, "maxFiles", errors),
+            max_bytes=_read_positive_int(raw, "maxBytes", errors),
+        )
+
+
+@dataclass(frozen=True)
 class CodebaseScanJobInput:
     schema_version: str
     scan_run_id: str | None
@@ -107,6 +132,7 @@ class CodebaseScanJobInput:
     trigger: str
     correlation_id: str
     requested_by_clerk_user_id: str | None
+    scan_config: CodebaseScanJobConfig | None = None
 
     @classmethod
     def from_mapping(cls, value: Mapping[str, Any]) -> "CodebaseScanJobInput":
@@ -123,6 +149,7 @@ class CodebaseScanJobInput:
             trigger=_read_literal_from_set(value, "trigger", CODEBASE_SCAN_TRIGGERS, errors),
             correlation_id=_read_non_empty_str(value, "correlationId", errors),
             requested_by_clerk_user_id=_read_nullable_str(value, "requestedByClerkUserId", errors),
+            scan_config=CodebaseScanJobConfig.from_mapping(value, errors),
         )
         _raise_if_errors(errors)
         return payload
@@ -1229,6 +1256,17 @@ def _read_list(value: Mapping[str, Any], key: str, errors: list[str], path: str 
         return actual
     errors.append(f"{field_path} must be an array")
     return []
+
+
+def _read_string_list(value: Mapping[str, Any], key: str, errors: list[str]) -> list[str]:
+    items = _read_list(value, key, errors)
+    strings: list[str] = []
+    for index, item in enumerate(items):
+        if not isinstance(item, str) or not item:
+            errors.append(f"{key}[{index}] must be a non-empty string")
+            continue
+        strings.append(item)
+    return strings
 
 
 def _read_str(value: Mapping[str, Any], key: str, errors: list[str], prefix: str | None = None) -> str:

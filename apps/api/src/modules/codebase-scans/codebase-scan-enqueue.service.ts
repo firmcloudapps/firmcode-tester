@@ -48,6 +48,12 @@ export interface CodebaseScanRepositoryTarget {
   readonly repositoryFullName: string;
   readonly defaultBranch: string;
   readonly enabled: boolean;
+  readonly codebaseScanEnabled: boolean;
+  readonly codebaseScanCadenceHours: number;
+  readonly codebaseScanIgnoredPaths: readonly string[];
+  readonly codebaseScanSeverityThreshold: "info" | "low" | "medium" | "high" | "critical";
+  readonly codebaseScanMaxFiles: number;
+  readonly codebaseScanMaxBytes: number;
 }
 
 export interface ManualCodebaseScanRequest {
@@ -81,7 +87,7 @@ export class CodebaseScanEnqueueService {
     assertUuid("repository ID", input.repositoryId);
     const target = await this.targetStore.findRepositoryTarget(input.repositoryId);
 
-    if (target === null || !target.enabled) {
+    if (target === null || !target.enabled || !target.codebaseScanEnabled) {
       return null;
     }
 
@@ -106,7 +112,7 @@ export class CodebaseScanEnqueueService {
       return;
     }
 
-    if (target.enabled) {
+    if (target.enabled && target.codebaseScanEnabled) {
       await this.scheduleRepositoryTarget(target, this.createCorrelationId());
     } else {
       await this.queue.removeCodebaseScanSchedule(target.repositoryId);
@@ -145,7 +151,7 @@ export class CodebaseScanEnqueueService {
       throw new NotFoundException("Repository not found");
     }
 
-    if (!target.enabled) {
+    if (!target.enabled || !target.codebaseScanEnabled) {
       throw new ForbiddenException("Repository automation is disabled");
     }
 
@@ -170,9 +176,10 @@ export class CodebaseScanEnqueueService {
         commitSha: null,
         trigger: "scheduled",
         correlationId,
-        requestedByClerkUserId: null
+        requestedByClerkUserId: null,
+        scanConfig: toScanJobConfig(target)
       },
-      this.config.codebaseScan.defaultCadenceHours
+      target.codebaseScanCadenceHours
     );
   }
 
@@ -210,7 +217,8 @@ export class CodebaseScanEnqueueService {
         commitSha: input.commitSha,
         trigger: input.trigger,
         correlationId: input.correlationId,
-        requestedByClerkUserId: input.requestedByClerkUserId
+        requestedByClerkUserId: input.requestedByClerkUserId,
+        scanConfig: toScanJobConfig(input.target)
       });
 
       logScanQueueEvent("codebase_scan.enqueue", creation.scanRun, input.target, input.correlationId, Date.now() - startedAt, job.id);
@@ -275,12 +283,19 @@ SELECT
   gi.installation_id,
   r.full_name,
   r.default_branch,
-  r.enabled
+  r.enabled,
+  COALESCE(rc.codebase_scan_enabled, true) AS codebase_scan_enabled,
+  COALESCE(rc.codebase_scan_cadence_hours, $2) AS codebase_scan_cadence_hours,
+  COALESCE(rc.codebase_scan_ignored_paths_json, '[]'::jsonb) AS codebase_scan_ignored_paths_json,
+  COALESCE(rc.codebase_scan_severity_threshold, 'medium') AS codebase_scan_severity_threshold,
+  COALESCE(rc.codebase_scan_max_files, 500) AS codebase_scan_max_files,
+  COALESCE(rc.codebase_scan_max_bytes, 10000000) AS codebase_scan_max_bytes
 FROM repositories r
 JOIN github_installations gi ON gi.id = r.installation_id
+LEFT JOIN repository_review_configurations rc ON rc.repository_id = r.id
 WHERE r.id = $1
 `,
-      [repositoryId]
+      [repositoryId, 24]
     );
 
     return result.rows[0] === undefined ? null : toTarget(result.rows[0]);
@@ -296,13 +311,20 @@ SELECT
   gi.installation_id,
   r.full_name,
   r.default_branch,
-  r.enabled
+  r.enabled,
+  COALESCE(rc.codebase_scan_enabled, true) AS codebase_scan_enabled,
+  COALESCE(rc.codebase_scan_cadence_hours, $3) AS codebase_scan_cadence_hours,
+  COALESCE(rc.codebase_scan_ignored_paths_json, '[]'::jsonb) AS codebase_scan_ignored_paths_json,
+  COALESCE(rc.codebase_scan_severity_threshold, 'medium') AS codebase_scan_severity_threshold,
+  COALESCE(rc.codebase_scan_max_files, 500) AS codebase_scan_max_files,
+  COALESCE(rc.codebase_scan_max_bytes, 10000000) AS codebase_scan_max_bytes
 FROM repositories r
 JOIN github_installations gi ON gi.id = r.installation_id
+LEFT JOIN repository_review_configurations rc ON rc.repository_id = r.id
 WHERE r.id = $1
   AND gi.workspace_id = $2
 `,
-      [input.repositoryId, input.workspaceId]
+      [input.repositoryId, input.workspaceId, 24]
     );
 
     return result.rows[0] === undefined ? null : toTarget(result.rows[0]);
@@ -317,6 +339,12 @@ interface CodebaseScanTargetRow {
   readonly full_name: string;
   readonly default_branch: string;
   readonly enabled: boolean;
+  readonly codebase_scan_enabled: boolean;
+  readonly codebase_scan_cadence_hours: number;
+  readonly codebase_scan_ignored_paths_json: unknown;
+  readonly codebase_scan_severity_threshold: "info" | "low" | "medium" | "high" | "critical";
+  readonly codebase_scan_max_files: number;
+  readonly codebase_scan_max_bytes: number;
 }
 
 function toTarget(row: CodebaseScanTargetRow): CodebaseScanRepositoryTarget {
@@ -327,8 +355,27 @@ function toTarget(row: CodebaseScanTargetRow): CodebaseScanRepositoryTarget {
     installationId: Number(row.installation_id),
     repositoryFullName: row.full_name,
     defaultBranch: row.default_branch,
-    enabled: row.enabled
+    enabled: row.enabled,
+    codebaseScanEnabled: row.codebase_scan_enabled,
+    codebaseScanCadenceHours: Number(row.codebase_scan_cadence_hours),
+    codebaseScanIgnoredPaths: normalizeStringArray(row.codebase_scan_ignored_paths_json),
+    codebaseScanSeverityThreshold: row.codebase_scan_severity_threshold,
+    codebaseScanMaxFiles: Number(row.codebase_scan_max_files),
+    codebaseScanMaxBytes: Number(row.codebase_scan_max_bytes)
   };
+}
+
+function toScanJobConfig(target: CodebaseScanRepositoryTarget) {
+  return {
+    ignoredPaths: target.codebaseScanIgnoredPaths,
+    severityThreshold: target.codebaseScanSeverityThreshold,
+    maxFiles: target.codebaseScanMaxFiles,
+    maxBytes: target.codebaseScanMaxBytes
+  };
+}
+
+function normalizeStringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === "string") : [];
 }
 
 function toResponse(

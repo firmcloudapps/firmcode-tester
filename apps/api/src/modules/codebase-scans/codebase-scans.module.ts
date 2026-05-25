@@ -16,10 +16,12 @@ import {
   EmptyCodebaseScanTargetStore,
   PostgresCodebaseScanTargetStore
 } from "./codebase-scan-enqueue.service";
+import { CodebaseScansController } from "./codebase-scans.controller";
 import { CODEBASE_SCAN_STORE, EmptyCodebaseScanStore, PostgresCodebaseScanStore } from "./codebase-scan.store";
 
 @Module({
   imports: [ReviewQueueModule],
+  controllers: [CodebaseScansController],
   providers: [
     apiRuntimeConfigProvider,
     {

@@ -34,6 +34,45 @@ export interface RepositoryLastReview {
   finishedAt: string | null;
 }
 
+export type CodebaseScanStatus = "queued" | "running" | "succeeded" | "failed" | "cancelled" | "superseded";
+export type CodebaseScanTrigger = "install" | "scheduled" | "manual" | "push";
+export type CodebaseScanFindingSource = "semgrep" | "llm" | "tree_sitter" | "ci" | "policy";
+export type CodebaseScanFindingStatus = "open" | "resolved" | "suppressed" | "false_positive";
+
+export const CODEBASE_SCAN_STATUSES: readonly CodebaseScanStatus[] = [
+  "queued",
+  "running",
+  "succeeded",
+  "failed",
+  "cancelled",
+  "superseded"
+] as const;
+export const CODEBASE_SCAN_TRIGGERS: readonly CodebaseScanTrigger[] = ["install", "scheduled", "manual", "push"] as const;
+export const CODEBASE_SCAN_FINDING_SOURCES: readonly CodebaseScanFindingSource[] = [
+  "semgrep",
+  "llm",
+  "tree_sitter",
+  "ci",
+  "policy"
+] as const;
+export const CODEBASE_SCAN_FINDING_STATUSES: readonly CodebaseScanFindingStatus[] = [
+  "open",
+  "resolved",
+  "suppressed",
+  "false_positive"
+] as const;
+
+export interface RepositoryCodebaseScanSummary {
+  latestScanRunId: string | null;
+  latestScanStatus: CodebaseScanStatus | null;
+  latestScanTrigger: CodebaseScanTrigger | null;
+  latestScanCommitSha: string | null;
+  latestScanStartedAt: string | null;
+  latestScanFinishedAt: string | null;
+  latestScanCreatedAt: string | null;
+  openCodebaseFindingsCount: number;
+}
+
 export interface RepositoryListItem {
   id: string;
   owner: string;
@@ -44,7 +83,9 @@ export interface RepositoryListItem {
   enabled: boolean;
   primaryLanguage: string | null;
   openFindingsCount: number;
+  openCodebaseFindingsCount?: number;
   lastReview: RepositoryLastReview | null;
+  codebaseScan?: RepositoryCodebaseScanSummary;
   updatedAt: string;
 }
 
@@ -71,7 +112,9 @@ export type RepositoryActivityKind =
   | "configuration_updated"
   | "pull_request_seen"
   | "review_run_updated"
-  | "finding_created";
+  | "finding_created"
+  | "codebase_scan_updated"
+  | "codebase_finding_updated";
 
 export interface RepositoryActivityItem {
   id: string;
@@ -85,6 +128,8 @@ export interface RepositoryDetailPermissions {
   canManageConfiguration: boolean;
   canRetryReviewRuns: boolean;
   canAccessRawArtifacts: boolean;
+  canTriggerCodebaseScans?: boolean;
+  canManageCodebaseScans?: boolean;
 }
 
 export interface RepositoryDetailResponse {
@@ -93,6 +138,8 @@ export interface RepositoryDetailResponse {
   pullRequests: RepositoryPullRequestSummary[];
   reviewRuns: ReviewRunListItem[];
   findings: FindingInboxItem[];
+  codebaseScans?: CodebaseScanRunListItem[];
+  codebaseFindings?: CodebaseScanFindingInboxItem[];
   activity: RepositoryActivityItem[];
   permissions: RepositoryDetailPermissions;
 }
@@ -113,6 +160,57 @@ export interface CodebaseScanEnqueueResponse {
   correlationId: string;
   created: boolean;
   duplicate: boolean;
+}
+
+export interface CodebaseScanArtifactMetadataItem {
+  artifactType: "semgrep" | "tree_sitter" | "context_pack" | "llm_raw" | "scan_summary";
+  storageKey: string;
+  sizeBytes: number;
+  sha256: string;
+  redacted: boolean;
+  retentionExpiresAt: string;
+  metadata: Record<string, unknown>;
+}
+
+export interface CodebaseScanRunListItem {
+  id: string;
+  repositoryId: string;
+  repositoryFullName: string;
+  trigger: CodebaseScanTrigger;
+  defaultBranch: string;
+  commitSha: string | null;
+  status: CodebaseScanStatus;
+  startedAt: string | null;
+  finishedAt: string | null;
+  durationMs: number | null;
+  findingsCount: number;
+  openFindingsCount: number;
+  errorCode: string | null;
+  errorMessage: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CodebaseScanRunListFilters {
+  status?: CodebaseScanStatus;
+  trigger?: CodebaseScanTrigger;
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+export interface CodebaseScanRunListResponse {
+  repositoryId: string;
+  codebaseScans: CodebaseScanRunListItem[];
+  filters: CodebaseScanRunListFilters;
+}
+
+export interface CodebaseScanRunDetailResponse extends CodebaseScanRunListItem {
+  metrics: Record<string, unknown>;
+  artifacts: CodebaseScanArtifactMetadataItem[];
+  findings: CodebaseScanFindingInboxItem[];
+  permissions: {
+    canManageCodebaseFindings: boolean;
+  };
 }
 
 export interface GitHubOAuthUserSummary {
@@ -173,6 +271,14 @@ export function canManageRepositoryConfiguration(role: DashboardWorkspaceRole): 
   return role === "owner" || role === "admin";
 }
 
+export function canTriggerCodebaseScans(role: DashboardWorkspaceRole): boolean {
+  return role === "owner" || role === "admin" || role === "developer";
+}
+
+export function canManageCodebaseScans(role: DashboardWorkspaceRole): boolean {
+  return role === "owner" || role === "admin";
+}
+
 export function canAccessRawReviewArtifacts(role: DashboardWorkspaceRole): boolean {
   return role === "owner" || role === "admin" || role === "developer";
 }
@@ -188,6 +294,12 @@ export type RepositoryReviewSeverityThreshold = (typeof REPOSITORY_REVIEW_SEVERI
 export interface RepositoryReviewConfiguration {
   repositoryId: string;
   automationEnabled: boolean;
+  codebaseScanEnabled?: boolean;
+  codebaseScanCadenceHours?: number;
+  codebaseScanIgnoredPaths?: string[];
+  codebaseScanSeverityThreshold?: RepositoryReviewSeverityThreshold;
+  codebaseScanMaxFiles?: number;
+  codebaseScanMaxBytes?: number;
   draftPullRequestReviewsEnabled: boolean;
   maxInlineComments: number;
   severityThreshold: RepositoryReviewSeverityThreshold;
@@ -205,6 +317,12 @@ export type UpdateRepositoryReviewConfigurationRequest = Partial<
   Pick<
     RepositoryReviewConfiguration,
     | "automationEnabled"
+    | "codebaseScanEnabled"
+    | "codebaseScanCadenceHours"
+    | "codebaseScanIgnoredPaths"
+    | "codebaseScanSeverityThreshold"
+    | "codebaseScanMaxFiles"
+    | "codebaseScanMaxBytes"
     | "draftPullRequestReviewsEnabled"
     | "maxInlineComments"
     | "severityThreshold"
@@ -465,12 +583,21 @@ export interface ReviewRunChangedFile {
 }
 
 export type ReviewFindingSource = "semgrep" | "llm" | "ci" | "policy";
+export type FindingInboxSource = ReviewFindingSource | CodebaseScanFindingSource;
 export type ReviewFindingCategory = "bug" | "security" | "performance" | "maintainability" | "test" | "infra" | "ci";
 export type ReviewFindingSeverity = "info" | "low" | "medium" | "high" | "critical";
 export type ReviewFindingConfidence = "low" | "medium" | "high";
 export type ReviewFindingStatus = "open" | "posted" | "suppressed" | "resolved" | "false_positive";
+export type FindingInboxType = "pull_request" | "codebase_scan";
 
 export const REVIEW_FINDING_SOURCES: readonly ReviewFindingSource[] = ["semgrep", "llm", "ci", "policy"] as const;
+export const FINDING_INBOX_SOURCES: readonly FindingInboxSource[] = [
+  "semgrep",
+  "llm",
+  "tree_sitter",
+  "ci",
+  "policy"
+] as const;
 export const REVIEW_FINDING_CATEGORIES: readonly ReviewFindingCategory[] = [
   "bug",
   "security",
@@ -491,7 +618,7 @@ export const REVIEW_FINDING_STATUSES: readonly ReviewFindingStatus[] = [
 
 export interface ReviewRunFinding {
   id: string;
-  source: ReviewFindingSource;
+  source: FindingInboxSource;
   category: ReviewFindingCategory;
   severity: ReviewFindingSeverity;
   confidence: ReviewFindingConfidence;
@@ -509,8 +636,9 @@ export interface ReviewRunFinding {
 }
 
 export interface FindingsListFilters {
+  findingType?: FindingInboxType;
   severity?: ReviewFindingSeverity;
-  source?: ReviewFindingSource;
+  source?: FindingInboxSource;
   category?: ReviewFindingCategory;
   repositoryId?: string;
   repository?: string;
@@ -521,22 +649,72 @@ export interface FindingsListFilters {
 }
 
 export interface FindingInboxItem extends ReviewRunFinding {
-  reviewRunId: string;
+  findingType?: FindingInboxType;
+  reviewRunId: string | null;
+  scanRunId?: string | null;
   repositoryId: string;
   repositoryFullName: string;
-  pullRequestNumber: number;
-  pullRequestTitle: string;
+  pullRequestNumber: number | null;
+  pullRequestTitle: string | null;
+  scanStatus?: CodebaseScanStatus | null;
   status: ReviewFindingStatus;
   semgrepRuleId: string | null;
   postedAt: string | null;
   githubCommentId: number | null;
   githubCommentUrl: string | null;
-  reviewRunCreatedAt: string;
+  reviewRunCreatedAt: string | null;
+  scanRunCreatedAt?: string | null;
+  statusUpdatedAt?: string | null;
 }
 
 export interface FindingsListResponse {
   findings: FindingInboxItem[];
   filters: FindingsListFilters;
+  permissions?: {
+    canManageCodebaseFindings: boolean;
+  };
+}
+
+export interface CodebaseScanFindingInboxItem extends FindingInboxItem {
+  findingType: "codebase_scan";
+  reviewRunId: null;
+  scanRunId: string;
+  pullRequestNumber: null;
+  pullRequestTitle: null;
+  scanStatus: CodebaseScanStatus;
+  status: CodebaseScanFindingStatus;
+  suggestion: string | null;
+  postAsInline: false;
+  postedInline: false;
+  postedAt: null;
+  githubCommentId: null;
+  githubCommentUrl: null;
+  reviewRunCreatedAt: null;
+  scanRunCreatedAt: string;
+}
+
+export interface CodebaseScanFindingListFilters {
+  repositoryId?: string;
+  repository?: string;
+  severity?: ReviewFindingSeverity;
+  source?: CodebaseScanFindingSource;
+  category?: ReviewFindingCategory;
+  status?: CodebaseScanFindingStatus;
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+export interface CodebaseScanFindingListResponse {
+  findings: CodebaseScanFindingInboxItem[];
+  filters: CodebaseScanFindingListFilters;
+  permissions: {
+    canManageCodebaseFindings: boolean;
+  };
+}
+
+export interface UpdateCodebaseScanFindingStatusRequest {
+  status: CodebaseScanFindingStatus;
+  reason?: string | null;
 }
 
 export interface WorkspaceSettingsInstallation {
