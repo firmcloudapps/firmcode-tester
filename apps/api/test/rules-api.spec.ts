@@ -87,9 +87,19 @@ describe("rules and policies dashboard API", () => {
         dependencyReviewEnabled: true,
         ciWorkflowReviewEnabled: true
       },
+      workspaceControls: {
+        globalWorkspacePolicyEnabled: true,
+        retentionDays: 30,
+        apiKeyCreationEnabled: false,
+        billingChangesRequireAdmin: true,
+        supportSafetyOverridesEnabled: false
+      },
       updatedByClerkUserId: null
     });
     expect(response.permissions.canManagePolicies).toBe(true);
+    expect(response.permissions.canManageWorkspacePolicies).toBe(true);
+    expect(response.permissions.canManageRepositoryPolicies).toBe(true);
+    expect(response.permissions.canManageSensitiveWorkspacePolicies).toBe(true);
     expect(response.repositoryPolicies).toEqual([]);
   });
 
@@ -100,6 +110,9 @@ describe("rules and policies dashboard API", () => {
 
     expect(developer.permissions.canManagePolicies).toBe(false);
     expect(developerRepository.permissions.canManagePolicies).toBe(true);
+    expect(developer.permissions.canManageWorkspacePolicies).toBe(false);
+    expect(developer.permissions.canManageRepositoryPolicies).toBe(true);
+    expect(developer.permissions.canManageSensitiveWorkspacePolicies).toBe(false);
     expect(viewer.permissions.canManagePolicies).toBe(false);
     expect(developer.workspacePolicy.commentPolicy.severityThreshold).toBe("medium");
     expect(developerRepository.selectedRepositoryPolicy?.repositoryId).toBe(REPOSITORY_ID);
@@ -128,6 +141,11 @@ describe("rules and policies dashboard API", () => {
         },
         infrastructureSecurity: {
           dependencyReviewEnabled: false
+        },
+        workspaceControls: {
+          retentionDays: 45,
+          apiKeyCreationEnabled: true,
+          supportSafetyOverridesEnabled: true
         }
       },
       WORKSPACE_ID,
@@ -172,6 +190,12 @@ describe("rules and policies dashboard API", () => {
       infrastructureSecurity: {
         dependencyReviewEnabled: false,
         securityReviewEnabled: true
+      },
+      workspaceControls: {
+        retentionDays: 45,
+        apiKeyCreationEnabled: true,
+        billingChangesRequireAdmin: true,
+        supportSafetyOverridesEnabled: true
       },
       updatedByClerkUserId: ADMIN_USER_ID
     });
@@ -251,6 +275,12 @@ describe("rules and policies dashboard API", () => {
     await expect(
       controller.updateRules({ promptInstructions: "review\u0000everything" }, WORKSPACE_ID, OWNER_USER_ID)
     ).rejects.toThrow(BadRequestException);
+    await expect(
+      controller.updateRules({ workspaceControls: { retentionDays: 0 } }, WORKSPACE_ID, OWNER_USER_ID)
+    ).rejects.toThrow(BadRequestException);
+    await expect(
+      controller.updateRules({ workspaceControls: { apiKeyCreationEnabled: "yes" } }, WORKSPACE_ID, OWNER_USER_ID)
+    ).rejects.toThrow(BadRequestException);
   });
 
   it("validates ignored paths and generated-file ignore patterns as repository-relative safe patterns", async () => {
@@ -275,6 +305,12 @@ describe("rules and policies dashboard API", () => {
     await expect(controller.getRules(undefined, WORKSPACE_ID, undefined)).rejects.toThrow(UnauthorizedException);
     await expect(
       controller.updateRules({ commentPolicy: { maxInlineComments: 3 } }, WORKSPACE_ID, DEVELOPER_USER_ID)
+    ).rejects.toThrow(ForbiddenException);
+    await expect(
+      controller.updateRules({ workspaceControls: { retentionDays: 45 } }, WORKSPACE_ID, DEVELOPER_USER_ID)
+    ).rejects.toThrow(ForbiddenException);
+    await expect(
+      controller.updateRules({ repositoryId: REPOSITORY_ID, workspaceControls: { retentionDays: 45 } }, WORKSPACE_ID, OWNER_USER_ID)
     ).rejects.toThrow(ForbiddenException);
     await expect(
       controller.updateRules({ commentPolicy: { maxInlineComments: 3 } }, WORKSPACE_ID, VIEWER_USER_ID)

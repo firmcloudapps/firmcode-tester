@@ -173,7 +173,8 @@ ORDER BY table_name
       "007_ci_failure_artifacts",
       "008_codebase_scan_persistence",
       "009_codebase_scan_dashboard_configuration",
-      "010_workspace_membership_audit"
+      "010_workspace_membership_audit",
+      "011_review_policy_workspace_controls"
     ]);
     expect(secondRunMigrationIds).toEqual([]);
     expect(tables.rows.map((row) => row.table_name)).toEqual(EXPECTED_TABLES);
@@ -187,7 +188,8 @@ ORDER BY table_name
       { id: "007_ci_failure_artifacts" },
       { id: "008_codebase_scan_persistence" },
       { id: "009_codebase_scan_dashboard_configuration" },
-      { id: "010_workspace_membership_audit" }
+      { id: "010_workspace_membership_audit" },
+      { id: "011_review_policy_workspace_controls" }
     ]);
   });
 

@@ -368,6 +368,14 @@ export interface ReviewPolicyInfrastructureSecurity {
   ciWorkflowReviewEnabled: boolean;
 }
 
+export interface ReviewPolicyWorkspaceControls {
+  globalWorkspacePolicyEnabled: boolean;
+  retentionDays: number;
+  apiKeyCreationEnabled: boolean;
+  billingChangesRequireAdmin: boolean;
+  supportSafetyOverridesEnabled: boolean;
+}
+
 export interface ReviewPolicy {
   workspaceId: string;
   repositoryId: string | null;
@@ -381,6 +389,7 @@ export interface ReviewPolicy {
   semgrep: ReviewPolicySemgrepSettings;
   analysis: ReviewPolicyAnalysisToggles;
   infrastructureSecurity: ReviewPolicyInfrastructureSecurity;
+  workspaceControls: ReviewPolicyWorkspaceControls;
   updatedByClerkUserId: string | null;
   createdAt: string;
   updatedAt: string;
@@ -398,6 +407,9 @@ export interface RulesPolicyResponse {
   selectedRepositoryPolicy: ReviewPolicy | null;
   permissions: {
     canManagePolicies: boolean;
+    canManageWorkspacePolicies?: boolean;
+    canManageRepositoryPolicies?: boolean;
+    canManageSensitiveWorkspacePolicies?: boolean;
   };
 }
 
@@ -412,6 +424,7 @@ export interface UpdateReviewPolicyRequest {
   semgrep?: Partial<ReviewPolicySemgrepSettings>;
   analysis?: Partial<ReviewPolicyAnalysisToggles>;
   infrastructureSecurity?: Partial<ReviewPolicyInfrastructureSecurity>;
+  workspaceControls?: Partial<ReviewPolicyWorkspaceControls>;
 }
 
 export type ReviewRunRiskLevel = "low" | "medium" | "high" | "unknown";

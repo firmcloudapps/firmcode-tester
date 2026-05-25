@@ -7,6 +7,7 @@ import type {
   ReviewPolicyCategoryEnablement,
   ReviewPolicyInfrastructureSecurity,
   ReviewPolicyReviewPreferences,
+  ReviewPolicyWorkspaceControls,
   RulesPolicyResponse,
   UpdateReviewPolicyRequest
 } from "@firmcode/shared";
@@ -38,6 +39,9 @@ export interface ReviewPolicyDraft {
   semgrep: ReviewPolicy["semgrep"];
   analysis: ReviewPolicy["analysis"];
   infrastructureSecurity: ReviewPolicyInfrastructureSecurity;
+  workspaceControls: Omit<ReviewPolicyWorkspaceControls, "retentionDays"> & {
+    retentionDays: string;
+  };
 }
 
 export interface ReviewPolicyValidationResult {
@@ -66,6 +70,8 @@ const SEVERITY_OPTIONS: Array<ReviewPolicy["commentPolicy"]["severityThreshold"]
 const MAX_PROMPT_INSTRUCTIONS_LENGTH = 4_000;
 const MAX_PATH_PATTERNS = 100;
 const MAX_PATH_PATTERN_LENGTH = 240;
+const MIN_RETENTION_DAYS = 1;
+const MAX_RETENTION_DAYS = 365;
 const CONTROL_CHARACTER_PATTERN = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/;
 const SENSITIVE_VALUE_PATTERNS: readonly RegExp[] = [
   /-----BEGIN [A-Z ]*PRIVATE KEY-----/,
@@ -122,7 +128,7 @@ function RulesHeader({ data, empty }: { data: RulesPolicyResponse; empty: boolea
             data.permissions.canManagePolicies ? "bg-green-50 text-success" : "bg-slate-100 text-secondary"
           }`}
         >
-          {data.permissions.canManagePolicies ? "Admin editing" : "Read-only policy"}
+          {data.permissions.canManagePolicies ? "Policy editing" : "Read-only policy"}
         </span>
         <span className="rounded-full bg-subtle px-2 py-1 text-xs font-medium text-secondary">
           {activePolicy.scope === "workspace" ? "Workspace default" : "Repository override"}
@@ -137,12 +143,13 @@ function RulesHeader({ data, empty }: { data: RulesPolicyResponse; empty: boolea
 
 export function RulesPolicyForm({ data }: { data: RulesPolicyResponse }) {
   const activePolicy = getActivePolicy(data);
-  const readOnly = !data.permissions.canManagePolicies;
+  const canManageSensitiveWorkspacePolicies = data.permissions.canManageSensitiveWorkspacePolicies ?? data.permissions.canManagePolicies;
   const guardRef = React.useRef(createPendingActionGuard());
   const [basePolicy, setBasePolicy] = React.useState(activePolicy);
   const [draft, setDraft] = React.useState(() => createReviewPolicyDraft(activePolicy));
   const [pending, setPending] = React.useState(false);
   const [feedback, setFeedback] = React.useState<Feedback>(null);
+  const readOnly = !canSavePolicy(data, draft.repositoryId);
   const validation = validateReviewPolicyDraft(draft);
   const hasChanges = hasReviewPolicyDraftChanges(basePolicy, draft);
   const blocked = readOnly || pending || !hasChanges || !validation.valid;
@@ -205,7 +212,7 @@ export function RulesPolicyForm({ data }: { data: RulesPolicyResponse }) {
               id="policy-target"
               className="rounded-md border border-border bg-surface px-3 py-2 text-sm text-primary disabled:bg-subtle disabled:text-secondary"
               value={draft.repositoryId ?? "workspace"}
-              disabled={readOnly}
+              disabled={pending}
               onChange={(event) => {
                 const nextRepositoryId = event.target.value === "workspace" ? null : event.target.value;
                 const nextPolicy =
@@ -427,13 +434,71 @@ export function RulesPolicyForm({ data }: { data: RulesPolicyResponse }) {
         />
       </PolicySection>
 
+      <PolicySection
+        title="Workspace Administration"
+        description="Global workspace, retention, API key, billing, and support/safety controls require Admin."
+      >
+        <div className="grid gap-4 md:grid-cols-2">
+          <label className="flex flex-col gap-1 text-sm font-medium text-primary">
+            Retention days
+            <input
+              className={inputClassName(validation.errors.retentionDays)}
+              type="number"
+              min={MIN_RETENTION_DAYS}
+              max={MAX_RETENTION_DAYS}
+              value={draft.workspaceControls.retentionDays}
+              disabled={draft.repositoryId !== null || !canManageSensitiveWorkspacePolicies}
+              aria-invalid={validation.errors.retentionDays === undefined ? undefined : true}
+              aria-describedby={validation.errors.retentionDays === undefined ? undefined : "retention-days-error"}
+              onChange={(event) =>
+                setDraft({
+                  ...draft,
+                  workspaceControls: {
+                    ...draft.workspaceControls,
+                    retentionDays: event.target.value
+                  }
+                })
+              }
+            />
+            <FieldError id="retention-days-error" message={validation.errors.retentionDays} />
+          </label>
+          <ToggleGrid
+            readOnly={draft.repositoryId !== null || !canManageSensitiveWorkspacePolicies}
+            fields={[
+              ["globalWorkspacePolicyEnabled", "Global workspace policies", draft.workspaceControls.globalWorkspacePolicyEnabled],
+              ["apiKeyCreationEnabled", "Workspace API keys", draft.workspaceControls.apiKeyCreationEnabled],
+              ["billingChangesRequireAdmin", "Admin billing guardrail", draft.workspaceControls.billingChangesRequireAdmin],
+              ["supportSafetyOverridesEnabled", "Support safety overrides", draft.workspaceControls.supportSafetyOverridesEnabled]
+            ]}
+            onChange={(field, checked) =>
+              setDraft({
+                ...draft,
+                workspaceControls: {
+                  ...draft.workspaceControls,
+                  [field]: checked
+                }
+              })
+            }
+          />
+        </div>
+        <p className="mt-3 rounded-md border border-border bg-subtle p-3 text-xs leading-5 text-secondary">
+          {draft.repositoryId === null
+            ? canManageSensitiveWorkspacePolicies
+              ? "Admin-only workspace policy controls are included in this save."
+              : "Admin is required to change global workspace, retention, API key, billing, and support/safety policy controls."
+            : "Repository policies inherit workspace administration controls."}
+        </p>
+      </PolicySection>
+
       <section className="sticky bottom-0 rounded-lg border border-border bg-surface p-4 shadow-sm">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-sm font-semibold text-primary">Policy changes</h2>
             <p className="mt-1 text-sm leading-6 text-secondary" aria-live="polite">
               {readOnly
-                ? "This workspace role can view policies but cannot save changes."
+                ? draft.repositoryId === null
+                  ? "Admin is required to save workspace policies."
+                  : "This workspace role can view repository policies but cannot save changes."
                 : hasChanges
                   ? "Unsaved changes"
                   : "No unsaved changes"}
@@ -451,7 +516,7 @@ export function RulesPolicyForm({ data }: { data: RulesPolicyResponse }) {
             className="w-full rounded-md bg-accent px-4 py-2 text-sm font-medium text-white transition hover:bg-accentPressed disabled:cursor-not-allowed disabled:bg-mist disabled:text-secondary sm:w-auto"
             type="submit"
             disabled={blocked}
-            title={readOnly ? "Admin required." : "Save review policy"}
+            title={readOnly ? "This workspace role cannot save the selected policy." : "Save review policy"}
           >
             {pending ? "Saving..." : "Save policy"}
           </button>
@@ -604,7 +669,11 @@ export function createReviewPolicyDraft(policy: ReviewPolicy): ReviewPolicyDraft
     generatedFilePatternsText: policy.generatedFileIgnorePatterns.join("\n"),
     semgrep: { ...policy.semgrep },
     analysis: { ...policy.analysis },
-    infrastructureSecurity: { ...policy.infrastructureSecurity }
+    infrastructureSecurity: { ...policy.infrastructureSecurity },
+    workspaceControls: {
+      ...policy.workspaceControls,
+      retentionDays: String(policy.workspaceControls.retentionDays)
+    }
   };
 }
 
@@ -628,6 +697,7 @@ export function validateReviewPolicyDraft(draft: ReviewPolicyDraft): ReviewPolic
   const generatedPatterns = parsePatternLines(draft.generatedFilePatternsText);
   const ignoredPathError = validatePathPatterns(ignoredPaths);
   const generatedPatternError = validatePathPatterns(generatedPatterns);
+  const retentionDays = Number(draft.workspaceControls.retentionDays);
 
   if (ignoredPathError !== null) {
     errors.ignoredPaths = ignoredPathError;
@@ -635,6 +705,14 @@ export function validateReviewPolicyDraft(draft: ReviewPolicyDraft): ReviewPolic
 
   if (generatedPatternError !== null) {
     errors.generatedFileIgnorePatterns = generatedPatternError;
+  }
+
+  if (
+    !Number.isInteger(retentionDays) ||
+    retentionDays < MIN_RETENTION_DAYS ||
+    retentionDays > MAX_RETENTION_DAYS
+  ) {
+    errors.retentionDays = `Retention days must be an integer between ${MIN_RETENTION_DAYS} and ${MAX_RETENTION_DAYS}.`;
   }
 
   return {
@@ -648,7 +726,7 @@ export function hasReviewPolicyDraftChanges(policy: ReviewPolicy, draft: ReviewP
 }
 
 export function toReviewPolicyUpdateRequest(draft: ReviewPolicyDraft): UpdateReviewPolicyRequest {
-  return {
+  const request: UpdateReviewPolicyRequest = {
     repositoryId: draft.repositoryId,
     reviewPreferences: draft.reviewPreferences,
     commentPolicy: {
@@ -663,6 +741,23 @@ export function toReviewPolicyUpdateRequest(draft: ReviewPolicyDraft): UpdateRev
     analysis: draft.analysis,
     infrastructureSecurity: draft.infrastructureSecurity
   };
+
+  if (draft.repositoryId === null) {
+    request.workspaceControls = {
+      ...draft.workspaceControls,
+      retentionDays: Number(draft.workspaceControls.retentionDays)
+    };
+  }
+
+  return request;
+}
+
+function canSavePolicy(data: RulesPolicyResponse, repositoryId: string | null): boolean {
+  if (repositoryId === null) {
+    return data.permissions.canManageWorkspacePolicies ?? data.permissions.canManagePolicies;
+  }
+
+  return data.permissions.canManageRepositoryPolicies ?? data.permissions.canManagePolicies;
 }
 
 function parsePatternLines(value: string): string[] {

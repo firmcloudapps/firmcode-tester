@@ -7,6 +7,7 @@ import type {
   ReviewPolicyReviewPreferences,
   ReviewPolicySemgrepSettings,
   ReviewPolicySummary,
+  ReviewPolicyWorkspaceControls,
   ReviewPolicyCommentPolicy,
   UpdateReviewPolicyRequest
 } from "@firmcode/shared";
@@ -54,6 +55,7 @@ interface ReviewPolicyRow {
   readonly semgrep_policy_json: unknown;
   readonly analysis_toggles_json: unknown;
   readonly infrastructure_security_policy_json: unknown;
+  readonly workspace_controls_json: unknown;
   readonly updated_by_clerk_user_id: string | null;
   readonly created_at: Date | string | null;
   readonly updated_at: Date | string | null;
@@ -143,7 +145,8 @@ SET review_preferences_json = $2::jsonb,
     semgrep_policy_json = $9::jsonb,
     analysis_toggles_json = $10::jsonb,
     infrastructure_security_policy_json = $11::jsonb,
-    updated_by_clerk_user_id = $12,
+    workspace_controls_json = $12::jsonb,
+    updated_by_clerk_user_id = $13,
     updated_at = now()
 WHERE id = $1
 `,
@@ -159,6 +162,7 @@ WHERE id = $1
         JSON.stringify(merged.semgrep),
         JSON.stringify(merged.analysis),
         JSON.stringify(merged.infrastructureSecurity),
+        JSON.stringify(merged.workspaceControls),
         input.updatedByClerkUserId
       ]
     );
@@ -215,6 +219,7 @@ RETURNING
   semgrep_policy_json,
   analysis_toggles_json,
   infrastructure_security_policy_json,
+  workspace_controls_json,
   updated_by_clerk_user_id,
   created_at,
   updated_at
@@ -308,6 +313,7 @@ SELECT
   rp.semgrep_policy_json,
   rp.analysis_toggles_json,
   rp.infrastructure_security_policy_json,
+  rp.workspace_controls_json,
   rp.updated_by_clerk_user_id,
   rp.created_at,
   rp.updated_at
@@ -355,6 +361,7 @@ SELECT
   rp.semgrep_policy_json,
   rp.analysis_toggles_json,
   rp.infrastructure_security_policy_json,
+  rp.workspace_controls_json,
   rp.updated_by_clerk_user_id,
   rp.created_at,
   rp.updated_at
@@ -429,6 +436,14 @@ export const DEFAULT_INFRASTRUCTURE_SECURITY: ReviewPolicyInfrastructureSecurity
   ciWorkflowReviewEnabled: true
 };
 
+export const DEFAULT_WORKSPACE_CONTROLS: ReviewPolicyWorkspaceControls = {
+  globalWorkspacePolicyEnabled: true,
+  retentionDays: 30,
+  apiKeyCreationEnabled: false,
+  billingChangesRequireAdmin: true,
+  supportSafetyOverridesEnabled: false
+};
+
 function policyId(workspaceId: string, repositoryId: string | null): string {
   return repositoryId === null ? `workspace:${workspaceId}` : `repository:${repositoryId}`;
 }
@@ -462,6 +477,10 @@ function mergePolicy(current: ReviewPolicy, updates: ParsedReviewPolicyUpdate): 
     infrastructureSecurity: {
       ...current.infrastructureSecurity,
       ...updates.infrastructureSecurity
+    },
+    workspaceControls: {
+      ...current.workspaceControls,
+      ...updates.workspaceControls
     }
   };
 }
@@ -483,6 +502,7 @@ function toReviewPolicy(row: ReviewPolicyRow): ReviewPolicy {
     semgrep: mergeDefaults(DEFAULT_SEMGREP, row.semgrep_policy_json),
     analysis: mergeDefaults(DEFAULT_ANALYSIS, row.analysis_toggles_json),
     infrastructureSecurity: mergeDefaults(DEFAULT_INFRASTRUCTURE_SECURITY, row.infrastructure_security_policy_json),
+    workspaceControls: mergeDefaults(DEFAULT_WORKSPACE_CONTROLS, row.workspace_controls_json),
     updatedByClerkUserId: row.updated_by_clerk_user_id,
     createdAt: toRequiredIsoString(row.created_at),
     updatedAt: toRequiredIsoString(row.updated_at)
@@ -512,6 +532,7 @@ function buildDefaultReviewPolicy(input: {
       semgrep: DEFAULT_SEMGREP,
       analysis: DEFAULT_ANALYSIS,
       infrastructureSecurity: DEFAULT_INFRASTRUCTURE_SECURITY,
+      workspaceControls: DEFAULT_WORKSPACE_CONTROLS,
       updatedByClerkUserId: input.updatedByClerkUserId ?? null,
       createdAt: input.createdAt,
       updatedAt: input.updatedAt

@@ -42,7 +42,8 @@ const TOP_LEVEL_UPDATE_FIELDS = new Set([
   "generatedFileIgnorePatterns",
   "semgrep",
   "analysis",
-  "infrastructureSecurity"
+  "infrastructureSecurity",
+  "workspaceControls"
 ]);
 const REVIEW_PREFERENCE_FIELDS = new Set(["reviewDraftPullRequests", "requireTestsForRiskyChanges", "suggestMissingTests"]);
 const COMMENT_POLICY_FIELDS = new Set(["maxInlineComments", "severityThreshold"]);
@@ -54,6 +55,13 @@ const INFRASTRUCTURE_SECURITY_FIELDS = new Set([
   "securityReviewEnabled",
   "dependencyReviewEnabled",
   "ciWorkflowReviewEnabled"
+]);
+const WORKSPACE_CONTROL_FIELDS = new Set([
+  "globalWorkspacePolicyEnabled",
+  "retentionDays",
+  "apiKeyCreationEnabled",
+  "billingChangesRequireAdmin",
+  "supportSafetyOverridesEnabled"
 ]);
 const MAX_PROMPT_INSTRUCTIONS_LENGTH = 4_000;
 const MAX_PATH_PATTERNS = 100;
@@ -96,7 +104,8 @@ export class RulesService {
     return {
       ...rules,
       permissions: {
-        canManagePolicies: canManagePolicyScope(membership.role, repositoryId)
+        canManagePolicies: canManagePolicyScope(membership.role, repositoryId),
+        ...policyPermissions(membership.role)
       }
     };
   }
@@ -111,6 +120,16 @@ export class RulesService {
           ? "Workspace role cannot manage global review policies"
           : "Workspace role cannot manage repository review policies"
       );
+    }
+
+    if (updates.workspaceControls !== undefined) {
+      if (repositoryId !== null) {
+        throw new ForbiddenException("Workspace policy controls cannot be changed on repository policies");
+      }
+
+      if (!roleHasDashboardCapability(membership.role, "manage_sensitive_settings")) {
+        throw new ForbiddenException("Workspace role cannot manage sensitive workspace policies");
+      }
     }
 
     const updated = await this.rulesStore.updatePolicy({
@@ -137,7 +156,8 @@ export class RulesService {
       ...rules,
       selectedRepositoryPolicy: repositoryId === null ? rules.selectedRepositoryPolicy : updated,
       permissions: {
-        canManagePolicies: canManagePolicyScope(membership.role, repositoryId)
+        canManagePolicies: canManagePolicyScope(membership.role, repositoryId),
+        ...policyPermissions(membership.role)
       }
     };
   }
@@ -175,6 +195,20 @@ function canManagePolicyScope(role: DashboardMembership["role"], repositoryId: s
     roleHasDashboardCapability(role, "manage_review_policies") ||
     roleHasDashboardCapability(role, "manage_repository_configuration")
   );
+}
+
+function policyPermissions(role: DashboardMembership["role"]): {
+  canManageWorkspacePolicies: boolean;
+  canManageRepositoryPolicies: boolean;
+  canManageSensitiveWorkspacePolicies: boolean;
+} {
+  return {
+    canManageWorkspacePolicies: roleHasDashboardCapability(role, "manage_review_policies"),
+    canManageRepositoryPolicies:
+      roleHasDashboardCapability(role, "manage_review_policies") ||
+      roleHasDashboardCapability(role, "manage_repository_configuration"),
+    canManageSensitiveWorkspacePolicies: roleHasDashboardCapability(role, "manage_sensitive_settings")
+  };
 }
 
 function parseReviewPolicyUpdate(body: unknown): { repositoryId: string | null; updates: ParsedReviewPolicyUpdate } {
@@ -234,6 +268,10 @@ function parseReviewPolicyUpdate(body: unknown): { repositoryId: string | null; 
       payload.infrastructureSecurity,
       INFRASTRUCTURE_SECURITY_FIELDS
     );
+  }
+
+  if (payload.workspaceControls !== undefined) {
+    updates.workspaceControls = parseWorkspaceControls(payload.workspaceControls);
   }
 
   return { repositoryId, updates };
@@ -311,6 +349,52 @@ function parseCommentPolicy(value: unknown): ParsedReviewPolicyUpdate["commentPo
     }
 
     parsed.severityThreshold = payload.severityThreshold as ReviewPolicyCommentPolicy["severityThreshold"];
+  }
+
+  return parsed;
+}
+
+function parseWorkspaceControls(value: unknown): ParsedReviewPolicyUpdate["workspaceControls"] {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    throw new BadRequestException("workspaceControls must be an object");
+  }
+
+  const payload = value as Record<string, unknown>;
+  const parsed: ParsedReviewPolicyUpdate["workspaceControls"] = {};
+
+  for (const field of Object.keys(payload)) {
+    if (!WORKSPACE_CONTROL_FIELDS.has(field)) {
+      throw new BadRequestException(`Unknown workspaceControls field: ${field}`);
+    }
+  }
+
+  for (const field of [
+    "globalWorkspacePolicyEnabled",
+    "apiKeyCreationEnabled",
+    "billingChangesRequireAdmin",
+    "supportSafetyOverridesEnabled"
+  ] as const) {
+    if (payload[field] === undefined) {
+      continue;
+    }
+
+    if (typeof payload[field] !== "boolean") {
+      throw new BadRequestException(`workspaceControls.${field} must be a boolean`);
+    }
+
+    parsed[field] = payload[field];
+  }
+
+  if (payload.retentionDays !== undefined) {
+    if (!Number.isInteger(payload.retentionDays)) {
+      throw new BadRequestException("workspaceControls.retentionDays must be an integer");
+    }
+
+    if (typeof payload.retentionDays !== "number" || payload.retentionDays < 1 || payload.retentionDays > 365) {
+      throw new BadRequestException("workspaceControls.retentionDays must be between 1 and 365");
+    }
+
+    parsed.retentionDays = payload.retentionDays;
   }
 
   return parsed;
