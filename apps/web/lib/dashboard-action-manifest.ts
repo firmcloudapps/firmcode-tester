@@ -100,9 +100,9 @@ export const DASHBOARD_ROUTE_ACTIONS: readonly DashboardRouteAction[] = [
   {
     surface: "github-installations",
     label: "Configure",
-    status: "planned-disabled",
-    destination: "none",
-    title: "Repository detail configuration is planned"
+    status: "active",
+    destination: "internal",
+    href: "/repositories/[id]?tab=configuration"
   },
   {
     surface: "github-installations",

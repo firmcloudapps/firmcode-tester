@@ -159,7 +159,7 @@ describe("dashboard route readiness guard", () => {
 
     expect(settingsHtml).toContain("Workspace API keys are planned and not enabled in the MVP.");
     expect(settingsHtml).toContain("disabled=\"\"");
-    expect(githubHtml).toContain("Repository detail configuration is planned");
+    expect(githubHtml).toContain('href="/repositories/repo-1?tab=configuration"');
     expect(githubHtml).toContain("Manual review runs are planned");
     expect(billingHtml).toContain("Admin or Clerk billing permission is required to manage subscriptions.");
     expect(billingHtml).toContain("disabled=\"\"");
