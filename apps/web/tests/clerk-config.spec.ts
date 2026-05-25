@@ -32,6 +32,14 @@ describe("web Clerk config", () => {
     expect(config.afterSignUpUrl).toBe("/github/installations");
   });
 
+  it("treats a missing billing portal URL as an unavailable Clerk Billing entry point", () => {
+    const config = createWebClerkConfig({
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_example"
+    });
+
+    expect(config.billingPortalUrl).toBeNull();
+  });
+
   it("fails when the Clerk publishable key is missing", () => {
     expect(() => createWebClerkConfig({})).toThrow(/NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is required/);
   });

@@ -35,6 +35,7 @@ export class PostgresBillingUsageStore implements BillingUsageStore {
   constructor(private readonly database: DatabaseExecutor) {}
 
   async getWorkspaceUsage(workspaceId: string): Promise<WorkspaceBillingUsageCounters> {
+    const monthStart = getCurrentMonthStart();
     const result = await this.database.query<WorkspaceBillingUsageRow>(
       `
 SELECT
@@ -44,7 +45,7 @@ SELECT
     JOIN repositories r ON r.id = rr.repository_id
     JOIN github_installations gi ON gi.id = r.installation_id
     WHERE gi.workspace_id = $1
-      AND rr.created_at >= date_trunc('month', now())
+      AND rr.created_at >= $2
   ) AS review_runs_this_month,
   (
     SELECT COALESCE(SUM(COALESCE((rr.metrics_json->>'tokenUsage')::bigint, 0)), 0)
@@ -52,7 +53,7 @@ SELECT
     JOIN repositories r ON r.id = rr.repository_id
     JOIN github_installations gi ON gi.id = r.installation_id
     WHERE gi.workspace_id = $1
-      AND rr.created_at >= date_trunc('month', now())
+      AND rr.created_at >= $2
   ) AS ai_tokens_this_month,
   (
     SELECT COUNT(r.id)
@@ -68,7 +69,7 @@ SELECT
       AND wm.active = true
   ) AS seats
 `,
-      [workspaceId]
+      [workspaceId, monthStart]
     );
 
     const row = result.rows[0];
@@ -80,6 +81,11 @@ SELECT
       seats: toNullableNumber(row?.seats)
     };
   }
+}
+
+function getCurrentMonthStart(): Date {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
 }
 
 function toNullableNumber(value: string | number | null | undefined): number | null {

@@ -161,7 +161,7 @@ describe("dashboard route readiness guard", () => {
     expect(settingsHtml).toContain("disabled=\"\"");
     expect(githubHtml).toContain("Repository detail configuration is planned");
     expect(githubHtml).toContain("Manual review runs are planned");
-    expect(billingHtml).toContain("Owner billing permission is required to manage subscriptions.");
+    expect(billingHtml).toContain("Admin or Clerk billing permission is required to manage subscriptions.");
     expect(billingHtml).toContain("disabled=\"\"");
   });
 });

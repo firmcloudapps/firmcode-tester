@@ -121,7 +121,7 @@ describe("dashboard visual navigation smoke", () => {
     expect(html).toContain("Planned provider");
     expect(html).toContain("Connect GitHub OAuth before installing the GitHub App.");
     expect(html).toContain("Workspace API key creation is not enabled in the MVP.");
-    expect(html).toContain("Owner billing permission is required to manage subscriptions.");
+    expect(html).toContain("Admin or Clerk billing permission is required to manage subscriptions.");
     expect(html).toContain("disabled=\"\"");
   });
 });
