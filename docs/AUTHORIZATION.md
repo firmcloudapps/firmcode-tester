@@ -28,7 +28,7 @@ Every SaaS workspace must provide or link to:
 - Billing checkout, subscription management, and customer portal through Clerk Billing.
 - Required GitHub OAuth connection for each user.
 - GitHub App installation management for Owners/Admins.
-- Workspace settings for notifications, retention, API keys or disabled API-key state, and review policy configuration.
+- Workspace settings for notifications, retention, API keys or disabled API-key state, review policy configuration, and codebase scan cadence.
 - Clear disabled states when a feature is unavailable in the MVP.
 
 ## Roles
@@ -37,7 +37,7 @@ Every SaaS workspace must provide or link to:
 | --- | --- |
 | Owner | Full access, billing, deletion, GitHub installation management. |
 | Admin | Repository settings, review policies, retries, member management where Clerk allows. |
-| Developer | View runs/findings, retry failed runs, inspect artifacts. |
+| Developer | View runs/findings, retry failed runs, trigger manual scans where policy allows, inspect artifacts. |
 | Viewer | Read-only dashboard access. |
 
 ## Permission Rules
@@ -69,6 +69,8 @@ Each GitHub installation must be mapped to a workspace. API requests must verify
 ## API Authorization
 
 Every dashboard API should enforce workspace access by `workspace_id`. Do not trust repository IDs, review run IDs, or finding IDs without checking ownership.
+
+Codebase scan run and finding APIs must enforce ownership through the scan run repository and GitHub installation workspace before exposing scan artifacts, unresolved repository findings, or review enrichment data.
 
 ## Webhook Authorization
 

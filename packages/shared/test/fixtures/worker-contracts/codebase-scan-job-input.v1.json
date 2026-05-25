@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "codebase-scan-job-input/v1",
+  "scanRunId": "00000000-0000-4000-8000-000000000901",
+  "repositoryId": "00000000-0000-4000-8000-000000000002",
+  "installationId": 101,
+  "repositoryFullName": "openclaw/firmcode",
+  "defaultBranch": "main",
+  "commitSha": "7f1c2a3b4d5e6f7890abcdef1234567890abcdef",
+  "trigger": "scheduled",
+  "requestedByClerkUserId": null
+}

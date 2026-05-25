@@ -18,7 +18,11 @@ const fixtures = [
   ["ciLogArtifact", "ci-log-artifact.v1.json"],
   ["ciFailureExplanation", "ci-failure-explanation.v1.json"],
   ["llmReviewOutput", "llm-review-output.v1.json"],
-  ["publishPayload", "publish-payload.v1.json"]
+  ["publishPayload", "publish-payload.v1.json"],
+  ["codebaseScanJobInput", "codebase-scan-job-input.v1.json"],
+  ["codebaseScanArtifactMetadata", "codebase-scan-artifact-metadata.v1.json"],
+  ["codebaseScanFinding", "codebase-scan-finding.v1.json"],
+  ["codebaseScanReviewEnrichment", "codebase-scan-review-enrichment.v1.json"]
 ] as const;
 
 function readFixture(name: string): unknown {
@@ -67,7 +71,11 @@ describe("worker contract JSON schemas", () => {
       ["ciLogArtifact", WORKER_CONTRACT_SCHEMA_VERSIONS.ciLogArtifact],
       ["ciFailureExplanation", WORKER_CONTRACT_SCHEMA_VERSIONS.ciFailureExplanation],
       ["llmReviewOutput", WORKER_CONTRACT_SCHEMA_VERSIONS.llmReviewOutput],
-      ["publishPayload", WORKER_CONTRACT_SCHEMA_VERSIONS.publishPayload]
+      ["publishPayload", WORKER_CONTRACT_SCHEMA_VERSIONS.publishPayload],
+      ["codebaseScanJobInput", WORKER_CONTRACT_SCHEMA_VERSIONS.codebaseScanJobInput],
+      ["codebaseScanArtifactMetadata", WORKER_CONTRACT_SCHEMA_VERSIONS.codebaseScanArtifactMetadata],
+      ["codebaseScanFinding", WORKER_CONTRACT_SCHEMA_VERSIONS.codebaseScanFinding],
+      ["codebaseScanReviewEnrichment", WORKER_CONTRACT_SCHEMA_VERSIONS.codebaseScanReviewEnrichment]
     ]);
   });
 });

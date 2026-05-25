@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "codebase-scan-artifact-metadata/v1",
+  "scanRunId": "00000000-0000-4000-8000-000000000901",
+  "repositoryId": "00000000-0000-4000-8000-000000000002",
+  "repositoryFullName": "openclaw/firmcode",
+  "defaultBranch": "main",
+  "commitSha": "7f1c2a3b4d5e6f7890abcdef1234567890abcdef",
+  "artifacts": [
+    {
+      "artifactType": "semgrep",
+      "storageKey": "artifacts/codebase-scans/00000000-0000-4000-8000-000000000901/semgrep.json",
+      "sizeBytes": 2048,
+      "sha256": "3f786850e387550fdab836ed7e6dc881de23001b",
+      "redacted": true,
+      "retentionExpiresAt": "2026-06-24T10:00:00.000Z",
+      "metadata": {
+        "toolVersion": "1.120.0",
+        "findingCount": 1,
+        "secretLikeValuesRedacted": 2
+      }
+    }
+  ]
+}

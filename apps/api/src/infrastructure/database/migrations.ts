@@ -5,6 +5,7 @@ import { repositoryReviewConfigurationMigration } from "./migrations/004_reposit
 import { githubOAuthAndSyncMigration } from "./migrations/005_github_oauth_and_sync";
 import { reviewPoliciesMigration } from "./migrations/006_review_policies";
 import { ciFailureArtifactsMigration } from "./migrations/007_ci_failure_artifacts";
+import { codebaseScanPersistenceMigration } from "./migrations/008_codebase_scan_persistence";
 
 export interface DatabaseQueryResult<Row = unknown> {
   readonly rows: Row[];
@@ -27,7 +28,8 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigration[] = [
   repositoryReviewConfigurationMigration,
   githubOAuthAndSyncMigration,
   reviewPoliciesMigration,
-  ciFailureArtifactsMigration
+  ciFailureArtifactsMigration,
+  codebaseScanPersistenceMigration
 ];
 
 interface AppliedMigrationRow {

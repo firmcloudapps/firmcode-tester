@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "codebase-scan-finding/v1",
+  "scanRunId": "00000000-0000-4000-8000-000000000901",
+  "repositoryId": "00000000-0000-4000-8000-000000000002",
+  "repositoryFullName": "openclaw/firmcode",
+  "defaultBranch": "main",
+  "commitSha": "7f1c2a3b4d5e6f7890abcdef1234567890abcdef",
+  "source": "semgrep",
+  "category": "security",
+  "severity": "high",
+  "confidence": "high",
+  "filePath": "apps/api/src/server.ts",
+  "startLine": 42,
+  "endLine": 42,
+  "title": "Avoid shell execution with request data",
+  "body": "A scanner found request-controlled data reaching shell execution.",
+  "evidence": [
+    {
+      "source": "semgrep",
+      "artifactType": "semgrep",
+      "path": "apps/api/src/server.ts",
+      "lineRange": {
+        "startLine": 42,
+        "endLine": 42
+      },
+      "excerpt": "exec(redactedUserInput)",
+      "redacted": true
+    }
+  ],
+  "recommendation": "Route the operation through an allowlisted command wrapper.",
+  "dedupeKey": "semgrep:typescript.lang.security.audit.detect-child-process:apps/api/src/server.ts:42",
+  "status": "open",
+  "firstSeenAt": "2026-05-25T10:00:00.000Z",
+  "lastSeenAt": "2026-05-25T10:00:00.000Z",
+  "resolvedAt": null
+}
