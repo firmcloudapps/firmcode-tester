@@ -7,6 +7,7 @@ import {
   EmptyDashboardAuthStore,
   PostgresDashboardAuthStore
 } from "../review-runs/dashboard-auth.store";
+import { BILLING_USAGE_STORE, EmptyBillingUsageStore, PostgresBillingUsageStore } from "./billing-usage.store";
 import { BillingController } from "./billing.controller";
 import { BillingService } from "./billing.service";
 
@@ -22,6 +23,22 @@ import { BillingService } from "./billing.service";
         }
 
         return new PostgresDashboardAuthStore(
+          new Pool({
+            connectionString: config.database.url,
+            ssl: config.database.ssl ? { rejectUnauthorized: false } : false
+          })
+        );
+      },
+      inject: [API_RUNTIME_CONFIG]
+    },
+    {
+      provide: BILLING_USAGE_STORE,
+      useFactory: (config: ApiRuntimeConfig) => {
+        if (config.nodeEnv === "test") {
+          return new EmptyBillingUsageStore();
+        }
+
+        return new PostgresBillingUsageStore(
           new Pool({
             connectionString: config.database.url,
             ssl: config.database.ssl ? { rejectUnauthorized: false } : false
