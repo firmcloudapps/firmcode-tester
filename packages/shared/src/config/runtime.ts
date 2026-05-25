@@ -45,6 +45,8 @@ export interface ClerkWebConfig {
   publishableKey: string;
   signInUrl: string;
   signUpUrl: string;
+  afterSignInUrl: string;
+  afterSignUpUrl: string;
   billingPortalUrl: string | null;
 }
 
@@ -145,9 +147,18 @@ export function createWebClerkConfig(env: EnvironmentVariables): ClerkWebConfig 
   const publishableKey = readRequired(env, "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY", issues);
   const signInUrl = readClerkRoute(env, "NEXT_PUBLIC_CLERK_SIGN_IN_URL", "/sign-in", issues);
   const signUpUrl = readClerkRoute(env, "NEXT_PUBLIC_CLERK_SIGN_UP_URL", "/sign-up", issues);
+  const afterSignInUrl = readClerkRoute(env, "NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL", "/", issues);
+  const afterSignUpUrl = readClerkRoute(env, "NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL", "/", issues);
   const billingPortalUrl = readOptionalHttpUrl(env, "CLERK_BILLING_PORTAL_URL", issues);
 
-  if (issues.length > 0 || publishableKey === null || signInUrl === null || signUpUrl === null) {
+  if (
+    issues.length > 0 ||
+    publishableKey === null ||
+    signInUrl === null ||
+    signUpUrl === null ||
+    afterSignInUrl === null ||
+    afterSignUpUrl === null
+  ) {
     throw new ConfigValidationError("Web Clerk", issues);
   }
 
@@ -155,6 +166,8 @@ export function createWebClerkConfig(env: EnvironmentVariables): ClerkWebConfig 
     publishableKey,
     signInUrl,
     signUpUrl,
+    afterSignInUrl,
+    afterSignUpUrl,
     billingPortalUrl
   };
 }
@@ -595,7 +608,7 @@ function readClerkRoute(
 ): string | null {
   const value = readOptional(env, variable) ?? fallback;
 
-  if (value.startsWith("/")) {
+  if (value.startsWith("/") && !value.startsWith("//")) {
     return value;
   }
 

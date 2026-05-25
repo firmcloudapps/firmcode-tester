@@ -14,8 +14,8 @@ export function ClerkProviderBoundary({ children }: ClerkProviderBoundaryProps) 
       publishableKey={clerk.publishableKey}
       signInUrl={clerk.signInUrl}
       signUpUrl={clerk.signUpUrl}
-      afterSignInUrl="/"
-      afterSignUpUrl="/"
+      signInFallbackRedirectUrl={clerk.afterSignInUrl}
+      signUpFallbackRedirectUrl={clerk.afterSignUpUrl}
     >
       {children}
     </ClerkProvider>
