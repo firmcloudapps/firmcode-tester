@@ -13,7 +13,7 @@ from importlib.metadata import PackageNotFoundError, version
 from typing import Mapping
 from urllib.parse import urlparse
 
-from firmcode_worker.review_queue import REVIEW_QUEUE_NAME, run_bullmq_review_worker
+from firmcode_worker.review_queue import CODEBASE_SCAN_QUEUE_NAME, REVIEW_QUEUE_NAME, run_bullmq_review_worker
 
 
 @dataclass(frozen=True)
@@ -21,6 +21,7 @@ class WorkerRuntimeConfig:
     database_url: str
     redis_url: str
     queue_name: str
+    codebase_scan_queue_name: str
     log_level: str
     semgrep_executable: str
     semgrep_startup_timeout_seconds: float
@@ -47,6 +48,7 @@ def load_worker_config(env: Mapping[str, str] = os.environ) -> WorkerRuntimeConf
         database_url=database_url,
         redis_url=redis_url,
         queue_name=env.get("REVIEW_QUEUE_NAME", REVIEW_QUEUE_NAME),
+        codebase_scan_queue_name=env.get("CODEBASE_SCAN_QUEUE_NAME", CODEBASE_SCAN_QUEUE_NAME),
         log_level=env.get("LOG_LEVEL", "info"),
         semgrep_executable=env.get("SEMGREP_EXECUTABLE", "semgrep").strip() or "semgrep",
         semgrep_startup_timeout_seconds=_read_positive_float(env, "SEMGREP_STARTUP_TIMEOUT_SECONDS", 20.0),
@@ -90,18 +92,24 @@ def main(argv: list[str] | None = None) -> int:
     if status != "ok":
         return 1
 
-    _log("worker.queue.connected", status="ok", queue=config.queue_name)
+    _log("worker.queue.connected", status="ok", queue=config.queue_name, codebaseScanQueue=config.codebase_scan_queue_name)
     return asyncio.run(
         _run_worker(
             database_url=config.database_url,
             redis_url=config.redis_url,
             queue_name=config.queue_name,
+            codebase_scan_queue_name=config.codebase_scan_queue_name,
         )
     )
 
 
-async def _run_worker(database_url: str, redis_url: str, queue_name: str) -> int:
-    await run_bullmq_review_worker(database_url=database_url, redis_url=redis_url, queue_name=queue_name)
+async def _run_worker(database_url: str, redis_url: str, queue_name: str, codebase_scan_queue_name: str) -> int:
+    await run_bullmq_review_worker(
+        database_url=database_url,
+        redis_url=redis_url,
+        queue_name=queue_name,
+        codebase_scan_queue_name=codebase_scan_queue_name,
+    )
     _log("worker.shutdown", status="ok")
     return 0
 

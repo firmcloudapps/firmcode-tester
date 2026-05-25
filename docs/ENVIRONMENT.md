@@ -108,6 +108,16 @@ Clerk owns SaaS sign-in, sign-up, sessions, user profile, organizations/workspac
 | `REVIEW_CI_LOG_MAX_BYTES` | no | Maximum redacted CI log bytes retained per failed check for storage and LLM context. Defaults to `20000`. |
 | `ARTIFACT_RETENTION_DAYS` | no | Default artifact retention. |
 | `CODEBASE_SCAN_DEFAULT_CADENCE_HOURS` | no | Default repeat cadence for enabled repository codebase scans. Defaults to `24`. |
+| `CODEBASE_SCAN_QUEUE_NAME` | no | Worker queue name for repository codebase scan jobs. Defaults to `codebase-scans`. |
+| `CODEBASE_SCAN_MAX_FILES` | no | Maximum supported files fetched and scanned from one repository default-branch tree. Defaults to `500`. |
+| `CODEBASE_SCAN_MAX_TOTAL_BYTES` | no | Maximum total fetched file bytes for one codebase scan. Defaults to `10000000`. |
+| `CODEBASE_SCAN_MAX_FILE_BYTES` | no | Maximum individual file size fetched for one codebase scan. Defaults to `500000`. |
+| `CODEBASE_SCAN_IGNORED_PATHS` | no | Comma-separated repository-relative glob patterns skipped by codebase scans. |
+| `CODEBASE_SCAN_REPOSITORY_ALLOWLIST` | no | Optional comma-separated `owner/repo` glob allowlist for codebase scans. Empty allows all enabled repositories. |
+| `CODEBASE_SCAN_ARTIFACT_DIR` | no | Local directory for redacted codebase scan artifacts. Defaults to the system temp directory under `firmcode-codebase-scans`. |
+| `CODEBASE_SCAN_ARTIFACT_RETENTION_DAYS` | no | Retention window stamped onto codebase scan artifact metadata. Defaults to `30`. |
+| `CODEBASE_SCAN_LLM_ENABLED` | no | Enables optional LLM recommendations from redacted deterministic scan evidence. Defaults to `false`. |
+| `CODEBASE_SCAN_LLM_MODEL` | no | Model name for optional codebase scan LLM recommendations. Defaults to `LLM_REVIEW_MODEL` when set. |
 
 Repository-level dashboard configuration is persisted in PostgreSQL separately from environment defaults. Owners/Admins can fetch and update repository automation and review policy fields through the dashboard API; updates are workspace-scoped, preserve unspecified fields, and record update timestamps plus the Clerk user ID that made the change.
 

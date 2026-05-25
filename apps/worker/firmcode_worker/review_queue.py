@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import replace
 import signal
 from typing import Any, Mapping, Protocol
 
@@ -33,6 +34,11 @@ class ReviewRunRepository(Protocol):
 
 class CodebaseScanRunRepository(Protocol):
     async def create_queued_scan_for_scheduled_job(self, payload: CodebaseScanJobPayload) -> str:
+        ...
+
+
+class CodebaseScanPipeline(Protocol):
+    async def run(self, payload: CodebaseScanJobPayload) -> object:
         ...
 
 
@@ -113,6 +119,8 @@ class PostgresCodebaseScanRunRepository:
         self.database_url = database_url
 
     async def create_queued_scan_for_scheduled_job(self, payload: CodebaseScanJobPayload) -> str:
+        import uuid
+
         import psycopg
 
         async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
@@ -200,17 +208,31 @@ async def process_codebase_scan_job(
     return await repository.create_queued_scan_for_scheduled_job(payload)
 
 
+async def process_codebase_scan_pipeline_job(
+    payload: CodebaseScanJobPayload,
+    repository: CodebaseScanRunRepository,
+    pipeline: CodebaseScanPipeline,
+) -> str:
+    scan_run_id = await process_codebase_scan_job(payload, repository)
+    await pipeline.run(replace(payload, scan_run_id=scan_run_id))
+    return scan_run_id
+
+
 async def run_bullmq_review_worker(
     *,
     database_url: str,
     redis_url: str,
     queue_name: str = REVIEW_QUEUE_NAME,
+    codebase_scan_queue_name: str = CODEBASE_SCAN_QUEUE_NAME,
     pipeline: ReviewPipeline | None = None,
+    codebase_scan_pipeline: CodebaseScanPipeline | None = None,
 ) -> None:
     from bullmq import Worker
 
     repository = PostgresReviewRunRepository(database_url)
+    scan_repository = PostgresCodebaseScanRunRepository(database_url)
     review_pipeline = pipeline or _default_review_pipeline(database_url)
+    scan_pipeline = codebase_scan_pipeline or _default_codebase_scan_pipeline(database_url)
     shutdown_event = asyncio.Event()
 
     def request_shutdown(_signum: int, _frame: object) -> None:
@@ -239,11 +261,22 @@ async def run_bullmq_review_worker(
             "stalledInterval": REVIEW_WORKER_STALLED_INTERVAL_MS,
         },
     )
+    codebase_worker = Worker(
+        codebase_scan_queue_name,
+        _codebase_scan_process(scan_repository, scan_pipeline),
+        {
+            "connection": redis_url,
+            "lockDuration": REVIEW_WORKER_LOCK_DURATION_MS,
+            "lockRenewTime": REVIEW_WORKER_LOCK_RENEW_TIME_MS,
+            "stalledInterval": REVIEW_WORKER_STALLED_INTERVAL_MS,
+        },
+    )
 
     try:
         await shutdown_event.wait()
     finally:
         await worker.close()
+        await codebase_worker.close()
 
 
 def review_job_payload_from_mapping(value: Mapping[str, Any]) -> ReviewJobPayload:
@@ -285,3 +318,29 @@ def _default_review_pipeline(database_url: str) -> ReviewPipeline:
         return DeterministicReviewPipeline.from_env(database_url=database_url)
     except Exception as error:
         raise ReviewWorkerError(_error_code(error), _error_message(error)) from error
+
+
+def _default_codebase_scan_pipeline(database_url: str) -> CodebaseScanPipeline:
+    try:
+        from firmcode_worker.codebase_scan import CodebaseScanPipeline as DefaultCodebaseScanPipeline
+
+        return DefaultCodebaseScanPipeline.from_env(database_url=database_url)
+    except Exception as error:
+        raise ReviewWorkerError(_error_code(error), _error_message(error)) from error
+
+
+def _codebase_scan_process(
+    repository: CodebaseScanRunRepository,
+    pipeline: CodebaseScanPipeline,
+) -> Any:
+    async def process(job: Any, _job_token: str) -> None:
+        if job.name != CODEBASE_SCAN_JOB_NAME:
+            raise ReviewWorkerError("unsupported_job_name", f"Unsupported codebase scan job name: {job.name}")
+
+        await process_codebase_scan_pipeline_job(
+            payload=codebase_scan_job_payload_from_mapping(job.data),
+            repository=repository,
+            pipeline=pipeline,
+        )
+
+    return process
