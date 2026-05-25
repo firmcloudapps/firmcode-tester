@@ -7,10 +7,10 @@ Code context requirement: Before implementing, inspect existing repository confi
 
 Implement Rules / Policies API support for workspace and repository review policies. Include review preferences, severity thresholds, max inline comments, category enablement, prompt instructions, ignored paths, generated-file ignore patterns, Semgrep toggles, Tree-sitter/LLM/CI explanation toggles, and infrastructure/security policy sections where already modeled.
 
-Mutations must require Owner/Admin unless docs/AUTHORIZATION.md explicitly allows another role. Validate inputs at trust boundaries, preserve existing values on partial updates, and avoid storing secrets in custom instructions or logs.
+Repository-level mutations are available to Developers and Admins. Global workspace, billing, retention, API key, member, and support/safety mutations require Admin unless docs/AUTHORIZATION.md explicitly allows another capability. Validate inputs at trust boundaries, preserve existing values on partial updates, and avoid storing secrets in custom instructions or logs.
 
 Testing requirements:
-- Add API tests for policy read, policy update, validation failures, partial update preservation, Owner/Admin success, Developer/Viewer denial, and cross-workspace denial.
+- Add API tests for policy read, policy update, validation failures, partial update preservation, Developer repository-level success, Admin global-policy success, Developer global-policy denial, and cross-workspace denial.
 - Add tests for ignored-path and prompt-instruction length/format validation.
 - Add tests proving sensitive values are not logged or returned unexpectedly.
 

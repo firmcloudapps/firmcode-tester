@@ -2,6 +2,70 @@
 
 This runbook covers common operational issues for Firmcode.
 
+## Dashboard Authentication Failure
+
+Symptoms:
+
+- Dashboard redirects repeatedly between Firmcode and Clerk.
+- Signed-in users see a generic dashboard error.
+- Protected API calls return `401`.
+- GitHub OAuth start returns an auth/setup error.
+
+Check:
+
+- Vercel web env vars: `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `CLERK_JWT_AUDIENCE`, sign-in/sign-up URLs, and `NEXT_PUBLIC_API_URL`.
+- Coolify API env vars: `CLERK_SECRET_KEY`, `CLERK_JWT_AUDIENCE`, `CORS_ALLOWED_ORIGINS`, and public API URL.
+- Clerk dashboard allowed origins and redirect URLs include the deployed Vercel domain and preview domain if used.
+- The web route handler sends `Authorization: Bearer <Clerk token>` to the API.
+- The API auth guard validates the expected token audience/issuer.
+
+Action:
+
+- Fix Clerk redirect/origin configuration before changing app code.
+- If only API calls fail, compare the token audience/template used by web with the audience expected by the API.
+- Confirm server logs include a correlation ID and auth error class, but do not log token contents.
+- Treat production fallback to `FIRMCODE_DASHBOARD_CLERK_USER_ID` or `x-firmcode-user-id` as a security incident; remove the bypass and redeploy.
+
+## Workspace Or Role Mapping Failure
+
+Symptoms:
+
+- Signed-in users can authenticate but receive `403`.
+- Signed-in users see an empty or wrong workspace.
+- Admin controls are disabled for an expected admin.
+- A user cannot connect GitHub OAuth because no workspace membership resolves.
+
+Check:
+
+- Clerk organization membership and organization role for the user.
+- Firmcode `workspaces` row for the Clerk organization or personal workspace.
+- Firmcode `workspace_memberships` row for the Clerk user.
+- Role mapping metadata if explicit Firmcode roles are configured in Clerk.
+- Clerk webhook delivery history for user, organization, or membership sync events.
+
+Action:
+
+- Re-run the workspace/membership sync job or replay the relevant Clerk webhook.
+- For first-login failures, trigger the request-time workspace ensure path by signing out and back in.
+- Correct role metadata in Clerk, then replay membership sync.
+- Do not manually grant database roles in production unless the change is recorded as an audited break-glass action.
+
+## Cross-Workspace Access Suspected
+
+Symptoms:
+
+- A user sees repositories, review runs, findings, artifacts, settings, or billing data from another workspace.
+- API requests with a changed `workspaceId`, repository ID, or review run ID return data unexpectedly.
+
+Action:
+
+- Treat as a release blocker or security incident.
+- Disable dashboard access or affected routes if necessary.
+- Inspect API guard logs and resource ownership queries.
+- Confirm list endpoints are scoped by resolved `workspace_id`.
+- Confirm detail endpoints join through workspace-owned parents instead of trusting resource IDs.
+- Add a regression test for the exact resource type before redeploying.
+
 ## Failed Review Job
 
 Check:
@@ -171,7 +235,7 @@ Check:
 Action:
 
 - Run a manual scan against the current default branch.
-- Owners/Admins may mark known stale items resolved from the Findings inbox.
+- Developers and Admins may mark known stale items resolved from the Findings inbox where workspace policy allows it.
 - If stale resolution repeatedly misses findings, inspect dedupe key generation before bulk-updating rows.
 
 ## Codebase Scan Retention Cleanup

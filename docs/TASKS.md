@@ -15,7 +15,7 @@ The MVP is scoped as a 10-week build. A solo developer can compress or stretch t
 | 6 | 5 days | LLM review engine and JSON validation |
 | 7 | 4 days | GitHub summary and inline comment publishing |
 | 8 | 4 days | CI/CD failure explanation |
-| 9 | 5 days | Next.js TypeScript/Tailwind dashboard |
+| 9 | 7 days | Clerk-authenticated Next.js dashboard, role-gated APIs, and SaaS account flows |
 | 10 | 5 days | Hardening, observability, privacy, docs, release candidate |
 | 11 | 5 days | Continuous repository scanning, persisted codebase findings, and PR review enrichment |
 
@@ -551,6 +551,38 @@ Tests:
 
 ## Phase 9: Dashboard
 
+### Task 9.0: Complete Clerk Authentication Foundation
+
+Replace the current dashboard auth scaffold and local header shim with a complete Clerk-backed authentication flow.
+
+Acceptance criteria:
+
+- `apps/web` installs and wires `@clerk/nextjs`.
+- The root layout uses a real `ClerkProvider`.
+- Clerk sign-in and sign-up pages exist at `/sign-in/[[...sign-in]]` and `/sign-up/[[...sign-up]]`.
+- Sign-in and sign-up use the dedicated auth-page design from `docs/DASHBOARD_DESIGN.md`: light-mode unauthenticated shell, constrained Clerk panel, compact Firmcode context, responsive mobile layout, and no marketing hero treatment.
+- Next.js middleware protects all dashboard pages and dashboard route handlers.
+- Dashboard shell uses Clerk `UserButton` and `OrganizationSwitcher` where organizations are enabled.
+- The active workspace displayed in the shell comes from Clerk organization/personal workspace state, not static placeholder text.
+- Web server components and route handlers derive the user/session from Clerk `auth()`.
+- Web-to-API requests include `Authorization: Bearer <Clerk session token>`.
+- `FIRMCODE_DASHBOARD_WORKSPACE_ID`, `FIRMCODE_DASHBOARD_CLERK_USER_ID`, and `FIRMCODE_DASHBOARD_CLERK_BILLING_CAPABILITY` are removed from production request flow and kept only as explicit test/local bypass fixtures.
+- `apps/api` installs a Clerk server verification package such as `@clerk/backend`.
+- API dashboard routes use a shared Nest guard that verifies Clerk session/JWT tokens before controller logic runs.
+- API request context includes Clerk user ID, active Clerk organization ID when available, resolved workspace ID, role, and capabilities.
+- Workspace rows and memberships are resolved or created from Clerk organization/user state for first-login flows.
+- Spoofed `x-firmcode-user-id` headers are ignored or rejected in production.
+
+Tests:
+
+- Web route protection tests for authenticated and unauthenticated users.
+- Sign-in/sign-up route rendering tests.
+- Sign-in/sign-up visual or rendered-markup tests for desktop/mobile layout, Clerk appearance hooks, and no dashboard shell leakage.
+- Dashboard shell tests for Clerk user menu, organization switcher, and active workspace display.
+- API guard tests for missing token, invalid token, expired token, valid personal workspace token, and valid organization token.
+- Tests proving client-provided user headers cannot impersonate another Clerk user.
+- Integration test proving the dashboard can call a protected API route with a Clerk token.
+
 ### Task 9.1: Repository And Run Views
 
 Build dashboard pages for repositories and review runs.
@@ -610,18 +642,26 @@ Implement Clerk-backed app authorization rules from `docs/AUTHORIZATION.md`.
 
 Acceptance criteria:
 
+- All dashboard controllers use the shared Clerk auth guard/request context from Task 9.0.
 - Every dashboard API checks workspace membership and resource ownership.
-- Owner/Admin/Developer/Viewer role capabilities are enforced.
+- Admin/Developer role capabilities are enforced.
 - Billing and sensitive settings require elevated role.
 - Raw artifact access is role-gated.
 - Tenant isolation is enforced for every SaaS account resource, including workspace settings, members, billing context, GitHub OAuth identity, GitHub installations, repositories, review runs, findings, policies, artifacts, and audit events.
 - Sensitive account and integration actions write audit events.
+- List endpoints are tenant-scoped and require authentication; repository, review-run, finding, pull-request, and CI-failure lists must not expose global data.
+- API controllers no longer trust `x-firmcode-user-id`; user identity comes only from verified Clerk claims.
+- Optional workspace selection is accepted only after verifying the authenticated user belongs to that workspace.
+- Missing/invalid Clerk token returns `401`; authenticated users without capability receive `403`; cross-workspace resource lookups return `404` where existence would leak tenant data.
 
 Tests:
 
 - API authorization tests for every dashboard resource type.
 - Role capability tests.
 - Cross-workspace access denial tests.
+- Spoofed-header rejection tests.
+- Tenant-scoped list endpoint tests.
+- Audit-event persistence tests for OAuth connect/disconnect, GitHub installation connect/sync, repository enablement, policy update, raw artifact access, billing capability change, manual scan, and retry.
 
 ### Task 9.5: GitHub App Setup And Repository Sync Dashboard Flow
 
@@ -635,7 +675,7 @@ Acceptance criteria:
 - GitHub App installation callback/status handling is documented and wired to workspace ownership checks.
 - Dashboard APIs list installations for the caller workspace and sync installation repository metadata.
 - Repository-level sync is available only for repositories owned by the caller workspace.
-- Owners/Admins can install or manage the GitHub App after OAuth is connected; Developers/Viewers must connect OAuth but see an explicit Owner/Admin-required state for installation management.
+- Developers can connect GitHub OAuth, add/sync repositories, enable automation, and run/retry reviews after OAuth is connected, subject to plan limits. Admins can additionally manage billing, member access, global workspace settings, and support/safety controls.
 - Connect/sync buttons show loading, success, error, and disabled states and never link to missing routes.
 - Empty states explain how to connect GitHub without exposing secrets or private installation tokens.
 
@@ -655,7 +695,7 @@ Acceptance criteria:
 - Repository detail verifies workspace ownership and returns 404 for cross-workspace or missing repositories.
 - Configuration tab uses existing repository review configuration APIs and respects role capabilities.
 - `/rules` is implemented with review preferences, comment policy, prompt instructions, ignored paths, Semgrep/analysis toggles, and infrastructure/security policy sections.
-- Rules/policy mutations require Owner/Admin and preserve read-only views for Developer/Viewer.
+- Repository-level rules/policy mutations are available to Developers and Admins. Global workspace, retention, API key, billing, and support/safety policy mutations require Admin.
 - Repository Configure links route to implemented pages and do not 404.
 
 Tests:
@@ -853,7 +893,7 @@ Acceptance criteria:
 - Repository list/detail show latest codebase scan status, last scan time, open finding count, and manual scan action.
 - Findings inbox can filter PR findings and codebase scan findings by repository, severity, source, category, status, and date.
 - Repository configuration exposes scan cadence, enabled state, ignored paths, severity threshold, and maximum scan limits.
-- Owners/Admins can suppress or mark scan findings false positive; Developers can view findings and trigger scans where policy allows; Viewers are read-only.
+- Developers and Admins can view scan findings, trigger scans, suppress findings, or mark findings false positive where workspace policy and plan limits allow. Admins retain global policy and safety controls.
 - Operations runbook covers scan backlog, GitHub rate limits, scan failures, Semgrep timeouts, stale findings, and retention cleanup.
 
 Tests:

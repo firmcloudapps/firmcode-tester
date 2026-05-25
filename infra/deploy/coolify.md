@@ -42,6 +42,7 @@ Required API environment variables:
 | `DATABASE_SSL=true` | Required for NeonDB. |
 | `REDIS_URL` | Coolify Redis internal URL or managed Redis URL. |
 | `CLERK_SECRET_KEY` | Used to validate dashboard API requests. |
+| `CLERK_JWT_AUDIENCE` | Clerk token audience/template expected for dashboard API bearer tokens. |
 | `CLERK_WEBHOOK_SECRET` | Required if Clerk webhooks are enabled. |
 | `GITHUB_APP_ID` | GitHub App ID. |
 | `GITHUB_APP_PRIVATE_KEY` | PEM, escaped-newline, or base64 private key. In Coolify, prefer a single-line escaped-newline value such as `-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----` or a base64-encoded PEM. Do not log it. |
@@ -61,18 +62,20 @@ The GitHub App OAuth callback URL should point at the web dashboard route, not t
 https://firmcode.firmoncloud.com/api/auth/github/callback
 ```
 
+Dashboard API requests must authenticate with `Authorization: Bearer <Clerk session token>`. Production API services must not trust `x-firmcode-user-id`, `FIRMCODE_DASHBOARD_CLERK_USER_ID`, or any other caller-provided user identity header. Optional workspace selectors are valid only after Clerk token verification and membership checks.
+
 Coolify Compose compatibility note: `docker-compose.prod.yml` uses `env_file: .env` for API and worker application settings. Coolify should generate this `.env` file from runtime-enabled environment variables for the Compose app.
 
 The Compose `environment` blocks intentionally keep only fixed container-local values such as `NODE_ENV`, `PORT`, internal `REDIS_URL`, `DATABASE_SSL`, and `REVIEW_QUEUE_NAME`. Do not commit `.env`; keep secrets in Coolify environment variables and let Coolify write them to the Compose env file. If Coolify does not provide a variable, the API's safe runtime diagnostics will report the unresolved or missing shape without printing secret values.
 
-If the API exits with `ConfigValidationError` for missing `DATABASE_URL`, `GITHUB_APP_ID`, or `GITHUB_APP_PRIVATE_KEY`, check these Coolify settings before changing application code:
+If the API exits with `ConfigValidationError` for missing `DATABASE_URL`, `CLERK_SECRET_KEY`, `CLERK_JWT_AUDIENCE`, `GITHUB_APP_ID`, or `GITHUB_APP_PRIVATE_KEY`, check these Coolify settings before changing application code:
 
 - Deploy from `docker-compose.prod.yml`, not the standalone local compose file.
 - If using a standalone Dockerfile resource instead of the Compose stack, attach the variables to that exact API resource; Compose `env_file` settings will not apply.
 - Confirm each variable is enabled for runtime, not build-only.
 - Redeploy or recreate the containers after editing variables; already-running containers will not pick up changed values.
 - Keep `GITHUB_APP_PRIVATE_KEY` as a single-line escaped-newline PEM or base64-encoded PEM in Coolify.
-- Use the Coolify terminal to check presence without printing secrets: `node -e 'for (const k of ["DATABASE_URL","GITHUB_APP_ID","GITHUB_APP_PRIVATE_KEY"]) console.log(k, process.env[k] ? "set" : "missing")'`.
+- Use the Coolify terminal to check presence without printing secrets: `node -e 'for (const k of ["DATABASE_URL","CLERK_SECRET_KEY","CLERK_JWT_AUDIENCE","GITHUB_APP_ID","GITHUB_APP_PRIVATE_KEY"]) console.log(k, process.env[k] ? "set" : "missing")'`.
 
 ## Worker Service
 
@@ -151,7 +154,7 @@ The production API image already contains compiled JavaScript and omits TypeScri
 ## Deployment Order
 
 1. Provision NeonDB and copy the pooled `DATABASE_URL`.
-2. Provision Clerk and configure dashboard callback URLs.
+2. Provision Clerk and configure dashboard callback URLs, sign-in/sign-up URLs, and API token audience/template.
 3. Provision Redis through Coolify or a managed Redis provider.
 4. Configure Docker Hub credentials and image-publish secrets in GitHub Actions.
 5. Push to `main` and confirm the deploy workflow pushed `firmcode-api` and `firmcode-worker`.
@@ -162,8 +165,9 @@ The production API image already contains compiled JavaScript and omits TypeScri
 10. Keep one worker replica until live webhook processing is stable.
 11. Deploy the Vercel dashboard with `NEXT_PUBLIC_API_URL` pointing to the API URL.
 12. Add Vercel production and preview origins to API `CORS_ALLOWED_ORIGINS`.
-13. Configure GitHub App webhook URL: `https://firmcodeapi.firmoncloud.com/webhooks/github`.
-14. Run a synthetic dry-run review before setting `DRY_RUN=false`.
+13. Verify direct dashboard API calls without a Clerk token return `401` and signed-in Vercel calls succeed.
+14. Configure GitHub App webhook URL: `https://firmcodeapi.firmoncloud.com/webhooks/github`.
+15. Run a synthetic dry-run review before setting `DRY_RUN=false`.
 
 ## Rollback Notes
 

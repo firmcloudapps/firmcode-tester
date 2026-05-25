@@ -1,8 +1,17 @@
 # Phase 9, 10, And 11 Granular Task Prompts
 
-This directory breaks the broad prompts in `docs/TASK_PROMPTS.md` for Tasks 9.2, 9.3, 9.4, 9.5, 9.6, 9.7, 9.8, 10.1, 10.2, 10.3, 10.4, and `docs/TASKS.md` Phase 11 into smaller implementation prompts.
+This directory breaks the broad prompts in `docs/TASK_PROMPTS.md` for Tasks 9.0, 9.2, 9.3, 9.4, 9.5, 9.6, 9.7, 9.8, 10.1, 10.2, 10.3, 10.4, and `docs/TASKS.md` Phase 11 into smaller implementation prompts.
 
 Use these prompts in order where possible. Each prompt is intended to be independently handable to a coding agent and includes its own testing and acceptance criteria while preserving the source requirements from `docs/TASKS.md`.
+
+## Task 9.0: Complete Clerk Authentication Foundation
+
+0. `task-9.0-complete-clerk-authentication-foundation.md`
+1. `task-9.0a-web-clerk-provider-routes-and-middleware.md`
+2. `task-9.0b-web-to-api-clerk-token-forwarding.md`
+3. `task-9.0c-api-clerk-token-guard-and-request-context.md`
+4. `task-9.0d-workspace-membership-and-role-resolution.md`
+5. `task-9.0e-auth-flow-e2e-hardening-and-docs.md`
 
 ## Task 9.2: Retry And Configuration Controls
 

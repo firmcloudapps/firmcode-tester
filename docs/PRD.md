@@ -17,8 +17,8 @@ Firmcode must be designed as a multi-tenant SaaS product, not a single-user loca
 - Clerk owns sign-up, sign-in, sessions, user profile, organization/workspace switching, member invitations where enabled, and Billing.
 - Every user must authenticate to Firmcode through Clerk and connect GitHub OAuth before using GitHub-backed workflows.
 - Workspaces are the tenant boundary. Every repository, installation, review run, finding, artifact, policy, usage counter, and audit event must be scoped to one workspace.
-- Owners/Admins manage workspace settings, GitHub App installation, repository automation, review policies, members where Clerk permits, and billing.
-- Developers can view operational review data and retry failed runs where policy allows; Viewers are read-only.
+- Admins manage billing, plans, member access where Clerk permits, global workspace settings, retention, API keys, and support/safety controls.
+- Developers are the primary customer users: they connect GitHub accounts, add/sync repositories, enable PR review automation, run/retry analysis, and track reports, findings, and CI explanations for their workspace.
 - Billing and plan enforcement are SaaS concerns. Clerk Billing owns checkout/subscription management; Firmcode stores only the plan/usage/capability metadata needed for authorization, quotas, and display.
 - Account management surfaces must include profile access, workspace switcher, member management entry point, billing portal, GitHub OAuth connection status, GitHub App installation status, data retention, notifications, and API keys or an explicit disabled state.
 - Auditability is required for sensitive actions: OAuth connect/disconnect, GitHub App install/disconnect/rescope, repository enablement changes, policy changes, billing capability changes, raw artifact access, and retry actions.
@@ -107,6 +107,7 @@ Supporting production-planning docs:
 - Light-mode TypeScript/Tailwind dashboard with repositories, repository detail/configuration, pull requests, review runs, findings, CI failures, rules/policies, settings, billing, GitHub App setup, and raw/redacted artifacts.
 - GitHub App install entry point, installation status, and repository metadata sync controls that are functional or explicitly disabled until backend support exists.
 - Clerk-backed sign-in, user menu, organizations/workspaces where enabled, and billing portal.
+- Clerk session-token verification for every dashboard API; production APIs must never trust client-provided user identity headers or environment-provided dashboard user IDs as authentication.
 - Webhook idempotency, superseded-run protection, and delivery replay handling.
 - Large-PR handling with prioritized and summary-only modes.
 - Configurable data retention and raw artifact redaction.
@@ -654,7 +655,7 @@ Inline comments remain limited to findings tied to changed lines. Existing codeb
 
 Every Firmcode user must connect GitHub OAuth before using GitHub-backed dashboard workflows. OAuth is used for user identity, GitHub login display, audit trails, and membership checks. GitHub App installation remains the repository access mechanism for webhook ingestion, repository sync, diff/check/log reads, and PR comment publishing.
 
-Owners/Admins install or manage the GitHub App for a workspace after OAuth is connected. Developers/Viewers connect OAuth but do not install or manage the GitHub App unless promoted.
+Developers can connect GitHub OAuth and add GitHub repositories through the app setup flow, subject to plan limits. Admins can also manage billing, member access, global policies, and support/safety controls.
 
 Required permissions:
 

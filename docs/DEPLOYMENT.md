@@ -33,8 +33,9 @@ Clerk
 
 ```text
 User Browser
+  -> Clerk sign-in/session
   -> Vercel Next.js Dashboard
-  -> Coolify NestJS API
+  -> Coolify NestJS API with Clerk bearer token
   -> NeonDB / Redis / GitHub / Worker Artifacts
 
 GitHub Webhook
@@ -51,6 +52,10 @@ GitHub Webhook
 - Hosts `apps/web`.
 - Renders the dashboard.
 - Integrates Clerk frontend/session UI.
+- Protects dashboard pages and dashboard route handlers with Clerk middleware.
+- Sends Clerk session bearer tokens to the API for dashboard calls.
+- Renders sign-in/sign-up pages through Clerk components.
+- Renders Clerk user menu and organization switcher where enabled.
 - Calls the API through `NEXT_PUBLIC_API_URL`.
 - Supports preview deployments.
 - Does not receive GitHub webhooks.
@@ -63,6 +68,8 @@ GitHub Webhook
 - Receives GitHub webhooks.
 - Verifies GitHub signatures.
 - Verifies Clerk JWT/session tokens for dashboard APIs.
+- Resolves Clerk user/org claims to Firmcode workspace memberships and roles.
+- Rejects spoofed user/workspace headers in production.
 - Handles CORS for Vercel production, Vercel previews, and local dev.
 - Enqueues BullMQ jobs.
 - Provides dashboard API endpoints.
@@ -91,6 +98,8 @@ GitHub Webhook
 - Configure sign-in/sign-up, user profile, organization/workspace, member-management, and GitHub OAuth redirect URLs.
 - Enable Clerk Billing and expose its subscription portal entry point through `CLERK_BILLING_PORTAL_URL`.
 - Provide `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` to the web app and `CLERK_SECRET_KEY` to server runtimes that validate sessions or call Clerk server APIs.
+- Configure the API token audience/template used by the web app when calling the Coolify API.
+- Configure Clerk webhooks for user, organization, and membership changes after the API sync endpoint exists.
 
 ### Redis
 
@@ -118,7 +127,39 @@ Neither Compose file runs PostgreSQL or the Next.js dashboard. PostgreSQL is Neo
 | Web URL | `https://firmcode.example.com` | Clerk redirects, user dashboard |
 | API URL | `https://firmcodeapi.firmoncloud.com` | Vercel web, GitHub webhooks |
 | GitHub webhook URL | `https://firmcodeapi.firmoncloud.com/webhooks/github` | GitHub App |
+| Clerk sign-in URL | `https://firmcode.example.com/sign-in` | Clerk |
+| Clerk sign-up URL | `https://firmcode.example.com/sign-up` | Clerk |
+| Clerk after-auth URL | `https://firmcode.example.com/` | Clerk |
 | Clerk callback URLs | Vercel production and preview URLs | Clerk |
+| GitHub OAuth callback URL | `https://firmcode.example.com/api/auth/github/callback` | GitHub App OAuth |
+
+## Authentication Deployment Plan
+
+1. Configure Clerk production instance with sign-in/sign-up URLs, after-auth URLs, organization settings, and Billing.
+2. Configure a Clerk API token audience/template, for example `firmcode-api`.
+3. Set Vercel web env vars:
+   - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
+   - `CLERK_SECRET_KEY`
+   - `CLERK_JWT_AUDIENCE`
+   - `NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in`
+   - `NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up`
+   - `NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/`
+   - `NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/`
+   - `NEXT_PUBLIC_API_URL=<Coolify API URL>`
+   - `CLERK_BILLING_PORTAL_URL`
+4. Set Coolify API env vars:
+   - `CLERK_SECRET_KEY`
+   - `CLERK_JWT_AUDIENCE`
+   - `CLERK_WEBHOOK_SECRET` once webhooks are enabled
+   - `CORS_ALLOWED_ORIGINS=<Vercel production and approved preview origins>`
+5. Run migrations so workspace, membership, GitHub OAuth, audit, and repository tables exist.
+6. Deploy API, then web, then test sign-in from the production domain.
+7. Confirm a signed-in web request to the API includes an `Authorization` bearer token and the API resolves the correct workspace.
+8. Confirm unauthenticated dashboard page access redirects to Clerk.
+9. Confirm direct API requests without a valid Clerk token return `401`.
+10. Configure Clerk webhooks for organization/user/membership sync after the API endpoint is deployed.
+
+Production must not rely on `FIRMCODE_DASHBOARD_WORKSPACE_ID`, `FIRMCODE_DASHBOARD_CLERK_USER_ID`, or other user-identity headers as authentication.
 
 ## CORS Policy
 
@@ -155,20 +196,28 @@ infra/deploy/coolify.md
 1. Provision NeonDB.
 2. Provision Clerk app and billing settings.
 3. Provision Redis.
-4. Deploy API to Coolify.
-5. Run migrations.
-6. Deploy worker to Coolify.
-7. Deploy web to Vercel.
-8. Configure Clerk redirect URLs and allowed origins.
-9. Configure GitHub App webhook URL.
-10. Run dry-run fixture.
-11. Enable publishing for one test repository.
+4. Configure Clerk sign-in/sign-up URLs, API token audience/template, and allowed origins.
+5. Deploy API to Coolify.
+6. Run migrations.
+7. Deploy worker to Coolify.
+8. Deploy web to Vercel.
+9. Verify Clerk route protection and API token verification.
+10. Configure Clerk webhooks if membership sync endpoint is deployed.
+11. Configure GitHub App webhook URL and GitHub OAuth callback URL.
+12. Run dry-run fixture.
+13. Enable publishing for one test repository.
 
 ## Smoke Checks
 
 - Vercel dashboard loads.
 - Clerk sign-in works on Vercel.
+- Unauthenticated dashboard access redirects to `/sign-in`.
+- Clerk user menu works.
+- Clerk organization/workspace switcher works where enabled.
 - Vercel dashboard can call Coolify API.
+- Direct Coolify dashboard API calls without a Clerk token return `401`.
+- Spoofed user/workspace headers cannot impersonate another user.
+- Cross-workspace resource requests are denied.
 - API health/readiness checks pass.
 - Worker is connected to Redis.
 - API and worker can reach NeonDB.

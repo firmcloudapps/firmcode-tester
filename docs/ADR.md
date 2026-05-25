@@ -152,3 +152,26 @@ Implications:
 - Compose smoke checks verify API and worker reach NeonDB from inside Docker.
 - Local web development uses `npm run dev --workspace @firmcode/web` and `NEXT_PUBLIC_API_URL=http://localhost:3001`.
 - This supersedes ADR-005's local PostgreSQL allowance and ADR-010's earlier local full-stack web Compose implication.
+
+## ADR-012: Clerk Session Tokens For Dashboard API Authentication
+
+Status: Accepted
+
+Decision: Protect the dashboard with Clerk end to end. The Next.js web app uses `@clerk/nextjs` for sign-in, sign-up, session middleware, user menu, and organization switching. The web app sends Clerk session bearer tokens to the NestJS API. The API verifies those tokens server-side, resolves the Clerk user and active organization to a Firmcode workspace membership, and then enforces the simplified Admin/Developer role model plus resource ownership.
+
+Rationale:
+
+- The dashboard is a SaaS surface containing private repository metadata, review artifacts, findings, CI details, billing state, and account settings.
+- Trusting web-provided user/workspace headers is not authentication and allows impersonation if exposed beyond isolated local tests.
+- Clerk already owns identity, session, organization, member, and billing workflows, so Firmcode should consume verified Clerk claims instead of duplicating identity logic.
+- Firmcode still needs application authorization because Clerk identity alone does not prove repository, review run, finding, artifact, policy, or GitHub installation ownership.
+
+Implications:
+
+- `apps/web` must include real Clerk provider wiring, protected routes, sign-in/sign-up pages, `UserButton`, and organization switching where enabled.
+- `apps/api` must include a shared Clerk auth guard and request context for all dashboard APIs.
+- Production API controllers must never derive caller identity from `x-firmcode-user-id` or environment-provided dashboard user IDs.
+- Optional workspace selector headers or params are allowed only after token verification and membership checks.
+- Every dashboard list endpoint must be tenant-scoped; global dashboard lists are not allowed.
+- GitHub webhooks remain unauthenticated by Clerk and continue to use GitHub signature verification and installation ownership checks.
+- Tests must cover missing/invalid/expired tokens, first-login workspace resolution, role denial, cross-workspace denial, and spoofed-header rejection.

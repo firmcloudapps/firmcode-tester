@@ -12,7 +12,7 @@ Expose typed dashboard endpoints to fetch and update repository automation/confi
 Testing requirements:
 - Add API tests for enabling and disabling repository automation.
 - Add validation tests for unknown fields, invalid field types, and invalid numeric bounds if configuration fields are present.
-- Add authorization tests for Owner/Admin/Developer/Viewer capabilities according to docs/AUTHORIZATION.md.
+- Add authorization tests for Admin/Developer capabilities according to docs/AUTHORIZATION.md.
 - Add persistence tests proving changes survive a fresh fetch.
 
 Acceptance criteria:
@@ -22,4 +22,3 @@ Acceptance criteria:
 - Unauthorized and cross-workspace updates are denied.
 - Tests pass through the documented local command, or inability to run them is documented with the exact command and failure.
 ```
-

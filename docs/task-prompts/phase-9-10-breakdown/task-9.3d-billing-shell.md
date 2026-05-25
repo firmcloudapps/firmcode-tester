@@ -7,7 +7,7 @@ Code context requirement: Before implementing, inspect the existing billing page
 
 Build or complete the Billing shell. Display plan and usage placeholders or real usage counters where already available: current plan, monthly review runs, AI tokens, repositories, seats, and billing status. Billing subscription management must route to Clerk Billing through the configured portal URL or Clerk-managed component; do not store payment state locally.
 
-Billing access must be Clerk-authenticated and require Owner/Admin or the Clerk-managed billing role described in docs/AUTHORIZATION.md. Lower roles should see a clear denied or read-only state depending on existing route conventions.
+Billing access must be Clerk-authenticated and require Admin or the Clerk-managed billing capability described in docs/AUTHORIZATION.md. Developers should see current plan/usage context, upgrade prompts, and a clear disabled state for Manage Subscription unless Clerk grants billing capability.
 
 Testing requirements:
 - Add component tests for billing populated, missing portal URL, and loading/error states if data is fetched.
@@ -22,4 +22,3 @@ Acceptance criteria:
 - UI follows docs/DASHBOARD_DESIGN.md and does not introduce local payment management.
 - Tests and visual smoke checks pass, or inability to run them is documented with exact commands.
 ```
-

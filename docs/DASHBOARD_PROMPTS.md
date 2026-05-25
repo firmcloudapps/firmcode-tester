@@ -44,7 +44,7 @@ Build the Firmcode Repositories page following docs/DASHBOARD_DESIGN.md. Include
 Read AGENTS.md first and follow it strictly.
 Relevant planning docs: docs/DASHBOARD_DESIGN.md, docs/DASHBOARD_PROMPTS.md, docs/PRD.md, docs/AUTHORIZATION.md, docs/ENVIRONMENT.md, docs/DEPLOYMENT.md, docs/TASKS.md Task 9.5, CLAUDE.md.
 Acceptance/test criteria: Verify against docs/DASHBOARD_DESIGN.md with component tests for loading, empty, error, connected, disconnected, unauthorized, and repository automation states; route/navigation tests must prove the PR Review link and related actions do not 404; do not declare done until checks pass or any inability to run them is documented.
-Build the Firmcode PR Review workspace as the focused page for repository review automation. Use a full-width light layout with provider tabs where GitHub is active and future providers are disabled planned states. Show separate connection cards for required GitHub account/OAuth status and Firmcode GitHub App installation status. Every signed-in Firmcode user must connect GitHub OAuth before using GitHub-backed workflows; Owners/Admins additionally manage GitHub App installation. Render compact repository automation rows with repository identity, exact owner/repo, readiness status, enabled control, last review/run status, configure action, and run/retry action. Do not expose raw OAuth tokens, installation tokens, private keys, webhook secrets, or raw payloads. Role-gate mutating controls according to docs/AUTHORIZATION.md.
+Build the Firmcode PR Review workspace as the focused page for repository review automation, using the attached developer-dashboard reference as structural inspiration: left navigation, PR Review active state, provider tabs, GitHub OAuth/App cards, compact repository rows, enabled toggles, settings icons, and Run actions. Use Firmcode branding and tokens rather than copying the reference brand. Every signed-in Developer can connect GitHub OAuth, add/sync repositories, enable automation, run/retry reviews, and track report analysis. Admins additionally manage billing, member access, global workspace settings, and support/safety controls. Do not expose raw OAuth tokens, installation tokens, private keys, webhook secrets, or raw payloads. Role-gate mutating controls according to docs/AUTHORIZATION.md.
 ```
 
 ## Repository Detail
@@ -110,13 +110,22 @@ Acceptance/test criteria: Verify against docs/DASHBOARD_DESIGN.md with component
 Build the Firmcode Settings and Billing shells following docs/DASHBOARD_DESIGN.md. Settings should include General, GitHub Account/OAuth, GitHub App, Members, API Keys, Data Retention, and Notifications tabs or equivalent sections. Clerk owns identity, workspace/organization switching, member management where possible, and account profile surfaces. Billing should show current plan, monthly usage, review runs, AI tokens, repositories, seats, plan capability messaging, and a Manage Subscription action through Clerk Billing. Use TypeScript, Tailwind CSS, Clerk-gated access, NeonDB-backed tenant-scoped settings data, and tests.
 ```
 
+## Complete Auth Foundation
+
+```text
+Read AGENTS.md first and follow it strictly.
+Relevant planning docs: docs/TASKS.md Task 9.0, docs/AUTHORIZATION.md, docs/ENVIRONMENT.md, docs/DEPLOYMENT.md, docs/LOCAL_DEVELOPMENT.md, docs/DASHBOARD_DESIGN.md, docs/ADR.md ADR-012, CLAUDE.md.
+Acceptance/test criteria: Verify against docs/TASKS.md Task 9.0 and docs/AUTHORIZATION.md. Add web route-protection tests, sign-in/sign-up tests, API token verification tests, workspace resolution tests, spoofed-header rejection tests, and a protected web-to-API integration test; do not declare done until checks pass or any inability to run them is documented.
+Implement complete Clerk-backed dashboard authentication. Replace the no-op Clerk provider with @clerk/nextjs ClerkProvider, add /sign-in and /sign-up pages using the dedicated auth-page design in docs/DASHBOARD_DESIGN.md, protect dashboard pages and route handlers with Clerk middleware, render Clerk UserButton and OrganizationSwitcher where enabled, derive active workspace from Clerk organization or personal workspace state, and send Clerk bearer tokens to the API. Add API Clerk token verification, request context, workspace membership resolution, role capability derivation, and production rejection of spoofed user headers. FIRMCODE_DASHBOARD_* may remain only as explicit test/local bypass fixtures, not production auth.
+```
+
 ## GitHub App Setup And Sync
 
 ```text
 Read AGENTS.md first and follow it strictly.
 Relevant planning docs: docs/DASHBOARD_DESIGN.md, docs/DASHBOARD_PROMPTS.md, docs/PRD.md, docs/AUTHORIZATION.md, docs/ENVIRONMENT.md, docs/DEPLOYMENT.md, docs/TASKS.md Task 9.5, CLAUDE.md.
 Acceptance/test criteria: Verify against docs/DASHBOARD_DESIGN.md with component tests for loading, empty, error, unauthorized, and connected states, plus route/navigation tests proving Connect GitHub and Sync GitHub do not 404; do not declare done until checks pass or any inability to run them is documented.
-Build the Firmcode GitHub OAuth plus GitHub App setup and sync dashboard flow. Implement /github/installations as a Clerk-authenticated setup/status page with required GitHub OAuth account connection, GitHub App install entry point, missing-config state, installation status, repository sync status, and safe error/retry states. Wire Connect GitHub, Settings GitHub App actions, repository Sync GitHub, and row sync controls to real routes/APIs or disabled planned states. Do not expose private keys, webhook secrets, OAuth access tokens, installation tokens, or raw payloads. Use the full-width light dashboard layout and brand tokens from docs/DASHBOARD_DESIGN.md.
+Build the Firmcode GitHub OAuth plus GitHub App setup and sync dashboard flow. Implement /github/installations as a Clerk-authenticated setup/status page with required GitHub OAuth account connection, GitHub App install entry point, missing-config state, installation status, repository sync status, and safe error/retry states. OAuth start and callback routes must require a signed-in Clerk user and resolved workspace membership. Wire Connect GitHub, Settings GitHub App actions, repository Sync GitHub, and row sync controls to real routes/APIs or disabled planned states. Do not expose private keys, webhook secrets, OAuth access tokens, installation tokens, or raw payloads. Use the full-width light dashboard layout and brand tokens from docs/DASHBOARD_DESIGN.md.
 ```
 
 ## Navigation Readiness QA

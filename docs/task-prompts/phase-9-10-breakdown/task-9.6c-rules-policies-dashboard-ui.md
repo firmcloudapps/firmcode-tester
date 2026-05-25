@@ -7,7 +7,7 @@ Code context requirement: Before implementing, inspect dashboard shell/sidebar, 
 
 Build /rules as the Rules / Policies dashboard page. Include sections for review preferences, comment policy, prompt instructions, ignored paths, generated-file patterns, Semgrep/analysis toggles, and infrastructure/security policy controls.
 
-Use accessible form controls, validation states, loading/error/empty/populated states, and unsaved-change handling. Owner/Admin can save changes. Developer/Viewer must see read-only or disabled controls according to docs/AUTHORIZATION.md.
+Use accessible form controls, validation states, loading/error/empty/populated states, and unsaved-change handling. Developers can save repository-level review policy changes. Admins can also save global workspace, retention, API key, billing, and support/safety policy changes. Controls that exceed the user's role or plan must be read-only or disabled according to docs/AUTHORIZATION.md.
 
 Testing requirements:
 - Add component tests for loading, empty, error, populated, validation error, unsaved changes, save success, save failure, and read-only role states.

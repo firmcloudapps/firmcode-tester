@@ -52,12 +52,27 @@ Use this checklist before deploying or enabling real GitHub publishing.
 
 ## Auth And Billing
 
-- Clerk sign-in works.
-- User menu works.
+- `@clerk/nextjs` is installed and the dashboard uses a real `ClerkProvider`.
+- `/sign-in` and `/sign-up` routes work.
+- Next.js middleware protects every dashboard page and dashboard API route handler.
+- Unauthenticated dashboard access redirects to Clerk sign-in.
+- Clerk sign-in works on local, Vercel preview if enabled, and production.
+- Clerk user menu works.
+- Clerk organization/workspace switcher works where enabled.
 - Workspace/org mapping works.
+- First login creates or resolves the expected personal/organization workspace.
+- API dashboard routes verify Clerk bearer tokens server-side.
+- Direct API calls without a token return `401`.
+- Expired/invalid Clerk tokens return `401`.
+- Spoofed user/workspace headers cannot impersonate another user.
+- Admin/Developer role gates match `docs/AUTHORIZATION.md`.
+- Cross-workspace repository, review run, finding, artifact, settings, billing, GitHub OAuth, and policy access is denied.
 - Billing portal link works.
+- Billing management is limited to Admin or verified Clerk Billing capability.
 - Unauthorized users cannot access dashboard data.
 - Vercel dashboard can call Coolify API with Clerk-authenticated requests.
+- GitHub OAuth connect flow requires a signed-in Clerk user.
+- GitHub App install/sync management requires GitHub OAuth plus active Admin or Developer membership and plan allowance.
 
 ## Review Pipeline
 

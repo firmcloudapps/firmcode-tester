@@ -18,14 +18,52 @@ Firmcode should be developed Docker-first for API and worker runtime behavior. D
 
 1. Copy `.env.example` to `.env`.
 2. Create Clerk application and fill Clerk env vars.
-3. Create a NeonDB database and set `DATABASE_URL`.
-4. Create GitHub App with required permissions and webhook secret.
-5. Set `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, and `GITHUB_WEBHOOK_SECRET`.
-6. Set LLM provider/model variables.
-7. Start API, worker, and Redis with local Docker Compose.
-8. Run migrations.
-9. Start the web dashboard independently with Next.js dev.
-10. Use webhook tunnel for GitHub App webhook URL.
+3. Configure Clerk sign-in/sign-up URLs and organization settings.
+4. Create a NeonDB database and set `DATABASE_URL`.
+5. Create GitHub App with required permissions and webhook secret.
+6. Set `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, and `GITHUB_WEBHOOK_SECRET`.
+7. Set LLM provider/model variables.
+8. Start API, worker, and Redis with local Docker Compose.
+9. Run migrations.
+10. Start the web dashboard independently with Next.js dev.
+11. Sign in through Clerk, confirm workspace creation/mapping, then connect GitHub OAuth.
+12. Use webhook tunnel for GitHub App webhook URL.
+
+## Clerk Local Authentication Setup
+
+Create a Clerk development application and configure:
+
+- Sign-in URL: `http://localhost:3000/sign-in`
+- Sign-up URL: `http://localhost:3000/sign-up`
+- After sign-in URL: `http://localhost:3000/`
+- After sign-up URL: `http://localhost:3000/`
+- Allowed redirect origin: `http://localhost:3000`
+- Organizations enabled if testing team workspaces.
+- A JWT template or audience matching `CLERK_JWT_AUDIENCE` for API calls.
+
+Local `.env` values should include:
+
+```text
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
+CLERK_SECRET_KEY=sk_test_...
+CLERK_JWT_AUDIENCE=firmcode-api
+NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
+NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
+NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/
+NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/
+```
+
+The expected local auth flow is:
+
+1. Visit `http://localhost:3000`.
+2. Unauthenticated users are redirected to `/sign-in`.
+3. Sign in or sign up through Clerk.
+4. The dashboard creates or resolves the active personal or organization workspace.
+5. Web server requests to the API include a Clerk bearer token.
+6. API dashboard endpoints reject requests without a valid Clerk token.
+7. Connect GitHub OAuth from `/github/installations` before using GitHub-backed workflows.
+
+Do not use `FIRMCODE_DASHBOARD_WORKSPACE_ID` or `FIRMCODE_DASHBOARD_CLERK_USER_ID` for normal local development once Task 9.0 is implemented. Those variables are reserved for isolated tests and explicit seed/debug bypass workflows.
 
 ## Docker-First Workflow
 
@@ -59,6 +97,10 @@ Do not add PostgreSQL or the Next.js web app to either backend Compose stack. Ne
 
 Before merging implementation work, verify:
 
+- Unauthenticated dashboard requests redirect to Clerk sign-in.
+- Signed-in dashboard requests include a Clerk bearer token when calling the API.
+- API protected routes return `401` without a token and tenant-scoped data with a valid token.
+- A user cannot access another workspace by changing request headers or IDs.
 - API image builds.
 - Worker image builds.
 - Worker image includes Semgrep CLI and Tree-sitter runtime dependencies.
@@ -174,7 +216,10 @@ docker compose run --rm worker pytest
 ## Troubleshooting
 
 - If webhook verification fails, confirm raw body handling and `GITHUB_WEBHOOK_SECRET`.
-- If Clerk auth fails, confirm publishable/secret keys and allowed redirect URLs.
+- If Clerk auth fails in the web app, confirm publishable key, sign-in/sign-up URLs, after-auth URLs, allowed redirect URLs, and middleware route matching.
+- If protected API calls return `401`, confirm the web route handler is sending `Authorization: Bearer <Clerk token>`, `CLERK_SECRET_KEY` is configured on the API, and `CLERK_JWT_AUDIENCE` matches the token template/audience.
+- If protected API calls return `403`, confirm the Clerk user is mapped to an active workspace membership with the required role.
+- If cross-workspace data appears, stop and fix workspace ownership checks before continuing; this is a release blocker.
 - If NeonDB fails, confirm SSL settings and connection string.
 - If worker does not process jobs, confirm `REDIS_URL` and queue names.
 - If Semgrep is missing, confirm worker image includes Semgrep CLI.
