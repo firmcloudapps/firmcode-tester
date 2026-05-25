@@ -4,6 +4,12 @@ import {
   type DashboardWorkspaceRole,
   type WorkspaceSettingsResponse
 } from "@firmcode/shared";
+import {
+  isAllowedExternalDashboardUrl,
+  isExternalDashboardUrl,
+  isImplementedDashboardRoute,
+  type DashboardExternalProvider
+} from "../../lib/dashboard-route-readiness";
 import type { ViewState } from "../../lib/view-state";
 import { formatDateTime } from "./format";
 
@@ -173,12 +179,8 @@ function GeneralPanel({ data }: { data: WorkspaceSettingsResponse }) {
         <MetadataCard label="Clerk organization" value={data.workspace.clerkOrgId ?? "Personal workspace"} monospace />
       </dl>
       <div className="mt-4 flex flex-wrap gap-2">
-        <a className="rounded-md border border-border px-3 py-2 text-sm font-medium text-primary" href={data.clerk.userProfileUrl}>
-          Open Clerk profile
-        </a>
-        <a className="rounded-md border border-border px-3 py-2 text-sm font-medium text-primary" href={data.clerk.organizationProfileUrl}>
-          Open Clerk organization
-        </a>
+        <RouteReadyAction href={data.clerk.userProfileUrl} label="Open Clerk profile" provider="clerk" />
+        <RouteReadyAction href={data.clerk.organizationProfileUrl} label="Open Clerk organization" provider="clerk" />
       </div>
     </SettingsPanel>
   );
@@ -194,20 +196,18 @@ function GitHubAppPanel({ data }: { data: WorkspaceSettingsResponse }) {
     >
       <div className="flex flex-wrap gap-2">
         {canManage ? (
-          <a
-            className="rounded-md bg-accent px-3 py-2 text-sm font-medium text-white"
-            href={data.githubApp.installUrl}
-          >
-            Connect GitHub App
-          </a>
+          <RouteReadyAction href={data.githubApp.installUrl} label="Connect GitHub App" primary provider="github" />
         ) : (
-          <button className="rounded-md bg-mist px-3 py-2 text-sm font-medium text-secondary" type="button" disabled>
+          <button
+            className="rounded-md bg-mist px-3 py-2 text-sm font-medium text-secondary"
+            type="button"
+            disabled
+            title="Owner or Admin required to connect the GitHub App."
+          >
             Connect GitHub App
           </button>
         )}
-        <a className="rounded-md border border-border px-3 py-2 text-sm font-medium text-primary" href={data.githubApp.repositoryConfigurationUrl}>
-          Repository configuration
-        </a>
+        <RouteReadyAction href={data.githubApp.repositoryConfigurationUrl} label="Repository configuration" provider="github" />
       </div>
       <div className="mt-4 grid gap-3">
         {data.githubApp.installations.length === 0 ? (
@@ -247,17 +247,18 @@ function MembersPanel({ data }: { data: WorkspaceSettingsResponse }) {
     <SettingsPanel title="Members" description="Clerk owns member invitations, removals, profile details, and organization roles.">
       <div className="flex flex-wrap gap-2">
         {canManage ? (
-          <a className="rounded-md bg-accent px-3 py-2 text-sm font-medium text-white" href={data.clerk.memberManagementUrl}>
-            Open Clerk members
-          </a>
+          <RouteReadyAction href={data.clerk.memberManagementUrl} label="Open Clerk members" primary provider="clerk" />
         ) : (
-          <button className="rounded-md bg-slate-200 px-3 py-2 text-sm font-medium text-secondary" type="button" disabled>
+          <button
+            className="rounded-md bg-slate-200 px-3 py-2 text-sm font-medium text-secondary"
+            type="button"
+            disabled
+            title="Owner or Admin required to manage Clerk members."
+          >
             Open Clerk members
           </button>
         )}
-        <a className="rounded-md border border-border px-3 py-2 text-sm font-medium text-primary" href={data.clerk.organizationProfileUrl}>
-          View organization
-        </a>
+        <RouteReadyAction href={data.clerk.organizationProfileUrl} label="View organization" provider="clerk" />
       </div>
       <p className="mt-4 rounded-md border border-border bg-subtle p-3 text-sm leading-6 text-secondary">
         Firmcode reads the active workspace membership for authorization and leaves member lifecycle workflows in Clerk.
@@ -276,6 +277,11 @@ function ApiKeysPanel({ data }: { data: WorkspaceSettingsResponse }) {
         className="mt-4 rounded-md bg-slate-200 px-3 py-2 text-sm font-medium text-secondary disabled:cursor-not-allowed disabled:opacity-60"
         type="button"
         disabled={!canManage || !data.apiKeys.enabled}
+        title={
+          canManage
+            ? "Workspace API keys are planned and not enabled in the MVP."
+            : "Owner or Admin required to create workspace API keys."
+        }
       >
         Create API key
       </button>
@@ -342,8 +348,66 @@ function TogglePlaceholder({ label, disabled }: { label: string; disabled: boole
   return (
     <label className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface p-3 text-sm font-medium text-primary">
       {label}
-      <input className="h-4 w-4" type="checkbox" disabled={disabled} />
+      <input
+        className="h-4 w-4"
+        type="checkbox"
+        disabled={disabled}
+        title={disabled ? `${label} are planned and not enabled in the MVP.` : label}
+      />
     </label>
+  );
+}
+
+function RouteReadyAction({
+  href,
+  label,
+  primary = false,
+  provider
+}: {
+  href: string;
+  label: string;
+  primary?: boolean;
+  provider: DashboardExternalProvider;
+}) {
+  const className = primary
+    ? "rounded-md bg-accent px-3 py-2 text-sm font-medium text-white"
+    : "rounded-md border border-border px-3 py-2 text-sm font-medium text-primary";
+  const disabledClassName = primary
+    ? "rounded-md bg-slate-200 px-3 py-2 text-sm font-medium text-secondary"
+    : "rounded-md border border-border bg-subtle px-3 py-2 text-sm font-medium text-secondary";
+  const external = isExternalDashboardUrl(href);
+
+  if (external && isAllowedExternalDashboardUrl(href, provider)) {
+    return (
+      <a
+        className={className}
+        data-dashboard-destination="external"
+        data-dashboard-provider={provider}
+        href={href}
+        rel="noreferrer"
+      >
+        {label}
+      </a>
+    );
+  }
+
+  if (!external && isImplementedDashboardRoute(href)) {
+    return (
+      <a className={className} data-dashboard-destination="internal" href={href}>
+        {label}
+      </a>
+    );
+  }
+
+  return (
+    <button
+      className={disabledClassName}
+      type="button"
+      disabled
+      title={`${label} is planned until its ${external ? "external" : "internal"} destination is route-ready.`}
+    >
+      {label}
+    </button>
   );
 }
 

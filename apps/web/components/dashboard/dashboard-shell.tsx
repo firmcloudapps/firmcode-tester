@@ -1,32 +1,10 @@
 import React from "react";
+import { DASHBOARD_NAV_ITEMS, type DashboardActiveItem } from "../../lib/dashboard-navigation";
 
 interface DashboardShellProps {
-  activeItem:
-    | "Overview"
-    | "PR Review"
-    | "Repositories"
-    | "Pull Requests"
-    | "Review Runs"
-    | "Findings"
-    | "CI Failures"
-    | "Rules"
-    | "Settings"
-    | "Billing";
+  activeItem: DashboardActiveItem;
   children: React.ReactNode;
 }
-
-const navItems = [
-  { label: "Overview", href: "/", enabled: true },
-  { label: "PR Review", href: "/github/installations", enabled: true },
-  { label: "Repositories", href: "/repositories", enabled: true },
-  { label: "Pull Requests", href: "/pull-requests", enabled: true },
-  { label: "Review Runs", href: "/review-runs", enabled: true },
-  { label: "Findings", href: "/findings", enabled: true },
-  { label: "CI Failures", href: "/ci-failures", enabled: true },
-  { label: "Rules / Policies", href: "/rules", enabled: true },
-  { label: "Settings", href: "/settings", enabled: true },
-  { label: "Billing", href: "/billing", enabled: true }
-];
 
 export function DashboardShell({ activeItem, children }: DashboardShellProps) {
   return (
@@ -68,9 +46,8 @@ export function DashboardShell({ activeItem, children }: DashboardShellProps) {
         <details className="border-t border-border px-4 py-2 lg:hidden">
           <summary className="cursor-pointer text-sm font-medium text-primary">Navigation</summary>
           <nav className="mt-2 grid gap-1" aria-label="Mobile dashboard">
-            {navItems.map((item) => {
-              const normalizedLabel = item.label === "Rules / Policies" ? "Rules" : item.label;
-              const active = normalizedLabel === activeItem;
+            {DASHBOARD_NAV_ITEMS.map((item) => {
+              const active = item.activeItem === activeItem;
 
               return item.enabled ? (
                 <a
@@ -88,7 +65,7 @@ export function DashboardShell({ activeItem, children }: DashboardShellProps) {
                   key={item.label}
                   className="cursor-not-allowed rounded-md px-3 py-2 text-sm font-medium text-secondary opacity-55"
                   aria-disabled="true"
-                  title="Planned dashboard section"
+                  title={item.disabledTitle ?? "Planned dashboard section"}
                 >
                   {item.label}
                 </span>
@@ -109,9 +86,8 @@ export function DashboardShell({ activeItem, children }: DashboardShellProps) {
             </div>
           </div>
           <nav className="flex flex-col gap-1" aria-label="Dashboard">
-            {navItems.map((item) => {
-              const normalizedLabel = item.label === "Rules / Policies" ? "Rules" : item.label;
-              const active = normalizedLabel === activeItem;
+            {DASHBOARD_NAV_ITEMS.map((item) => {
+              const active = item.activeItem === activeItem;
 
               return item.enabled ? (
                 <a
@@ -131,7 +107,7 @@ export function DashboardShell({ activeItem, children }: DashboardShellProps) {
                   key={item.label}
                   className="cursor-not-allowed rounded-md border border-transparent px-3 py-2 text-sm font-medium text-secondary opacity-55"
                   aria-disabled="true"
-                  title="Planned dashboard section"
+                  title={item.disabledTitle ?? "Planned dashboard section"}
                 >
                   {item.label}
                 </span>
