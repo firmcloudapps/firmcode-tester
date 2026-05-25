@@ -65,6 +65,8 @@ Use this checklist before deploying or enabling real GitHub publishing.
 - Direct API calls without a token return `401`.
 - Expired/invalid Clerk tokens return `401`.
 - Spoofed user/workspace headers cannot impersonate another user.
+- Production and normal local paths do not use `FIRMCODE_DASHBOARD_*`; only `FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN` is present in isolated web tests.
+- Dashboard list endpoints return only the resolved workspace's repositories, pull requests, review runs, findings, CI failures, codebase scans, and settings data.
 - Admin/Developer role gates match `docs/AUTHORIZATION.md`.
 - Cross-workspace repository, review run, finding, artifact, settings, billing, GitHub OAuth, and policy access is denied.
 - Billing portal link works.

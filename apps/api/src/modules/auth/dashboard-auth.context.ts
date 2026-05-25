@@ -53,13 +53,33 @@ export function isDashboardRequestContext(value: DashboardAuthParam): value is D
   );
 }
 
-export function toDashboardServiceAuth(context: DashboardRequestContext): {
+export function requireDashboardRequestContext(value: DashboardAuthParam): DashboardRequestContext {
+  if (!isDashboardRequestContext(value)) {
+    throw new UnauthorizedException("Dashboard authentication is required");
+  }
+
+  return value;
+}
+
+export function toDashboardServiceAuth(auth: DashboardAuthParam): {
   readonly workspaceId: string;
   readonly clerkUserId: string;
+};
+export function toDashboardServiceAuth(auth: DashboardAuthParam, legacyUserIdHeader: string | string[] | undefined): {
+  readonly workspaceId: string | null;
+  readonly clerkUserId: string | null;
+};
+export function toDashboardServiceAuth(auth: DashboardAuthParam, legacyUserIdHeader?: string | string[] | undefined): {
+  readonly workspaceId: string | null;
+  readonly clerkUserId: string | null;
 } {
+  if (!isDashboardRequestContext(auth)) {
+    return readTestOnlyLegacyServiceAuth(auth, legacyUserIdHeader);
+  }
+
   return {
-    workspaceId: context.workspaceId,
-    clerkUserId: context.clerkUserId
+    workspaceId: auth.workspaceId,
+    clerkUserId: auth.clerkUserId
   };
 }
 
@@ -110,32 +130,53 @@ export function deriveDashboardCapabilities(
 
 export async function resolveDashboardMembership(
   auth: DashboardAuthParam,
-  legacyUserIdHeader: string | string[] | undefined,
-  dashboardAuthStore: DashboardAuthStore,
-  notFoundMessage: string
+  _legacyUserIdHeader: string | string[] | undefined,
+  _dashboardAuthStore: DashboardAuthStore,
+  _notFoundMessage: string
 ): Promise<DashboardMembership> {
-  if (isDashboardRequestContext(auth)) {
-    return {
-      workspaceId: auth.workspaceId,
-      clerkUserId: auth.clerkUserId,
-      role: auth.role
-    };
+  if (!isDashboardRequestContext(auth)) {
+    const legacy = readTestOnlyLegacyServiceAuth(auth, _legacyUserIdHeader);
+
+    if (legacy.workspaceId === null || legacy.clerkUserId === null) {
+      throw new UnauthorizedException("Dashboard authentication is required");
+    }
+
+    const membership = await _dashboardAuthStore.findActiveMembership({
+      workspaceId: legacy.workspaceId,
+      clerkUserId: legacy.clerkUserId
+    });
+
+    if (membership === null) {
+      throw new NotFoundException(_notFoundMessage);
+    }
+
+    return membership;
   }
 
-  const workspaceId = readSingleValue(auth) ?? null;
-  const clerkUserId = readSingleValue(legacyUserIdHeader) ?? null;
+  return {
+    workspaceId: auth.workspaceId,
+    clerkUserId: auth.clerkUserId,
+    role: auth.role
+  };
+}
 
-  if (workspaceId === null || clerkUserId === null) {
+function readTestOnlyLegacyServiceAuth(
+  auth: DashboardAuthParam,
+  legacyUserIdHeader: string | string[] | undefined
+): {
+  readonly workspaceId: string | null;
+  readonly clerkUserId: string | null;
+} {
+  if (process.env.NODE_ENV !== "test") {
     throw new UnauthorizedException("Dashboard authentication is required");
   }
 
-  const membership = await dashboardAuthStore.findActiveMembership({ workspaceId, clerkUserId });
+  const legacyWorkspaceId = isDashboardRequestContext(auth) ? undefined : auth;
 
-  if (membership === null) {
-    throw new NotFoundException(notFoundMessage);
-  }
-
-  return membership;
+  return {
+    workspaceId: readSingleValue(legacyWorkspaceId) ?? null,
+    clerkUserId: readSingleValue(legacyUserIdHeader) ?? null
+  };
 }
 
 function readSingleValue(value: string | string[] | undefined): string | undefined {

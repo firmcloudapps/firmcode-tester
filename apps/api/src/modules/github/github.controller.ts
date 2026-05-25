@@ -9,8 +9,7 @@ import type {
 import {
   DashboardAuth,
   toDashboardServiceAuth,
-  type DashboardAuthParam,
-  type DashboardRequestContext
+  type DashboardAuthParam
 } from "../auth/dashboard-auth.context";
 import { DashboardAuthGuard } from "../auth/dashboard-auth.guard";
 import { GitHubDashboardService } from "./github.service";
@@ -110,15 +109,8 @@ export class GitHubDashboardController {
   }
 }
 
-function readServiceAuth(auth: DashboardAuthParam, userIdHeader: string | string[] | undefined) {
-  if (typeof auth === "object" && auth !== null && !Array.isArray(auth) && "workspaceId" in auth) {
-    return toDashboardServiceAuth(auth as DashboardRequestContext);
-  }
-
-  return {
-    workspaceId: readSingleValue(auth) ?? null,
-    clerkUserId: readSingleValue(userIdHeader) ?? null
-  };
+function readServiceAuth(auth: DashboardAuthParam, _userIdHeader: string | string[] | undefined) {
+  return toDashboardServiceAuth(auth, _userIdHeader);
 }
 
 function readSingleValue(value: string | string[] | undefined): string | undefined {

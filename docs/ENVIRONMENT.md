@@ -73,7 +73,7 @@ The production dashboard authentication flow is:
 2. Web server code reads Clerk auth state with `auth()` and obtains a Clerk session token for `CLERK_JWT_AUDIENCE`.
 3. Web-to-API calls send `Authorization: Bearer <Clerk session token>`.
 4. The NestJS API verifies the token with Clerk, derives the Clerk user and organization claims, resolves the Firmcode workspace/membership, and then applies role/capability checks.
-5. The API must ignore client-provided user identity headers. Web tests may use `FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN` as an isolated bearer-token fixture, but production and normal local development must use Clerk sessions.
+5. The API must ignore client-provided user identity headers. Web tests may use `FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN` as an isolated bearer-token fixture, but production and normal local development must use Clerk sessions. Any legacy workspace/user shortcut is gated to `NODE_ENV=test` for direct controller tests only; setting `FIRMCODE_DASHBOARD_*` or sending `x-firmcode-user-id` is not a supported runtime authentication path.
 
 Required Clerk dashboard configuration:
 

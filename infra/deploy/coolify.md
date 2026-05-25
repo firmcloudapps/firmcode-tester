@@ -165,7 +165,7 @@ The production API image already contains compiled JavaScript and omits TypeScri
 10. Keep one worker replica until live webhook processing is stable.
 11. Deploy the Vercel dashboard with `NEXT_PUBLIC_API_URL` pointing to the API URL.
 12. Add Vercel production and preview origins to API `CORS_ALLOWED_ORIGINS`.
-13. Verify direct dashboard API calls without a Clerk token return `401` and signed-in Vercel calls succeed.
+13. Verify direct dashboard API calls without a Clerk token return `401`, spoofed `x-firmcode-user-id` requests are rejected, cross-workspace requests are denied, and signed-in Vercel calls succeed with `Authorization: Bearer <Clerk token>`.
 14. Configure GitHub App webhook URL: `https://firmcodeapi.firmoncloud.com/webhooks/github`.
 15. Run a synthetic dry-run review before setting `DRY_RUN=false`.
 

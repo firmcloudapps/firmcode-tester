@@ -2,14 +2,12 @@ import { Controller, Get, UseGuards } from "@nestjs/common";
 import type { WorkspaceBillingResponse } from "@firmcode/shared";
 import {
   DashboardAuth,
+  isDashboardRequestContext,
   toDashboardServiceAuth,
-  type DashboardAuthParam,
-  type DashboardRequestContext
+  type DashboardAuthParam
 } from "../auth/dashboard-auth.context";
 import { DashboardAuthGuard } from "../auth/dashboard-auth.guard";
-import {
-  hasClerkManagedBillingCapability
-} from "../review-runs/dashboard-auth.store";
+import { hasClerkManagedBillingCapability } from "../review-runs/dashboard-auth.store";
 import { BillingService } from "./billing.service";
 
 @Controller("api/billing")
@@ -28,31 +26,14 @@ export class BillingController {
     return this.billingService.getWorkspaceBilling({
       ...serviceAuth,
       hasClerkBillingCapability:
-        (typeof auth === "object" &&
-          auth !== null &&
-          !Array.isArray(auth) &&
-          "capabilities" in auth &&
-          (auth as DashboardRequestContext).capabilities.includes("manage_billing")) ||
-        hasClerkManagedBillingCapability(billingCapabilityHeader)
+        (isDashboardRequestContext(auth) && auth.capabilities.includes("manage_billing")) ||
+        (process.env.NODE_ENV === "test" &&
+          !isDashboardRequestContext(auth) &&
+          hasClerkManagedBillingCapability(billingCapabilityHeader))
     });
   }
 }
 
-function readServiceAuth(auth: DashboardAuthParam, userIdHeader: string | string[] | undefined) {
-  if (typeof auth === "object" && auth !== null && !Array.isArray(auth) && "workspaceId" in auth) {
-    return toDashboardServiceAuth(auth as DashboardRequestContext);
-  }
-
-  return {
-    workspaceId: readSingleValue(auth) ?? null,
-    clerkUserId: readSingleValue(userIdHeader) ?? null
-  };
-}
-
-function readSingleValue(value: string | string[] | undefined): string | undefined {
-  if (Array.isArray(value)) {
-    return value[0];
-  }
-
-  return value === "" ? undefined : value;
+function readServiceAuth(auth: DashboardAuthParam, _userIdHeader: string | string[] | undefined) {
+  return toDashboardServiceAuth(auth, _userIdHeader);
 }

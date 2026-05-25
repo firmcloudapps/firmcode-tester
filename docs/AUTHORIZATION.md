@@ -173,7 +173,7 @@ Every dashboard API should enforce workspace access by `workspace_id`. Do not tr
 
 Codebase scan run and finding APIs must enforce ownership through the scan run repository and GitHub installation workspace before exposing scan artifacts, unresolved repository findings, or review enrichment data.
 
-Production dashboard APIs must not accept caller identity from `x-firmcode-user-id`, `FIRMCODE_DASHBOARD_CLERK_USER_ID`, or any equivalent client-controlled value. Isolated web tests may use `FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN` as a clearly named bearer-token fixture, but it must not be treated as production auth.
+Production dashboard APIs must not accept caller identity from `x-firmcode-user-id`, `FIRMCODE_DASHBOARD_CLERK_USER_ID`, or any equivalent client-controlled value. Isolated web tests may use `FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN` as a clearly named bearer-token fixture, but it must not be treated as production auth. Direct controller unit tests may still pass legacy workspace/user strings only under `NODE_ENV=test`; the same fallback throws `401` outside tests.
 
 ## Implementation Acceptance Criteria
 

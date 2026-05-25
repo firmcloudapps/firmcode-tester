@@ -23,11 +23,9 @@ import { ReviewRunRetryService } from "./review-run-retry.service";
 import {
   DashboardAuth,
   hasDashboardCapability,
-  isDashboardRequestContext,
   resolveDashboardMembership,
   toDashboardServiceAuth,
-  type DashboardAuthParam,
-  type DashboardRequestContext
+  type DashboardAuthParam
 } from "../auth/dashboard-auth.context";
 import { DashboardAuthGuard } from "../auth/dashboard-auth.guard";
 import {
@@ -49,11 +47,16 @@ export class ReviewRunsController {
   @Get()
   async listReviewRuns(
     @Query() query: Record<string, string | string[] | undefined>,
-    @DashboardAuth() auth?: DashboardAuthParam
+    @DashboardAuth() auth: DashboardAuthParam
   ): Promise<ReviewRunListResponse> {
+    const serviceAuth = toDashboardServiceAuth(auth);
+    if (serviceAuth.workspaceId === null) {
+      throw new UnauthorizedException("Dashboard authentication is required");
+    }
+
     return this.reviewRunsStore.listReviewRuns({
       ...parseReviewRunListFilters(query),
-      workspaceId: isDashboardRequestContext(auth) ? auth.workspaceId : undefined
+      workspaceId: serviceAuth.workspaceId
     });
   }
 
@@ -132,15 +135,8 @@ export class ReviewRunsController {
   }
 }
 
-function readServiceAuth(auth: DashboardAuthParam, userIdHeader: string | string[] | undefined) {
-  if (typeof auth === "object" && auth !== null && !Array.isArray(auth) && "workspaceId" in auth) {
-    return toDashboardServiceAuth(auth as DashboardRequestContext);
-  }
-
-  return {
-    workspaceId: readSingleValue(auth) ?? null,
-    clerkUserId: readSingleValue(userIdHeader) ?? null
-  };
+function readServiceAuth(auth: DashboardAuthParam, _userIdHeader: string | string[] | undefined) {
+  return toDashboardServiceAuth(auth, _userIdHeader);
 }
 
 function hasMembershipCapability(
