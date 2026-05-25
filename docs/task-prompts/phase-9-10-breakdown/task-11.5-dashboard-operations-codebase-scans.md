@@ -11,7 +11,7 @@ Implementation requirements:
 - Show latest scan status, last scan time, open finding count, and manual scan action on repository list/detail.
 - Extend findings inbox filters to include PR findings and codebase scan findings with repository, severity, source, category, status, and date filters.
 - Add repository scan configuration for cadence, enabled state, ignored paths, severity threshold, max files, and max bytes.
-- Enforce role permissions: Owners/Admins configure scans and suppress/mark false positive, Developers can view and trigger scans where policy allows, Viewers are read-only.
+- Enforce role permissions: Developers and Admins can configure repository scans, trigger scans, and suppress/mark findings false positive where workspace policy and plan limits allow. Admins retain global policy and support/safety controls.
 - Update operations docs for scan backlog, GitHub rate limits, scan failures, Semgrep timeouts, stale findings, retention cleanup, and manual recovery.
 
 Acceptance criteria:

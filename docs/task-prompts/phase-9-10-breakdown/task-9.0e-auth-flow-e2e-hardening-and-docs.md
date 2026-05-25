@@ -14,9 +14,9 @@ Add or update smoke tests and docs so future deployments can validate:
 - direct API calls without token return 401
 - spoofed user/workspace headers cannot impersonate another user
 - cross-workspace resource requests are denied
-- Owner/Admin/Developer/Viewer capabilities behave as documented
+- Admin/Developer capabilities behave as documented
 - GitHub OAuth start/callback require a signed-in Clerk user
-- Billing management requires Owner/Admin or verified Clerk Billing capability
+- Billing management requires Admin or verified Clerk Billing capability
 
 Testing requirements:
 - Add an end-to-end or integration smoke test for protected dashboard-to-API calls.

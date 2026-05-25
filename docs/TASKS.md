@@ -560,6 +560,7 @@ Acceptance criteria:
 - `apps/web` installs and wires `@clerk/nextjs`.
 - The root layout uses a real `ClerkProvider`.
 - Clerk sign-in and sign-up pages exist at `/sign-in/[[...sign-in]]` and `/sign-up/[[...sign-up]]`.
+- Sign-in and sign-up use the dedicated auth-page design from `docs/DASHBOARD_DESIGN.md`: light-mode unauthenticated shell, constrained Clerk panel, compact Firmcode context, responsive mobile layout, and no marketing hero treatment.
 - Next.js middleware protects all dashboard pages and dashboard route handlers.
 - Dashboard shell uses Clerk `UserButton` and `OrganizationSwitcher` where organizations are enabled.
 - The active workspace displayed in the shell comes from Clerk organization/personal workspace state, not static placeholder text.
@@ -576,6 +577,7 @@ Tests:
 
 - Web route protection tests for authenticated and unauthenticated users.
 - Sign-in/sign-up route rendering tests.
+- Sign-in/sign-up visual or rendered-markup tests for desktop/mobile layout, Clerk appearance hooks, and no dashboard shell leakage.
 - Dashboard shell tests for Clerk user menu, organization switcher, and active workspace display.
 - API guard tests for missing token, invalid token, expired token, valid personal workspace token, and valid organization token.
 - Tests proving client-provided user headers cannot impersonate another Clerk user.
@@ -642,7 +644,7 @@ Acceptance criteria:
 
 - All dashboard controllers use the shared Clerk auth guard/request context from Task 9.0.
 - Every dashboard API checks workspace membership and resource ownership.
-- Owner/Admin/Developer/Viewer role capabilities are enforced.
+- Admin/Developer role capabilities are enforced.
 - Billing and sensitive settings require elevated role.
 - Raw artifact access is role-gated.
 - Tenant isolation is enforced for every SaaS account resource, including workspace settings, members, billing context, GitHub OAuth identity, GitHub installations, repositories, review runs, findings, policies, artifacts, and audit events.
@@ -673,7 +675,7 @@ Acceptance criteria:
 - GitHub App installation callback/status handling is documented and wired to workspace ownership checks.
 - Dashboard APIs list installations for the caller workspace and sync installation repository metadata.
 - Repository-level sync is available only for repositories owned by the caller workspace.
-- Owners/Admins can install or manage the GitHub App after OAuth is connected; Developers/Viewers must connect OAuth but see an explicit Owner/Admin-required state for installation management.
+- Developers can connect GitHub OAuth, add/sync repositories, enable automation, and run/retry reviews after OAuth is connected, subject to plan limits. Admins can additionally manage billing, member access, global workspace settings, and support/safety controls.
 - Connect/sync buttons show loading, success, error, and disabled states and never link to missing routes.
 - Empty states explain how to connect GitHub without exposing secrets or private installation tokens.
 
@@ -693,7 +695,7 @@ Acceptance criteria:
 - Repository detail verifies workspace ownership and returns 404 for cross-workspace or missing repositories.
 - Configuration tab uses existing repository review configuration APIs and respects role capabilities.
 - `/rules` is implemented with review preferences, comment policy, prompt instructions, ignored paths, Semgrep/analysis toggles, and infrastructure/security policy sections.
-- Rules/policy mutations require Owner/Admin and preserve read-only views for Developer/Viewer.
+- Repository-level rules/policy mutations are available to Developers and Admins. Global workspace, retention, API key, billing, and support/safety policy mutations require Admin.
 - Repository Configure links route to implemented pages and do not 404.
 
 Tests:
@@ -891,7 +893,7 @@ Acceptance criteria:
 - Repository list/detail show latest codebase scan status, last scan time, open finding count, and manual scan action.
 - Findings inbox can filter PR findings and codebase scan findings by repository, severity, source, category, status, and date.
 - Repository configuration exposes scan cadence, enabled state, ignored paths, severity threshold, and maximum scan limits.
-- Owners/Admins can suppress or mark scan findings false positive; Developers can view findings and trigger scans where policy allows; Viewers are read-only.
+- Developers and Admins can view scan findings, trigger scans, suppress findings, or mark findings false positive where workspace policy and plan limits allow. Admins retain global policy and safety controls.
 - Operations runbook covers scan backlog, GitHub rate limits, scan failures, Semgrep timeouts, stale findings, and retention cleanup.
 
 Tests:

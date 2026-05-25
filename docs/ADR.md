@@ -157,7 +157,7 @@ Implications:
 
 Status: Accepted
 
-Decision: Protect the dashboard with Clerk end to end. The Next.js web app uses `@clerk/nextjs` for sign-in, sign-up, session middleware, user menu, and organization switching. The web app sends Clerk session bearer tokens to the NestJS API. The API verifies those tokens server-side, resolves the Clerk user and active organization to a Firmcode workspace membership, and then enforces Owner/Admin/Developer/Viewer capabilities plus resource ownership.
+Decision: Protect the dashboard with Clerk end to end. The Next.js web app uses `@clerk/nextjs` for sign-in, sign-up, session middleware, user menu, and organization switching. The web app sends Clerk session bearer tokens to the NestJS API. The API verifies those tokens server-side, resolves the Clerk user and active organization to a Firmcode workspace membership, and then enforces the simplified Admin/Developer role model plus resource ownership.
 
 Rationale:
 

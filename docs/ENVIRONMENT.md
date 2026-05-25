@@ -154,9 +154,9 @@ Keep `APP_URL=https://firmcode.firmoncloud.com` on the API service and `NEXT_PUB
 | `CODEBASE_SCAN_LLM_ENABLED` | no | Enables optional LLM recommendations from redacted deterministic scan evidence. Defaults to `false`. |
 | `CODEBASE_SCAN_LLM_MODEL` | no | Model name for optional codebase scan LLM recommendations. Defaults to `LLM_REVIEW_MODEL` when set. |
 
-Repository-level dashboard configuration is persisted in PostgreSQL separately from environment defaults. Owners/Admins can fetch and update repository automation and review policy fields through the dashboard API; updates are workspace-scoped, preserve unspecified fields, and record update timestamps plus the Clerk user ID that made the change.
+Repository-level dashboard configuration is persisted in PostgreSQL separately from environment defaults. Developers and Admins can fetch and update repository automation and review policy fields through the dashboard API; updates are workspace-scoped, preserve unspecified fields, and record update timestamps plus the Clerk user ID that made the change.
 
-Workspace and repository Rules / Policies settings are also persisted in PostgreSQL through `GET /api/rules` and `PATCH /api/rules`. These policies cover review preferences, comment limits and severity thresholds, category enablement, prompt instructions, ignored paths, generated-file patterns, Semgrep settings, Tree-sitter/LLM/CI toggles, and infrastructure/security toggles. Policy mutations require Owner/Admin membership; prompt instructions that look like secrets or tokens are rejected rather than stored.
+Workspace and repository Rules / Policies settings are also persisted in PostgreSQL through `GET /api/rules` and `PATCH /api/rules`. These policies cover review preferences, comment limits and severity thresholds, category enablement, prompt instructions, ignored paths, generated-file patterns, Semgrep settings, Tree-sitter/LLM/CI toggles, and infrastructure/security toggles. Repository-level policy mutations are available to Developers and Admins; global workspace/billing/retention policy mutations require Admin. Prompt instructions that look like secrets or tokens are rejected rather than stored.
 
 ## Semgrep
 

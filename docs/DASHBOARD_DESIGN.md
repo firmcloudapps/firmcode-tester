@@ -2,7 +2,7 @@
 
 Firmcode's dashboard should feel like a clean, modern, light-mode code review SaaS product: calm, precise, fast to scan, and built for repeated engineering workflows. It should feel closer to a polished developer operations console than a marketing site.
 
-Firmcode is a CodeRabbit-style SaaS product. The dashboard must serve real multi-user workspaces: account setup, required GitHub OAuth, GitHub App installation, member management, billing, role-aware settings, and tenant-safe operational views are part of the product, not optional admin extras.
+Firmcode is a CodeRabbit-style SaaS product. The dashboard must serve real SaaS customers with a developer-first workflow: account setup, required GitHub OAuth, GitHub App installation, repository automation, report analysis, billing, and tenant-safe operational views are part of the product, not optional admin extras.
 
 Copy-ready prompts for implementing and QAing the dashboard live in `docs/DASHBOARD_PROMPTS.md`.
 
@@ -13,7 +13,7 @@ Copy-ready prompts for implementing and QAing the dashboard live in `docs/DASHBO
 - Authentication: Clerk.
 - Billing: Clerk Billing.
 - Database: NeonDB PostgreSQL.
-- UI posture: light mode first, responsive, dense but breathable.
+- UI posture: developer dashboard first, responsive, dense but breathable.
 
 ## Visual Direction
 
@@ -28,7 +28,7 @@ Copy-ready prompts for implementing and QAing the dashboard live in `docs/DASHBO
 
 ### Palette
 
-Use a neutral light shell with restrained accent color.
+Use a neutral shell with restrained accent color. The default design remains light-mode for the MVP, but the PR Review workspace may use a darker developer-console variant if implemented consistently across the dashboard, similar to the attached reference: dark sidebar, compact cards, strong active nav state, and high-contrast status pills.
 
 - App background: `#F8FAFC`
 - Surface: `#FFFFFF`
@@ -105,7 +105,7 @@ Left Sidebar
 
 ### Reference-Informed PR Review Workspace
 
-The PR Review page should learn from developer tools that put setup status and repo automation in one focused workspace. Do not copy the reference UI directly; use the structure in Firmcode's light, full-width brand system.
+The PR Review page should learn from developer tools that put setup status and repo automation in one focused workspace. The attached Planarc reference is the right product shape: a left navigation rail, a focused PR Review page, provider tabs, GitHub OAuth/App setup cards, repository rows, enabled toggles, run controls, and pricing/settings access. Do not copy the brand directly; adapt the structure into Firmcode's system.
 
 Recommended layout:
 
@@ -138,7 +138,7 @@ Behavior notes:
 
 - GitHub is the only active provider in the MVP. Other providers should appear only as disabled planned states if shown at all.
 - Connection cards should separate required user/account OAuth connection from GitHub App installation status.
-- Every signed-in Firmcode user must connect GitHub OAuth before using GitHub-backed workflows. Owners/Admins can then install or manage the GitHub App for repository access; Developers/Viewers see installation status and Owner/Admin-required management states.
+- Every signed-in Firmcode user must connect GitHub OAuth before using GitHub-backed workflows. Developers can add GitHub accounts/repositories, enable automation, run reviews, and track report analysis. Admins can additionally manage billing, member access, global workspace settings, and support/safety controls.
 - PR reviews, repository sync, and PR publishing must use GitHub App installation tokens, not individual users' OAuth tokens.
 - Repository rows should make automation state obvious: Ready, Needs setup, Enabled, Disabled, Last reviewed, Failed, or Running.
 - Run/retry controls must respect role capabilities and duplicate-click protection.
@@ -159,6 +159,37 @@ Clerk should own:
 The Next.js app should wrap the dashboard in a Clerk provider boundary. Until `@clerk/nextjs` is installed, the boundary remains a no-op scaffold so the rest of the dashboard can compile while the environment and route contracts are tested.
 
 For the complete MVP, the no-op boundary must be replaced by a real `ClerkProvider`, Clerk middleware, sign-in/sign-up pages, `UserButton`, and `OrganizationSwitcher` where enabled. Dashboard pages and route handlers must be inaccessible without a Clerk session. The web app must call the API with a Clerk bearer token; static env-based user/workspace headers are a test-only scaffold and do not satisfy the dashboard authentication requirement.
+
+## Authentication Page Design
+
+The sign-in and sign-up pages are product surfaces, not marketing landing pages. They should use a dedicated unauthenticated shell instead of the dashboard shell.
+
+Recommended layout:
+
+```text
+Desktop
+├── Left context rail
+│   ├── Firmcode wordmark
+│   ├── Short product line
+│   └── Compact setup/security cues
+└── Auth panel
+    └── Clerk SignIn or SignUp component
+
+Mobile
+└── Stacked auth panel with compact wordmark above it
+```
+
+Design requirements:
+
+- Use the same light-mode tokens as the dashboard: `bg-shell`, `bg-surface`, `border`, `text-primary`, `text-secondary`, and `accent`.
+- Keep the auth panel constrained to roughly 400-460px wide.
+- Use 6-8px radius on custom containers and configure Clerk component appearance to match the dashboard controls.
+- Keep copy short and operational: users are signing into a PR review workspace, not reading a sales page.
+- Include links between sign-in and sign-up through Clerk's built-in routing.
+- Include a safe loading/skeleton state if Clerk is still mounting.
+- Show Clerk-managed errors in the panel without custom secret-revealing text.
+- Avoid decorative gradient blobs, oversized hero treatment, stock imagery, or a split marketing hero.
+- The pages must be responsive, keyboard-accessible, and visually checked at mobile and desktop sizes.
 
 Firmcode should store Clerk-linked metadata:
 

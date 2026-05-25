@@ -32,7 +32,7 @@ Symptoms:
 
 - Signed-in users can authenticate but receive `403`.
 - Signed-in users see an empty or wrong workspace.
-- Owner/Admin controls are disabled for an expected admin.
+- Admin controls are disabled for an expected admin.
 - A user cannot connect GitHub OAuth because no workspace membership resolves.
 
 Check:
@@ -235,7 +235,7 @@ Check:
 Action:
 
 - Run a manual scan against the current default branch.
-- Owners/Admins may mark known stale items resolved from the Findings inbox.
+- Developers and Admins may mark known stale items resolved from the Findings inbox where workspace policy allows it.
 - If stale resolution repeatedly misses findings, inspect dedupe key generation before bulk-updating rows.
 
 ## Codebase Scan Retention Cleanup

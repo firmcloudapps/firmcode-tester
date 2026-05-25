@@ -63,14 +63,13 @@ The MVP must ship with real Clerk-backed authentication before any dashboard dat
   - Map Clerk organization memberships to `workspace_memberships`.
   - Prefer explicit Firmcode role metadata when configured.
   - Fallback role mapping:
-    - Clerk organization admin/owner -> `admin`, with the workspace creator or explicit metadata owner mapped to `owner`.
+    - Clerk organization admin/owner -> `admin`.
     - Clerk member -> `developer`.
-    - Explicit read-only metadata -> `viewer`.
 - Clerk Organizations disabled:
   - Create one personal workspace per Clerk user.
-  - The owning user is `owner`.
+  - The owning user is `developer` by default unless an internal seed or support flow explicitly grants `admin`.
 - Sync membership from Clerk webhooks and also repair/ensure the active workspace on authenticated requests so first login does not require manual seed data.
-- Persist role changes with `updated_at` and write audit events for elevated role changes.
+- Persist role changes with `updated_at` and write audit events for admin grants or removals.
 
 ### Authenticated Request Flow
 
@@ -82,7 +81,7 @@ Browser
   -> Next.js sends Authorization: Bearer <Clerk token> to API
   -> NestJS Clerk guard verifies token
   -> Workspace resolver maps Clerk user/org to Firmcode workspace
-  -> Capability guard checks Owner/Admin/Developer/Viewer permissions
+  -> Capability guard checks Admin/Developer permissions
   -> Controller/service checks resource ownership by workspace_id
   -> Response contains only tenant-scoped, role-allowed data
 ```
@@ -113,6 +112,13 @@ If Clerk Organizations are enabled, a Clerk organization maps to one Firmcode wo
 
 The workspace is the tenant boundary. Every application row that contains customer data or customer configuration should either belong directly to a workspace or be reachable only through a workspace-owned parent.
 
+Firmcode uses a deliberately small SaaS role model for the MVP:
+
+- `admin`
+- `developer`
+
+Do not introduce Owner, Viewer, maintainer, auditor, or custom workspace roles for MVP unless the product requirements change. Extra roles create billing, support, and authorization branches that are not needed for the initial revenue-focused developer dashboard.
+
 ## Account Management Requirements
 
 Every SaaS workspace must provide or link to:
@@ -120,10 +126,10 @@ Every SaaS workspace must provide or link to:
 - Clerk sign-up and sign-in.
 - Clerk user profile management.
 - Workspace or organization switching.
-- Member invitation/removal/role management through Clerk where available.
+- Member invitation/removal through Clerk where available.
 - Billing checkout, subscription management, and customer portal through Clerk Billing.
 - Required GitHub OAuth connection for each user.
-- GitHub App installation management for Owners/Admins.
+- GitHub App installation and repository management.
 - Workspace settings for notifications, retention, API keys or disabled API-key state, review policy configuration, and codebase scan cadence.
 - Clear disabled states when a feature is unavailable in the MVP.
 
@@ -131,19 +137,16 @@ Every SaaS workspace must provide or link to:
 
 | Role | Capabilities |
 | --- | --- |
-| Owner | Full access, billing, deletion, GitHub installation management. |
-| Admin | Repository settings, review policies, retries, member management where Clerk allows. |
-| Developer | View runs/findings, retry failed runs, trigger manual scans where policy allows, inspect artifacts. |
-| Viewer | Read-only dashboard access. |
+| Admin | Platform/workspace administration: manage billing, plans, members where Clerk allows, workspace settings, retention, API keys, global policies, support/debug access, and safety overrides. Admins can also do everything Developers can do. |
+| Developer | Primary customer role: connect GitHub OAuth, install/connect GitHub App where plan allows, add/sync repositories, enable PR review automation, run/retry reviews, trigger scans, configure repository-level review settings, and view reports, findings, CI failure analysis, and redacted artifacts for their workspace. |
 
 ## Permission Rules
 
-- Only Owners/Admins can connect or disconnect GitHub installations.
-- Only Owners/Admins can enable/disable repository automation.
-- Only Owners/Admins can edit review policies, prompt instructions, retention, and ignored paths.
-- Developers can retry failed review runs unless workspace policy disables this.
-- Viewers cannot view raw artifacts unless explicitly permitted.
-- Billing requires Owner or Clerk-managed billing role.
+- Admins can manage billing, plans, member access where Clerk allows, data retention, API keys, global workspace policies, and destructive workspace actions.
+- Developers can connect GitHub OAuth, install/connect GitHub App for their workspace where plan allows, add/sync repositories, enable/disable repository automation, edit repository-level review settings, retry failed review runs, trigger manual scans, and view report analysis.
+- Global workspace policy changes that affect billing, retention, API keys, or all repositories require Admin.
+- Raw artifact access is allowed for Admin and can be allowed for Developer only through a redacted artifact flow. Plain raw logs, private diffs, and tokens must not be exposed by default.
+- Billing requires Admin or a verified Clerk-managed billing capability.
 - Billing UI routes users to the Clerk-managed subscription portal. Firmcode should only cache billing status or usage counters needed for authorization and display; Clerk remains the source of truth for plans, seats, checkout, and subscription management.
 
 ## GitHub OAuth Requirement
@@ -151,7 +154,7 @@ Every SaaS workspace must provide or link to:
 - Every signed-in Firmcode user must connect a GitHub OAuth account before using GitHub-backed dashboard workflows.
 - OAuth identifies the user, supports GitHub username/audit display, and can be used for organization membership checks.
 - OAuth does not grant repository review execution by itself. Review, sync, webhook handling, and PR comment publishing must use GitHub App installation tokens.
-- Owners/Admins can install or manage GitHub App installations after connecting OAuth. Developers/Viewers connect OAuth but cannot install, disconnect, or rescope GitHub App installations unless their workspace role changes.
+- Developers can connect GitHub OAuth and add GitHub repositories through the app setup flow. Admins can also manage workspace-wide installation, billing, member, and policy controls.
 
 ## GitHub Installation Mapping
 
@@ -177,10 +180,10 @@ Production dashboard APIs must not accept caller identity from `x-firmcode-user-
 - Dashboard API requests without a valid Clerk token return `401`.
 - A valid Clerk user can access only resources owned by their resolved workspace.
 - Cross-workspace repository, review run, finding, CI failure, artifact, billing, settings, and policy requests are denied.
-- Owner/Admin/Developer/Viewer capabilities match the role table in this document.
-- Billing management requires Owner/Admin or a verified Clerk Billing capability.
+- Admin/Developer capabilities match the role table in this document.
+- Billing management requires Admin or a verified Clerk Billing capability.
 - GitHub OAuth cannot start or complete without a signed-in Clerk user and workspace membership.
-- GitHub App installation management requires a connected GitHub OAuth account plus Owner/Admin role.
+- GitHub App installation and repository connection require a connected GitHub OAuth account and an active Admin or Developer workspace membership, subject to plan limits.
 - Raw artifact access is role-gated and audited.
 - Tests cover sign-in route protection, API token verification, workspace resolution, role denial, cross-workspace denial, and spoofed-header rejection.
 

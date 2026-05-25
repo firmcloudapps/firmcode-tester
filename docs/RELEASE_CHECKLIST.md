@@ -65,14 +65,14 @@ Use this checklist before deploying or enabling real GitHub publishing.
 - Direct API calls without a token return `401`.
 - Expired/invalid Clerk tokens return `401`.
 - Spoofed user/workspace headers cannot impersonate another user.
-- Owner/Admin/Developer/Viewer role gates match `docs/AUTHORIZATION.md`.
+- Admin/Developer role gates match `docs/AUTHORIZATION.md`.
 - Cross-workspace repository, review run, finding, artifact, settings, billing, GitHub OAuth, and policy access is denied.
 - Billing portal link works.
-- Billing management is limited to Owner/Admin or verified Clerk Billing capability.
+- Billing management is limited to Admin or verified Clerk Billing capability.
 - Unauthorized users cannot access dashboard data.
 - Vercel dashboard can call Coolify API with Clerk-authenticated requests.
 - GitHub OAuth connect flow requires a signed-in Clerk user.
-- GitHub App install/sync management requires GitHub OAuth plus Owner/Admin role.
+- GitHub App install/sync management requires GitHub OAuth plus active Admin or Developer membership and plan allowance.
 
 ## Review Pipeline
 
