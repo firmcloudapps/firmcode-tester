@@ -1,5 +1,6 @@
 # Task 11.5: Dashboard And Operations For Codebase Scans
 
+Ensure you read the existing code on this task before you make any change
 Relevant planning docs: docs/TASKS.md Task 11.5, docs/PRD.md sections 6, 10, and 16, docs/DASHBOARD_DESIGN.md, docs/DASHBOARD_PROMPTS.md, docs/AUTHORIZATION.md, docs/OPERATIONS_RUNBOOK.md, docs/PRIVACY_RETENTION.md.
 Code context requirement: Before implementing, inspect repository list/detail UI, findings inbox, review run detail, rules/policies UI, dashboard API stores, authorization helpers, and existing component/API tests.
 
