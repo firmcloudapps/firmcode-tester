@@ -1,4 +1,4 @@
-import { BadRequestException, Controller, Get, Headers, Inject, NotFoundException, Query, UnauthorizedException, UseGuards } from "@nestjs/common";
+import { BadRequestException, Controller, Get, Inject, Query, UseGuards } from "@nestjs/common";
 import {
   FINDING_INBOX_SOURCES,
   REVIEW_FINDING_CATEGORIES,
@@ -7,10 +7,15 @@ import {
   type FindingsListFilters,
   type FindingsListResponse
 } from "@firmcode/shared";
+import {
+  DashboardAuth,
+  hasDashboardCapability,
+  resolveDashboardMembership,
+  type DashboardAuthParam
+} from "../auth/dashboard-auth.context";
 import { DashboardAuthGuard } from "../auth/dashboard-auth.guard";
 import {
   DASHBOARD_AUTH_STORE,
-  roleHasDashboardCapability,
   type DashboardAuthStore
 } from "./dashboard-auth.store";
 import { FINDINGS_STORE, type FindingsStore } from "./findings.store";
@@ -26,27 +31,27 @@ export class FindingsController {
   @Get()
   async listFindings(
     @Query() query: Record<string, string | string[] | undefined>,
-    @Headers("x-firmcode-workspace-id") workspaceIdHeader: string | string[] | undefined,
-    @Headers("x-firmcode-user-id") userIdHeader: string | string[] | undefined
+    @DashboardAuth() auth: DashboardAuthParam,
+    userIdHeader?: string | string[]
   ): Promise<FindingsListResponse> {
-    const workspaceId = readSingleValue(workspaceIdHeader) ?? null;
-    const clerkUserId = readSingleValue(userIdHeader) ?? null;
-
-    if (workspaceId === null || clerkUserId === null) {
-      throw new UnauthorizedException("Dashboard authentication is required");
-    }
-
-    assertUuid("workspace ID", workspaceId);
-    const membership = await this.dashboardAuthStore.findActiveMembership({ workspaceId, clerkUserId });
-
-    if (membership === null) {
-      throw new NotFoundException("Findings not found");
-    }
+    const membership = await resolveDashboardMembership(auth, userIdHeader, this.dashboardAuthStore, "Findings not found");
+    assertUuid("workspace ID", membership.workspaceId);
 
     return this.findingsStore.listFindings({
-      workspaceId,
+      workspaceId: membership.workspaceId,
       filters: parseFindingsListFilters(query),
-      canManageCodebaseFindings: roleHasDashboardCapability(membership.role, "manage_codebase_scan_findings")
+      canManageCodebaseFindings: hasDashboardCapability(
+        {
+          workspaceId: membership.workspaceId,
+          clerkUserId: membership.clerkUserId,
+          clerkOrgId: null,
+          sessionId: null,
+          role: membership.role,
+          capabilities: [],
+          clerkCapabilities: []
+        },
+        "manage_codebase_scan_findings"
+      )
     });
   }
 }

@@ -29,8 +29,10 @@ import type { DatabaseExecutor } from "../../infrastructure/database/migrations"
 
 export const REPOSITORIES_STORE = Symbol("REPOSITORIES_STORE");
 
+type RepositoryListLookup = DashboardRepositoryListFilters & { readonly workspaceId?: string };
+
 export interface RepositoriesStore {
-  listRepositories(filters: DashboardRepositoryListFilters): Promise<RepositoryListResponse>;
+  listRepositories(filters: RepositoryListLookup): Promise<RepositoryListResponse>;
   getRepositoryDetail(input: RepositoryDetailLookup): Promise<RepositoryDetailResponse | null>;
   listRepositoryActivity(input: RepositoryActivityLookup): Promise<RepositoryActivityResponse | null>;
   getRepositoryConfiguration(input: RepositoryConfigurationLookup): Promise<RepositoryReviewConfiguration | null>;
@@ -234,7 +236,7 @@ interface RepositoryCodebaseFindingRow {
 }
 
 export class EmptyRepositoriesStore implements RepositoriesStore {
-  async listRepositories(filters: DashboardRepositoryListFilters): Promise<RepositoryListResponse> {
+  async listRepositories(filters: RepositoryListLookup): Promise<RepositoryListResponse> {
     return { repositories: [], filters };
   }
 
@@ -258,7 +260,7 @@ export class EmptyRepositoriesStore implements RepositoriesStore {
 export class PostgresRepositoriesStore implements RepositoriesStore {
   constructor(private readonly database: DatabaseExecutor) {}
 
-  async listRepositories(filters: DashboardRepositoryListFilters): Promise<RepositoryListResponse> {
+  async listRepositories(filters: RepositoryListLookup): Promise<RepositoryListResponse> {
     const { whereSql, values } = buildRepositoryWhereClause(filters);
     const result = await this.database.query<RepositoryListRow>(
       `
@@ -272,6 +274,7 @@ SELECT
   r.enabled,
   r.updated_at
 FROM repositories r
+JOIN github_installations gi ON gi.id = r.installation_id
 ${whereSql}
 ORDER BY r.full_name ASC
 LIMIT 100
@@ -1016,9 +1019,14 @@ RETURNING *
   }
 }
 
-function buildRepositoryWhereClause(filters: DashboardRepositoryListFilters): { whereSql: string; values: unknown[] } {
+function buildRepositoryWhereClause(filters: RepositoryListLookup): { whereSql: string; values: unknown[] } {
   const conditions: string[] = [];
   const values: unknown[] = [];
+
+  if (filters.workspaceId !== undefined) {
+    values.push(filters.workspaceId);
+    conditions.push(`gi.workspace_id = $${values.length}`);
+  }
 
   if (filters.enabled !== undefined) {
     values.push(filters.enabled);

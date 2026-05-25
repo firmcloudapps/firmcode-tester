@@ -3,7 +3,11 @@ import {
   CLERK_TOKEN_VERIFIER,
   type ClerkTokenVerifier
 } from "./clerk-token-verifier";
-import type { DashboardAuthenticatedRequest, DashboardRequestContext } from "./dashboard-auth.context";
+import {
+  deriveDashboardCapabilities,
+  type DashboardAuthenticatedRequest,
+  type DashboardRequestContext
+} from "./dashboard-auth.context";
 import {
   DASHBOARD_WORKSPACE_RESOLVER,
   type DashboardWorkspaceResolver
@@ -11,7 +15,6 @@ import {
 
 const WORKSPACE_HEADER = "x-firmcode-workspace-id";
 const USER_HEADER = "x-firmcode-user-id";
-const BILLING_CAPABILITY_HEADER = "x-firmcode-clerk-billing-capability";
 
 @Injectable()
 export class DashboardAuthGuard implements CanActivate {
@@ -46,16 +49,11 @@ export class DashboardAuthGuard implements CanActivate {
       sessionId: workspace.sessionId,
       workspaceId: workspace.workspaceId,
       role: workspace.role,
-      capabilities: workspace.billingCapabilities
+      capabilities: deriveDashboardCapabilities(workspace.role, workspace.billingCapabilities),
+      clerkCapabilities: workspace.billingCapabilities
     };
 
     request.dashboardAuth = requestContext;
-    request.headers[WORKSPACE_HEADER] = workspace.workspaceId;
-    request.headers[USER_HEADER] = workspace.clerkUserId;
-
-    if (workspace.billingCapabilities.some((capability) => isBillingCapability(capability))) {
-      request.headers[BILLING_CAPABILITY_HEADER] = "manage_billing";
-    }
 
     return true;
   }
@@ -85,8 +83,4 @@ function readBearerToken(value: string | null): string | null {
 
   const match = /^Bearer\s+(.+)$/i.exec(value);
   return match?.[1] ?? null;
-}
-
-function isBillingCapability(value: string): boolean {
-  return ["manage_billing", "billing_admin", "org:billing:manage", "true"].includes(value);
 }

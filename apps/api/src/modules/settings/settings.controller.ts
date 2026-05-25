@@ -1,5 +1,11 @@
-import { Body, Controller, Get, Headers, Patch, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Patch, Post, UseGuards } from "@nestjs/common";
 import type { WorkspaceSettingsResponse } from "@firmcode/shared";
+import {
+  DashboardAuth,
+  toDashboardServiceAuth,
+  type DashboardAuthParam,
+  type DashboardRequestContext
+} from "../auth/dashboard-auth.context";
 import { DashboardAuthGuard } from "../auth/dashboard-auth.guard";
 import { SettingsService } from "./settings.service";
 
@@ -10,24 +16,22 @@ export class SettingsController {
 
   @Get()
   async getWorkspaceSettings(
-    @Headers("x-firmcode-workspace-id") workspaceIdHeader: string | string[] | undefined,
-    @Headers("x-firmcode-user-id") userIdHeader: string | string[] | undefined
+    @DashboardAuth() auth: DashboardAuthParam,
+    userIdHeader?: string | string[]
   ): Promise<WorkspaceSettingsResponse> {
     return this.settingsService.getWorkspaceSettings({
-      workspaceId: readSingleValue(workspaceIdHeader) ?? null,
-      clerkUserId: readSingleValue(userIdHeader) ?? null
+      ...readServiceAuth(auth, userIdHeader)
     });
   }
 
   @Patch("retention")
   async updateRetentionPolicy(
     @Body() body: unknown,
-    @Headers("x-firmcode-workspace-id") workspaceIdHeader: string | string[] | undefined,
-    @Headers("x-firmcode-user-id") userIdHeader: string | string[] | undefined
+    @DashboardAuth() auth: DashboardAuthParam,
+    userIdHeader?: string | string[]
   ): Promise<never> {
     return this.settingsService.updateRetentionPolicy({
-      workspaceId: readSingleValue(workspaceIdHeader) ?? null,
-      clerkUserId: readSingleValue(userIdHeader) ?? null,
+      ...readServiceAuth(auth, userIdHeader),
       body
     });
   }
@@ -35,15 +39,25 @@ export class SettingsController {
   @Post("api-keys")
   async createApiKey(
     @Body() body: unknown,
-    @Headers("x-firmcode-workspace-id") workspaceIdHeader: string | string[] | undefined,
-    @Headers("x-firmcode-user-id") userIdHeader: string | string[] | undefined
+    @DashboardAuth() auth: DashboardAuthParam,
+    userIdHeader?: string | string[]
   ): Promise<never> {
     return this.settingsService.createApiKey({
-      workspaceId: readSingleValue(workspaceIdHeader) ?? null,
-      clerkUserId: readSingleValue(userIdHeader) ?? null,
+      ...readServiceAuth(auth, userIdHeader),
       body
     });
   }
+}
+
+function readServiceAuth(auth: DashboardAuthParam, userIdHeader: string | string[] | undefined) {
+  if (typeof auth === "object" && auth !== null && !Array.isArray(auth) && "workspaceId" in auth) {
+    return toDashboardServiceAuth(auth as DashboardRequestContext);
+  }
+
+  return {
+    workspaceId: readSingleValue(auth) ?? null,
+    clerkUserId: readSingleValue(userIdHeader) ?? null
+  };
 }
 
 function readSingleValue(value: string | string[] | undefined): string | undefined {

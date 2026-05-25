@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, Param, Post, Query, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Param, Post, Query, UseGuards } from "@nestjs/common";
 import type {
   GitHubInstallationListResponse,
   GitHubInstallationSyncResponse,
@@ -6,6 +6,12 @@ import type {
   GitHubOAuthStatusResponse,
   GitHubRepositorySyncResponse
 } from "@firmcode/shared";
+import {
+  DashboardAuth,
+  toDashboardServiceAuth,
+  type DashboardAuthParam,
+  type DashboardRequestContext
+} from "../auth/dashboard-auth.context";
 import { DashboardAuthGuard } from "../auth/dashboard-auth.guard";
 import { GitHubDashboardService } from "./github.service";
 
@@ -16,12 +22,11 @@ export class GitHubDashboardController {
 
   @Get("auth/github")
   async startOAuth(
-    @Headers("x-firmcode-workspace-id") workspaceIdHeader: string | string[] | undefined,
-    @Headers("x-firmcode-user-id") userIdHeader: string | string[] | undefined
+    @DashboardAuth() auth: DashboardAuthParam,
+    userIdHeader?: string | string[]
   ): Promise<GitHubOAuthStartResponse> {
     return this.githubService.startOAuth({
-      workspaceId: readSingleValue(workspaceIdHeader) ?? null,
-      clerkUserId: readSingleValue(userIdHeader) ?? null
+      ...readServiceAuth(auth, userIdHeader)
     });
   }
 
@@ -29,12 +34,11 @@ export class GitHubDashboardController {
   async completeOAuth(
     @Query("code") code: string | string[] | undefined,
     @Query("state") state: string | string[] | undefined,
-    @Headers("x-firmcode-workspace-id") workspaceIdHeader: string | string[] | undefined,
-    @Headers("x-firmcode-user-id") userIdHeader: string | string[] | undefined
+    @DashboardAuth() auth: DashboardAuthParam,
+    userIdHeader?: string | string[]
   ): Promise<GitHubOAuthStatusResponse> {
     return this.githubService.completeOAuth({
-      workspaceId: readSingleValue(workspaceIdHeader) ?? null,
-      clerkUserId: readSingleValue(userIdHeader) ?? null,
+      ...readServiceAuth(auth, userIdHeader),
       code: readSingleValue(code) ?? null,
       state: readSingleValue(state) ?? null
     });
@@ -42,48 +46,44 @@ export class GitHubDashboardController {
 
   @Get("api/github/oauth/status")
   async getOAuthStatus(
-    @Headers("x-firmcode-workspace-id") workspaceIdHeader: string | string[] | undefined,
-    @Headers("x-firmcode-user-id") userIdHeader: string | string[] | undefined
+    @DashboardAuth() auth: DashboardAuthParam,
+    userIdHeader?: string | string[]
   ): Promise<GitHubOAuthStatusResponse> {
     return this.githubService.getOAuthStatus({
-      workspaceId: readSingleValue(workspaceIdHeader) ?? null,
-      clerkUserId: readSingleValue(userIdHeader) ?? null
+      ...readServiceAuth(auth, userIdHeader)
     });
   }
 
   @Get("github/installations/callback")
   async connectInstallation(
     @Query("installation_id") installationId: string | string[] | undefined,
-    @Headers("x-firmcode-workspace-id") workspaceIdHeader: string | string[] | undefined,
-    @Headers("x-firmcode-user-id") userIdHeader: string | string[] | undefined
+    @DashboardAuth() auth: DashboardAuthParam,
+    userIdHeader?: string | string[]
   ): Promise<GitHubInstallationSyncResponse> {
     return this.githubService.connectInstallation({
-      workspaceId: readSingleValue(workspaceIdHeader) ?? null,
-      clerkUserId: readSingleValue(userIdHeader) ?? null,
+      ...readServiceAuth(auth, userIdHeader),
       installationId: readSingleValue(installationId) ?? null
     });
   }
 
   @Get("api/github/installations")
   async listInstallations(
-    @Headers("x-firmcode-workspace-id") workspaceIdHeader: string | string[] | undefined,
-    @Headers("x-firmcode-user-id") userIdHeader: string | string[] | undefined
+    @DashboardAuth() auth: DashboardAuthParam,
+    userIdHeader?: string | string[]
   ): Promise<GitHubInstallationListResponse> {
     return this.githubService.listInstallations({
-      workspaceId: readSingleValue(workspaceIdHeader) ?? null,
-      clerkUserId: readSingleValue(userIdHeader) ?? null
+      ...readServiceAuth(auth, userIdHeader)
     });
   }
 
   @Post("api/github/installations/sync")
   async syncInstallations(
     @Body() body: unknown,
-    @Headers("x-firmcode-workspace-id") workspaceIdHeader: string | string[] | undefined,
-    @Headers("x-firmcode-user-id") userIdHeader: string | string[] | undefined
+    @DashboardAuth() auth: DashboardAuthParam,
+    userIdHeader?: string | string[]
   ): Promise<GitHubInstallationSyncResponse> {
     return this.githubService.syncInstallations({
-      workspaceId: readSingleValue(workspaceIdHeader) ?? null,
-      clerkUserId: readSingleValue(userIdHeader) ?? null,
+      ...readServiceAuth(auth, userIdHeader),
       body
     });
   }
@@ -91,24 +91,34 @@ export class GitHubDashboardController {
   @Post("api/github/repositories/:id/sync")
   async syncRepository(
     @Param("id") id: string,
-    @Headers("x-firmcode-workspace-id") workspaceIdHeader: string | string[] | undefined,
-    @Headers("x-firmcode-user-id") userIdHeader: string | string[] | undefined
+    @DashboardAuth() auth: DashboardAuthParam,
+    userIdHeader?: string | string[]
   ): Promise<GitHubRepositorySyncResponse> {
     return this.githubService.syncRepository({
       repositoryId: id,
-      workspaceId: readSingleValue(workspaceIdHeader) ?? null,
-      clerkUserId: readSingleValue(userIdHeader) ?? null
+      ...readServiceAuth(auth, userIdHeader)
     });
   }
 
   @Post("api/repositories/:id/sync")
   async syncDashboardRepository(
     @Param("id") id: string,
-    @Headers("x-firmcode-workspace-id") workspaceIdHeader: string | string[] | undefined,
-    @Headers("x-firmcode-user-id") userIdHeader: string | string[] | undefined
+    @DashboardAuth() auth: DashboardAuthParam,
+    userIdHeader?: string | string[]
   ): Promise<GitHubRepositorySyncResponse> {
-    return this.syncRepository(id, workspaceIdHeader, userIdHeader);
+    return this.syncRepository(id, auth, userIdHeader);
   }
+}
+
+function readServiceAuth(auth: DashboardAuthParam, userIdHeader: string | string[] | undefined) {
+  if (typeof auth === "object" && auth !== null && !Array.isArray(auth) && "workspaceId" in auth) {
+    return toDashboardServiceAuth(auth as DashboardRequestContext);
+  }
+
+  return {
+    workspaceId: readSingleValue(auth) ?? null,
+    clerkUserId: readSingleValue(userIdHeader) ?? null
+  };
 }
 
 function readSingleValue(value: string | string[] | undefined): string | undefined {

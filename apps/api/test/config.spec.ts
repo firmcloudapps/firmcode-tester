@@ -42,6 +42,16 @@ describe("API runtime config", () => {
     expect(config.codebaseScan.defaultCadenceHours).toBe(24);
   });
 
+  it("loads the configured Clerk JWT audience", () => {
+    const config = createApiRuntimeConfig({
+      ...VALID_ENV,
+      CLERK_JWT_AUDIENCE: "firmcode-api"
+    });
+
+    expect(config.clerk.secretKey).toBe("sk_test_example");
+    expect(config.clerk.jwtAudience).toBe("firmcode-api");
+  });
+
   it("accepts values copied with surrounding quotes from deployment UIs", () => {
     const config = createApiRuntimeConfig({
       ...VALID_ENV,
@@ -62,6 +72,12 @@ describe("API runtime config", () => {
 
   it("fails fast when Clerk, database, or GitHub variables are missing", () => {
     expect(() => createApiRuntimeConfig({ NODE_ENV: "development" })).toThrow(ConfigValidationError);
+  });
+
+  it("requires a Clerk secret key", () => {
+    const { CLERK_SECRET_KEY: _missingSecret, ...env } = VALID_ENV;
+
+    expect(() => createApiRuntimeConfig(env)).toThrow(/CLERK_SECRET_KEY is required/);
   });
 
   it("allows GitHub App config to be omitted in test environments", () => {

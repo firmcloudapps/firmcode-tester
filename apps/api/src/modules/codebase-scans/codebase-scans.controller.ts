@@ -4,7 +4,6 @@ import {
   Controller,
   ForbiddenException,
   Get,
-  Headers,
   Inject,
   NotFoundException,
   Param,
@@ -27,10 +26,15 @@ import {
   type CodebaseScanRunListResponse,
   type UpdateCodebaseScanFindingStatusRequest
 } from "@firmcode/shared";
+import {
+  DashboardAuth,
+  hasDashboardCapability,
+  resolveDashboardMembership,
+  type DashboardAuthParam
+} from "../auth/dashboard-auth.context";
 import { DashboardAuthGuard } from "../auth/dashboard-auth.guard";
 import {
   DASHBOARD_AUTH_STORE,
-  roleHasDashboardCapability,
   type DashboardAuthStore,
   type DashboardMembership
 } from "../review-runs/dashboard-auth.store";
@@ -48,11 +52,11 @@ export class CodebaseScansController {
   async listRepositoryScans(
     @Param("id") id: string,
     @Query() query: Record<string, string | string[] | undefined>,
-    @Headers("x-firmcode-workspace-id") workspaceIdHeader: string | string[] | undefined,
-    @Headers("x-firmcode-user-id") userIdHeader: string | string[] | undefined
+    @DashboardAuth() auth: DashboardAuthParam,
+    userIdHeader?: string | string[]
   ): Promise<CodebaseScanRunListResponse> {
     assertUuid("repository ID", id);
-    const membership = await this.requireMembership(workspaceIdHeader, userIdHeader, "Codebase scans not found");
+    const membership = await this.requireMembership(auth, userIdHeader, "Codebase scans not found");
     const response = await this.scanStore.listRepositoryScanRuns({
       repositoryId: id,
       workspaceId: membership.workspaceId,
@@ -69,15 +73,15 @@ export class CodebaseScansController {
   @Get("api/codebase-scans/:id")
   async getScanDetail(
     @Param("id") id: string,
-    @Headers("x-firmcode-workspace-id") workspaceIdHeader: string | string[] | undefined,
-    @Headers("x-firmcode-user-id") userIdHeader: string | string[] | undefined
+    @DashboardAuth() auth: DashboardAuthParam,
+    userIdHeader?: string | string[]
   ): Promise<CodebaseScanRunDetailResponse> {
     assertUuid("codebase scan ID", id);
-    const membership = await this.requireMembership(workspaceIdHeader, userIdHeader, "Codebase scan not found");
+    const membership = await this.requireMembership(auth, userIdHeader, "Codebase scan not found");
     const detail = await this.scanStore.getScanRunDetail({
       scanRunId: id,
       workspaceId: membership.workspaceId,
-      canManageCodebaseFindings: roleHasDashboardCapability(membership.role, "manage_codebase_scan_findings")
+      canManageCodebaseFindings: hasMembershipCapability(membership, "manage_codebase_scan_findings")
     });
 
     if (detail === null) {
@@ -90,16 +94,16 @@ export class CodebaseScansController {
   @Get("api/codebase-findings")
   async listCodebaseFindings(
     @Query() query: Record<string, string | string[] | undefined>,
-    @Headers("x-firmcode-workspace-id") workspaceIdHeader: string | string[] | undefined,
-    @Headers("x-firmcode-user-id") userIdHeader: string | string[] | undefined
+    @DashboardAuth() auth: DashboardAuthParam,
+    userIdHeader?: string | string[]
   ): Promise<CodebaseScanFindingListResponse> {
-    const membership = await this.requireMembership(workspaceIdHeader, userIdHeader, "Codebase findings not found");
+    const membership = await this.requireMembership(auth, userIdHeader, "Codebase findings not found");
     const filters = parseCodebaseFindingListFilters(query);
 
     return this.scanStore.listWorkspaceFindings({
       workspaceId: membership.workspaceId,
       filters,
-      canManageCodebaseFindings: roleHasDashboardCapability(membership.role, "manage_codebase_scan_findings")
+      canManageCodebaseFindings: hasMembershipCapability(membership, "manage_codebase_scan_findings")
     });
   }
 
@@ -107,13 +111,13 @@ export class CodebaseScansController {
   async updateCodebaseFindingStatus(
     @Param("id") id: string,
     @Body() body: unknown,
-    @Headers("x-firmcode-workspace-id") workspaceIdHeader: string | string[] | undefined,
-    @Headers("x-firmcode-user-id") userIdHeader: string | string[] | undefined
+    @DashboardAuth() auth: DashboardAuthParam,
+    userIdHeader?: string | string[]
   ) {
     assertUuid("codebase finding ID", id);
-    const membership = await this.requireMembership(workspaceIdHeader, userIdHeader, "Codebase finding not found");
+    const membership = await this.requireMembership(auth, userIdHeader, "Codebase finding not found");
 
-    if (!roleHasDashboardCapability(membership.role, "manage_codebase_scan_findings")) {
+    if (!hasMembershipCapability(membership, "manage_codebase_scan_findings")) {
       throw new ForbiddenException("Workspace role cannot update codebase scan findings");
     }
 
@@ -132,26 +136,32 @@ export class CodebaseScansController {
   }
 
   private async requireMembership(
-    workspaceIdHeader: string | string[] | undefined,
+    auth: DashboardAuthParam,
     userIdHeader: string | string[] | undefined,
     notFoundMessage: string
   ): Promise<DashboardMembership> {
-    const workspaceId = readSingleValue(workspaceIdHeader) ?? null;
-    const clerkUserId = readSingleValue(userIdHeader) ?? null;
-
-    if (workspaceId === null || clerkUserId === null) {
-      throw new UnauthorizedException("Dashboard authentication is required");
-    }
-
-    assertUuid("workspace ID", workspaceId);
-    const membership = await this.dashboardAuthStore.findActiveMembership({ workspaceId, clerkUserId });
-
-    if (membership === null) {
-      throw new NotFoundException(notFoundMessage);
-    }
-
+    const membership = await resolveDashboardMembership(auth, userIdHeader, this.dashboardAuthStore, notFoundMessage);
+    assertUuid("workspace ID", membership.workspaceId);
     return membership;
   }
+}
+
+function hasMembershipCapability(
+  membership: DashboardMembership,
+  capability: Parameters<typeof hasDashboardCapability>[1]
+): boolean {
+  return hasDashboardCapability(
+    {
+      workspaceId: membership.workspaceId,
+      clerkUserId: membership.clerkUserId,
+      clerkOrgId: null,
+      sessionId: null,
+      role: membership.role,
+      capabilities: [],
+      clerkCapabilities: []
+    },
+    capability
+  );
 }
 
 function parseScanRunListFilters(query: Record<string, string | string[] | undefined>): CodebaseScanRunListFilters {
