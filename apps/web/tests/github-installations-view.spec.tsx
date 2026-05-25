@@ -65,7 +65,7 @@ describe("GitHubInstallationsView", () => {
   it("renders connected installations", () => {
     const html = renderToString(
       <GitHubInstallationsView
-        state={{ status: "populated", data: syncData(ownerSettings, true) }}
+        state={{ status: "populated", data: syncData(developerSettings, true) }}
         installConfig={{
           status: "configured",
           installUrl: "https://github.com/apps/firmcode/installations/new",
@@ -83,7 +83,7 @@ describe("GitHubInstallationsView", () => {
   it("renders provider tabs and repository automation rows", () => {
     const html = renderToString(
       <GitHubInstallationsView
-        state={{ status: "populated", data: syncData(ownerSettings, true) }}
+        state={{ status: "populated", data: syncData(developerSettings, true) }}
         installConfig={{
           status: "configured",
           installUrl: "https://github.com/apps/firmcode/installations/new",
@@ -140,7 +140,7 @@ describe("GitHubInstallationsView", () => {
     expect(html).toContain('href="/github/installations"');
   });
 
-  it("renders unauthorized installation and sync states for read-only roles", () => {
+  it("renders unauthorized installation and sync states for non-MVP roles", () => {
     const html = renderToString(
       <GitHubInstallationsView
         state={{ status: "populated", data: syncData(viewerSettings, true) }}
@@ -152,8 +152,8 @@ describe("GitHubInstallationsView", () => {
       />
     );
 
-    expect(html).toContain("Owner or Admin required");
-    expect(html).toContain("Owner or Admin required to sync GitHub installations.");
+    expect(html).toContain("Developer or Admin required");
+    expect(html).toContain("Developer or Admin required to sync GitHub installations.");
     expect(html).not.toContain('href="https://github.com/apps/firmcode/installations/new"');
   });
 
@@ -176,13 +176,13 @@ describe("GitHubInstallationsView", () => {
   });
 });
 
-const ownerSettings: WorkspaceSettingsResponse = {
+const developerSettings: WorkspaceSettingsResponse = {
   workspace: {
     id: "00000000-0000-4000-8000-000000000101",
     name: "Firmcode",
     clerkOrgId: "org_firmcode",
-    role: "owner",
-    canManageSensitiveSettings: true
+    role: "developer",
+    canManageSensitiveSettings: false
   },
   clerk: {
     userProfileUrl: "/user-profile",
@@ -226,17 +226,17 @@ const ownerSettings: WorkspaceSettingsResponse = {
 };
 
 const emptySettings: WorkspaceSettingsResponse = {
-  ...ownerSettings,
+  ...developerSettings,
   githubApp: {
-    ...ownerSettings.githubApp,
+    ...developerSettings.githubApp,
     installations: []
   }
 };
 
 const viewerSettings: WorkspaceSettingsResponse = {
-  ...ownerSettings,
+  ...developerSettings,
   workspace: {
-    ...ownerSettings.workspace,
+    ...developerSettings.workspace,
     role: "viewer",
     canManageSensitiveSettings: false
   }

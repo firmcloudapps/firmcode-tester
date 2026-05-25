@@ -6,7 +6,7 @@ import { parseSettingsTab, SettingsView } from "../components/dashboard/settings
 
 describe("SettingsView", () => {
   it("renders every settings tab and marks the active tab", () => {
-    const html = renderToString(<SettingsView state={{ status: "populated", data: ownerSettings }} activeTab="data-retention" />);
+    const html = renderToString(<SettingsView state={{ status: "populated", data: adminSettings }} activeTab="data-retention" />);
 
     expect(html).toContain("General");
     expect(html).toContain("GitHub App");
@@ -35,12 +35,12 @@ describe("SettingsView", () => {
   });
 
   it("renders populated workspace, GitHub, retention, placeholder, and Clerk delegation content", () => {
-    const general = renderToString(<SettingsView state={{ status: "populated", data: ownerSettings }} activeTab="general" />);
-    const github = renderToString(<SettingsView state={{ status: "populated", data: ownerSettings }} activeTab="github-app" />);
-    const retention = renderToString(<SettingsView state={{ status: "populated", data: ownerSettings }} activeTab="data-retention" />);
-    const members = renderToString(<SettingsView state={{ status: "populated", data: ownerSettings }} activeTab="members" />);
-    const apiKeys = renderToString(<SettingsView state={{ status: "populated", data: ownerSettings }} activeTab="api-keys" />);
-    const notifications = renderToString(<SettingsView state={{ status: "populated", data: ownerSettings }} activeTab="notifications" />);
+    const general = renderToString(<SettingsView state={{ status: "populated", data: adminSettings }} activeTab="general" />);
+    const github = renderToString(<SettingsView state={{ status: "populated", data: adminSettings }} activeTab="github-app" />);
+    const retention = renderToString(<SettingsView state={{ status: "populated", data: adminSettings }} activeTab="data-retention" />);
+    const members = renderToString(<SettingsView state={{ status: "populated", data: adminSettings }} activeTab="members" />);
+    const apiKeys = renderToString(<SettingsView state={{ status: "populated", data: adminSettings }} activeTab="api-keys" />);
+    const notifications = renderToString(<SettingsView state={{ status: "populated", data: adminSettings }} activeTab="notifications" />);
 
     expect(general).toContain("Firmcode");
     expect(general).toContain("org_firmcode");
@@ -56,7 +56,7 @@ describe("SettingsView", () => {
   it("keeps settings behind the Clerk-authenticated shell scaffold", () => {
     const html = renderToString(
       <DashboardShell activeItem="Settings">
-        <SettingsView state={{ status: "populated", data: ownerSettings }} activeTab="general" />
+        <SettingsView state={{ status: "populated", data: adminSettings }} activeTab="general" />
       </DashboardShell>
     );
 
@@ -64,26 +64,26 @@ describe("SettingsView", () => {
     expect(html).toContain('href="/settings" aria-current="page"');
   });
 
-  it("enables sensitive entry points for owners and disables them for viewers", () => {
-    const ownerHtml = renderToString(<SettingsView state={{ status: "populated", data: ownerSettings }} activeTab="github-app" />);
-    const viewerHtml = renderToString(<SettingsView state={{ status: "populated", data: viewerSettings }} activeTab="github-app" />);
-    const viewerMembers = renderToString(<SettingsView state={{ status: "populated", data: viewerSettings }} activeTab="members" />);
+  it("enables GitHub setup for Developers while keeping Admin-only settings disabled", () => {
+    const adminHtml = renderToString(<SettingsView state={{ status: "populated", data: adminSettings }} activeTab="github-app" />);
+    const developerHtml = renderToString(<SettingsView state={{ status: "populated", data: developerSettings }} activeTab="github-app" />);
+    const developerMembers = renderToString(<SettingsView state={{ status: "populated", data: developerSettings }} activeTab="members" />);
 
-    expect(ownerHtml).toContain('href="/github/installations"');
-    expect(ownerHtml).toContain("Sensitive settings enabled");
-    expect(viewerHtml).toContain("Read-only sensitive settings");
-    expect(viewerHtml).toContain("disabled=\"\"");
-    expect(viewerMembers).toContain("Open Clerk members");
-    expect(viewerMembers).toContain("disabled=\"\"");
+    expect(adminHtml).toContain('href="/github/installations"');
+    expect(adminHtml).toContain("Sensitive settings enabled");
+    expect(developerHtml).toContain('href="/github/installations"');
+    expect(developerHtml).toContain("Read-only sensitive settings");
+    expect(developerMembers).toContain("Open Clerk members");
+    expect(developerMembers).toContain("disabled=\"\"");
   });
 });
 
-const ownerSettings: WorkspaceSettingsResponse = {
+const adminSettings: WorkspaceSettingsResponse = {
   workspace: {
     id: "00000000-0000-4000-8000-000000000101",
     name: "Firmcode",
     clerkOrgId: "org_firmcode",
-    role: "owner",
+    role: "admin",
     canManageSensitiveSettings: true
   },
   clerk: {
@@ -128,18 +128,18 @@ const ownerSettings: WorkspaceSettingsResponse = {
 };
 
 const emptySettings: WorkspaceSettingsResponse = {
-  ...ownerSettings,
+  ...adminSettings,
   githubApp: {
-    ...ownerSettings.githubApp,
+    ...adminSettings.githubApp,
     installations: []
   }
 };
 
-const viewerSettings: WorkspaceSettingsResponse = {
-  ...ownerSettings,
+const developerSettings: WorkspaceSettingsResponse = {
+  ...adminSettings,
   workspace: {
-    ...ownerSettings.workspace,
-    role: "viewer",
+    ...adminSettings.workspace,
+    role: "developer",
     canManageSensitiveSettings: false
   }
 };

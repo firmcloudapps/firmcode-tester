@@ -241,10 +241,10 @@ ORDER BY full_name
     expect(scanQueue.schedules).toHaveLength(0);
   });
 
-  it("denies role, cross-workspace, and missing installation sync attempts", async () => {
-    await expect(controller.syncInstallations({ installationId: 301 }, WORKSPACE_ID, DEVELOPER_USER_ID)).rejects.toThrow(
-      ForbiddenException
-    );
+  it("allows Developer installation sync and denies cross-workspace or missing installation sync attempts", async () => {
+    await expect(controller.syncInstallations({ installationId: 301 }, WORKSPACE_ID, DEVELOPER_USER_ID)).resolves.toMatchObject({
+      syncedRepositoryCount: 2
+    });
     await expect(controller.syncRepository(REPOSITORY_ID, WORKSPACE_ID, VIEWER_USER_ID)).rejects.toThrow(ForbiddenException);
     await expect(controller.syncRepository(OTHER_REPOSITORY_ID, WORKSPACE_ID, OWNER_USER_ID)).rejects.toThrow(
       NotFoundException

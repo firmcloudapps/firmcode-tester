@@ -347,7 +347,7 @@ function toArtifact(row: CiFailureArtifactRow, canAccessRawArtifacts: boolean): 
     storageKey: canAccessRawArtifacts ? row.storage_key : null,
     metadata: sanitizeArtifactMetadata(row.metadata_json),
     rawAccessAllowed: canAccessRawArtifacts,
-    rawAccessRequiredRole: "developer",
+    rawAccessRequiredRole: "admin",
     rawAccessUrl: canAccessRawArtifacts ? `/api/review-runs/${row.review_run_id}/artifacts/${row.artifact_id}/raw` : null,
     createdAt: toRequiredIsoString(row.artifact_created_at)
   };

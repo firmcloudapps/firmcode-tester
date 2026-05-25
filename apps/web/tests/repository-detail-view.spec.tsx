@@ -54,8 +54,8 @@ describe("RepositoryDetailView", () => {
     expect(html).toContain("High");
   });
 
-  it("renders editable configuration for owners and read-only configuration for lower roles", () => {
-    const ownerHtml = renderToString(
+  it("renders editable configuration for Developers and read-only configuration when denied", () => {
+    const developerHtml = renderToString(
       <RepositoryDetailView state={{ status: "populated", data: repositoryDetail }} activeTab="configuration" />
     );
     const viewerHtml = renderToString(
@@ -74,9 +74,9 @@ describe("RepositoryDetailView", () => {
       />
     );
 
-    expect(ownerHtml).toContain("Owner/Admin controls are enabled");
-    expect(ownerHtml).toContain('role="switch"');
-    expect(ownerHtml).toContain('name="severityThreshold"');
+    expect(developerHtml).toContain("Developer/Admin controls are enabled");
+    expect(developerHtml).toContain('role="switch"');
+    expect(developerHtml).toContain('name="severityThreshold"');
     expect(viewerHtml).toContain("Read-only configuration");
     expect(viewerHtml).toContain("disabled=\"\"");
   });

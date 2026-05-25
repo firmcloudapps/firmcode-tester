@@ -852,7 +852,7 @@ function toArtifact(row: ArtifactRow, canAccessRawArtifacts: boolean): ReviewRun
     storageKey: canAccessRawArtifacts ? row.storage_key : null,
     metadata: normalizeJsonObject(row.metadata_json),
     rawAccessAllowed: canAccessRawArtifacts,
-    rawAccessRequiredRole: "developer",
+    rawAccessRequiredRole: "admin",
     rawAccessUrl: canAccessRawArtifacts ? `/api/review-runs/${row.review_run_id}/artifacts/${row.id}/raw` : null,
     createdAt: toRequiredIsoString(row.created_at)
   };

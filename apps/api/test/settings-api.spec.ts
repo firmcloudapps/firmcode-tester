@@ -13,10 +13,8 @@ interface PgPoolLike {
 }
 
 const WORKSPACE_ID = "00000000-0000-4000-8000-000000000101";
-const OWNER_USER_ID = "user_owner";
 const ADMIN_USER_ID = "user_admin";
 const DEVELOPER_USER_ID = "user_developer";
-const VIEWER_USER_ID = "user_viewer";
 
 function createTestPool(): PgPoolLike {
   const db = newDb({ autoCreateForeignKeyIndices: true, noAstCoverageCheck: true });
@@ -43,14 +41,14 @@ describe("settings dashboard API", () => {
     await pool.end();
   });
 
-  it("returns workspace settings, GitHub installation mapping, and retention policy for an owner", async () => {
-    const settings = await controller.getWorkspaceSettings(WORKSPACE_ID, OWNER_USER_ID);
+  it("returns workspace settings, GitHub installation mapping, and retention policy for an Admin", async () => {
+    const settings = await controller.getWorkspaceSettings(WORKSPACE_ID, ADMIN_USER_ID);
 
     expect(settings.workspace).toMatchObject({
       id: WORKSPACE_ID,
       name: "Firmcode",
       clerkOrgId: "org_firmcode",
-      role: "owner",
+      role: "admin",
       canManageSensitiveSettings: true
     });
     expect(settings.githubApp.installations).toEqual([
@@ -70,17 +68,17 @@ describe("settings dashboard API", () => {
     expect(settings.notifications.enabled).toBe(false);
   });
 
-  it("allows lower roles to fetch read-only settings context without sensitive management capability", async () => {
-    const settings = await controller.getWorkspaceSettings(WORKSPACE_ID, VIEWER_USER_ID);
+  it("allows Developers to fetch read-only settings context without sensitive management capability", async () => {
+    const settings = await controller.getWorkspaceSettings(WORKSPACE_ID, DEVELOPER_USER_ID);
 
-    expect(settings.workspace.role).toBe("viewer");
+    expect(settings.workspace.role).toBe("developer");
     expect(settings.workspace.canManageSensitiveSettings).toBe(false);
     expect(settings.githubApp.installations[0]?.repositoryCount).toBe(2);
   });
 
-  it("requires Owner or Admin for sensitive settings mutations", async () => {
+  it("requires Admin for sensitive settings mutations", async () => {
     await expect(
-      controller.updateRetentionPolicy({ artifactRetentionDays: 14 }, WORKSPACE_ID, OWNER_USER_ID)
+      controller.updateRetentionPolicy({ artifactRetentionDays: 14 }, WORKSPACE_ID, ADMIN_USER_ID)
     ).rejects.toThrow(NotImplementedException);
     await expect(
       controller.createApiKey({ name: "local smoke" }, WORKSPACE_ID, ADMIN_USER_ID)
@@ -88,14 +86,11 @@ describe("settings dashboard API", () => {
     await expect(
       controller.updateRetentionPolicy({ artifactRetentionDays: 14 }, WORKSPACE_ID, DEVELOPER_USER_ID)
     ).rejects.toThrow(ForbiddenException);
-    await expect(controller.createApiKey({ name: "viewer key" }, WORKSPACE_ID, VIEWER_USER_ID)).rejects.toThrow(
-      ForbiddenException
-    );
   });
 
   it("requires the Clerk dashboard workspace and user headers", async () => {
     await expect(controller.getWorkspaceSettings(WORKSPACE_ID, undefined)).rejects.toThrow(UnauthorizedException);
-    await expect(controller.getWorkspaceSettings(undefined, OWNER_USER_ID)).rejects.toThrow(UnauthorizedException);
+    await expect(controller.getWorkspaceSettings(undefined, ADMIN_USER_ID)).rejects.toThrow(UnauthorizedException);
     await expect(controller.getWorkspaceSettings(WORKSPACE_ID, "user_missing")).rejects.toThrow(UnauthorizedException);
   });
 });
@@ -149,10 +144,8 @@ INSERT INTO workspaces (id, clerk_org_id, name) VALUES
 ('${WORKSPACE_ID}', 'org_firmcode', 'Firmcode');
 
 INSERT INTO workspace_memberships (workspace_id, clerk_user_id, role, active) VALUES
-('${WORKSPACE_ID}', '${OWNER_USER_ID}', 'owner', true),
 ('${WORKSPACE_ID}', '${ADMIN_USER_ID}', 'admin', true),
-('${WORKSPACE_ID}', '${DEVELOPER_USER_ID}', 'developer', true),
-('${WORKSPACE_ID}', '${VIEWER_USER_ID}', 'viewer', true);
+('${WORKSPACE_ID}', '${DEVELOPER_USER_ID}', 'developer', true);
 
 INSERT INTO github_installations (
   id,

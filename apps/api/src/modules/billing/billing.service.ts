@@ -38,7 +38,7 @@ export class BillingService {
       hasClerkBillingCapability: input.hasClerkBillingCapability
     });
 
-    if (membership.role !== "owner" && membership.role !== "admin" && membership.role !== "developer" && !canManage) {
+    if (!canManage) {
       throw new ForbiddenException("Workspace role cannot manage billing");
     }
 

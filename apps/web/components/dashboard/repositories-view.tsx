@@ -290,9 +290,9 @@ function toRepositoryControls(state: GitHubRepositoryControlsState | undefined):
 
   const { oauth, settings } = state.data;
   const hasInstallations = settings.githubApp.installations.length > 0;
-  const canManage = settings.workspace.canManageSensitiveSettings;
+  const canManage = canManageRepositoryConfiguration(settings.workspace.role);
   const canManageRepositories = oauth.connected && hasInstallations && canManageRepositoryConfiguration(settings.workspace.role);
-  const canTriggerScans = oauth.connected && hasInstallations && ["owner", "admin", "developer"].includes(settings.workspace.role);
+  const canTriggerScans = oauth.connected && hasInstallations && ["admin", "developer"].includes(settings.workspace.role);
 
   return {
     canConnectOAuth: !oauth.connected,
@@ -314,7 +314,7 @@ function headerSyncDisabledReason(input: { oauthConnected: boolean; canManage: b
   }
 
   if (!input.canManage) {
-    return "Owner or Admin required to sync GitHub installations.";
+    return "Developer or Admin required to sync GitHub installations.";
   }
 
   if (!input.hasInstallations) {
@@ -334,7 +334,7 @@ function rowDisabledReason(input: { oauthConnected: boolean; canManage: boolean;
   }
 
   if (!input.canManage) {
-    return "Owner or Admin required.";
+    return "Developer or Admin required.";
   }
 
   return undefined;

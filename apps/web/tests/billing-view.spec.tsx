@@ -62,7 +62,7 @@ describe("BillingView", () => {
 const billing: WorkspaceBillingResponse = {
   workspace: {
     id: "workspace-1",
-    role: "owner",
+    role: "admin",
     canManageBilling: true,
     source: "clerk"
   },

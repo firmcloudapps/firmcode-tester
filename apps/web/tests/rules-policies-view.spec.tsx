@@ -28,7 +28,7 @@ describe("RulesPoliciesView", () => {
     expect(html).toContain("Ignored Paths");
     expect(html).toContain("Semgrep And Analysis");
     expect(html).toContain("Infrastructure And Security");
-    expect(html).toContain("Owner/Admin editing");
+    expect(html).toContain("Admin editing");
     expect(html).toContain("No repository overrides");
     expect(html).toContain("No unsaved changes");
   });
