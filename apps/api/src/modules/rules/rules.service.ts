@@ -96,14 +96,23 @@ export class RulesService {
     return {
       ...rules,
       permissions: {
-        canManagePolicies: roleHasDashboardCapability(membership.role, "manage_review_policies")
+        canManagePolicies: canManagePolicyScope(membership.role, repositoryId)
       }
     };
   }
 
   async updateRules(input: RulesUpdateContext): Promise<RulesPolicyResponse> {
-    const membership = await this.authorize(input, { requireManagePolicies: true });
     const { repositoryId, updates } = parseReviewPolicyUpdate(input.body);
+    const membership = await this.authorize(input, { requireManagePolicies: false });
+
+    if (!canManagePolicyScope(membership.role, repositoryId)) {
+      throw new ForbiddenException(
+        repositoryId === null
+          ? "Workspace role cannot manage global review policies"
+          : "Workspace role cannot manage repository review policies"
+      );
+    }
+
     const updated = await this.rulesStore.updatePolicy({
       workspaceId: membership.workspaceId,
       repositoryId,
@@ -128,7 +137,7 @@ export class RulesService {
       ...rules,
       selectedRepositoryPolicy: repositoryId === null ? rules.selectedRepositoryPolicy : updated,
       permissions: {
-        canManagePolicies: true
+        canManagePolicies: canManagePolicyScope(membership.role, repositoryId)
       }
     };
   }
@@ -155,6 +164,17 @@ export class RulesService {
 
     return membership;
   }
+}
+
+function canManagePolicyScope(role: DashboardMembership["role"], repositoryId: string | null | undefined): boolean {
+  if (repositoryId === undefined || repositoryId === null) {
+    return roleHasDashboardCapability(role, "manage_review_policies");
+  }
+
+  return (
+    roleHasDashboardCapability(role, "manage_review_policies") ||
+    roleHasDashboardCapability(role, "manage_repository_configuration")
+  );
 }
 
 function parseReviewPolicyUpdate(body: unknown): { repositoryId: string | null; updates: ParsedReviewPolicyUpdate } {
