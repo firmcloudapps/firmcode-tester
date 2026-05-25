@@ -6,6 +6,7 @@ import {
   type ExecutionContext
 } from "@nestjs/common";
 import {
+  DASHBOARD_CAPABILITIES,
   hasClerkManagedBillingCapability,
   roleHasDashboardCapability,
   type DashboardAuthStore,
@@ -104,22 +105,11 @@ export function deriveDashboardCapabilities(
   clerkCapabilities: readonly string[]
 ): readonly DashboardCapability[] {
   const capabilities: DashboardCapability[] = [];
-  const allCapabilities: readonly DashboardCapability[] = [
-    "retry_review_run",
-    "trigger_codebase_scan",
-    "manage_codebase_scan_findings",
-    "manage_repository_configuration",
-    "manage_review_policies",
-    "manage_sensitive_settings",
-    "access_raw_artifacts",
-    "manage_billing",
-    "manage_github_installations"
-  ];
   const hasClerkBillingCapability = clerkCapabilities.some((capability) =>
     hasClerkManagedBillingCapability(capability)
   );
 
-  for (const capability of allCapabilities) {
+  for (const capability of DASHBOARD_CAPABILITIES) {
     if (roleHasDashboardCapability(role, capability, { hasClerkBillingCapability })) {
       capabilities.push(capability);
     }

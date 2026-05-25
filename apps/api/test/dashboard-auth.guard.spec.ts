@@ -1,4 +1,5 @@
 import { ForbiddenException, UnauthorizedException, type ExecutionContext } from "@nestjs/common";
+import type { DashboardAuthenticatedRequest } from "../src/modules/auth/dashboard-auth.context";
 import { DashboardAuthGuard } from "../src/modules/auth/dashboard-auth.guard";
 import type { ClerkTokenVerifier, VerifiedClerkToken } from "../src/modules/auth/clerk-token-verifier";
 import type {
@@ -34,6 +35,27 @@ describe("DashboardAuthGuard", () => {
     });
 
     await expect(guard.canActivate(createHttpContext({ authorization: "Bearer invalid" }))).rejects.toBeInstanceOf(
+      UnauthorizedException
+    );
+  });
+
+  it("rejects valid-looking tokens without a Clerk session", async () => {
+    const guard = createGuard({
+      verifier: {
+        async verify() {
+          return {
+            clerkUserId: "user_sessionless",
+            clerkOrgId: null,
+            sessionId: null,
+            orgRole: null,
+            firmcodeRole: null,
+            billingCapabilities: []
+          };
+        }
+      }
+    });
+
+    await expect(guard.canActivate(createHttpContext({ authorization: "Bearer sessionless" }))).rejects.toBeInstanceOf(
       UnauthorizedException
     );
   });
@@ -149,6 +171,72 @@ describe("DashboardAuthGuard", () => {
       )
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
+
+  it("rejects authenticated requests when no workspace can be resolved", async () => {
+    const guard = createGuard({
+      resolver: {
+        async resolve() {
+          throw new ForbiddenException("Workspace membership is required");
+        }
+      }
+    });
+
+    await expect(guard.canActivate(createHttpContext({ authorization: "Bearer personal-token" }))).rejects.toBeInstanceOf(
+      ForbiddenException
+    );
+  });
+
+  it("uses the verified Clerk subject even when a workspace selector header is present", async () => {
+    const request = createRequest({
+      authorization: "Bearer personal-token",
+      "x-firmcode-workspace-id": "00000000-0000-4000-8000-000000000404"
+    });
+    const resolverCalls: Array<{ clerkUserId: string; selectedWorkspaceId: string | null }> = [];
+    const guard = createGuard({
+      verifier: {
+        async verify() {
+          return {
+            clerkUserId: "user_verified",
+            clerkOrgId: null,
+            sessionId: "sess_verified",
+            orgRole: null,
+            firmcodeRole: null,
+            billingCapabilities: []
+          };
+        }
+      },
+      resolver: {
+        async resolve(input) {
+          resolverCalls.push({
+            clerkUserId: input.token.clerkUserId,
+            selectedWorkspaceId: input.selectedWorkspaceId
+          });
+
+          return {
+            workspaceId: input.selectedWorkspaceId ?? "00000000-0000-4000-8000-000000000101",
+            clerkUserId: input.token.clerkUserId,
+            clerkOrgId: null,
+            sessionId: input.token.sessionId,
+            role: "developer",
+            billingCapabilities: []
+          };
+        }
+      }
+    });
+
+    await expect(guard.canActivate(createHttpContext(request.headers, request))).resolves.toBe(true);
+
+    expect(resolverCalls).toEqual([
+      {
+        clerkUserId: "user_verified",
+        selectedWorkspaceId: "00000000-0000-4000-8000-000000000404"
+      }
+    ]);
+    expect(request.dashboardAuth).toMatchObject({
+      clerkUserId: "user_verified",
+      workspaceId: "00000000-0000-4000-8000-000000000404"
+    });
+  });
 });
 
 function createGuard(overrides: {
@@ -194,6 +282,6 @@ function createHttpContext(headers: Record<string, string | string[] | undefined
   } as unknown as ExecutionContext;
 }
 
-function createRequest(headers: Record<string, string | string[] | undefined>): { headers: Record<string, string | string[] | undefined> } {
+function createRequest(headers: Record<string, string | string[] | undefined>): DashboardAuthenticatedRequest {
   return { headers };
 }
