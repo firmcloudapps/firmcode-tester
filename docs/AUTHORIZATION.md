@@ -22,7 +22,7 @@ The MVP must ship with real Clerk-backed authentication before any dashboard dat
   - Use `OrganizationSwitcher` when Clerk Organizations are enabled.
   - Show the active Clerk organization or personal workspace name instead of static placeholder text.
   - Redirect unauthenticated users to `/sign-in`.
-- Replace `FIRMCODE_DASHBOARD_WORKSPACE_ID` and `FIRMCODE_DASHBOARD_CLERK_USER_ID` forwarding with Clerk server auth:
+- Replace environment-provided dashboard identity forwarding with Clerk server auth:
   - Server components and route handlers call Clerk `auth()`.
   - Route handlers obtain a Clerk session token with the configured API audience/template.
   - Calls from web to API include `Authorization: Bearer <clerk-session-token>`.
@@ -171,7 +171,7 @@ Every dashboard API should enforce workspace access by `workspace_id`. Do not tr
 
 Codebase scan run and finding APIs must enforce ownership through the scan run repository and GitHub installation workspace before exposing scan artifacts, unresolved repository findings, or review enrichment data.
 
-Production dashboard APIs must not accept caller identity from `x-firmcode-user-id`, `FIRMCODE_DASHBOARD_CLERK_USER_ID`, or any equivalent client-controlled value. Those values are allowed only in isolated tests or local seed workflows that are explicitly marked as bypassing production auth.
+Production dashboard APIs must not accept caller identity from `x-firmcode-user-id`, `FIRMCODE_DASHBOARD_CLERK_USER_ID`, or any equivalent client-controlled value. Isolated web tests may use `FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN` as a clearly named bearer-token fixture, but it must not be treated as production auth.
 
 ## Implementation Acceptance Criteria
 

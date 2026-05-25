@@ -14,20 +14,19 @@ import {
 
 describe("dashboard findings data loader", () => {
   const originalApiUrl = process.env.NEXT_PUBLIC_API_URL;
-  const originalWorkspaceId = process.env.FIRMCODE_DASHBOARD_WORKSPACE_ID;
-  const originalClerkUserId = process.env.FIRMCODE_DASHBOARD_CLERK_USER_ID;
-  const originalBillingCapability = process.env.FIRMCODE_DASHBOARD_CLERK_BILLING_CAPABILITY;
+  const originalTestWorkspaceId = process.env.FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID;
+  const originalTestToken = process.env.FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN;
 
   afterEach(() => {
     process.env.NEXT_PUBLIC_API_URL = originalApiUrl;
-    process.env.FIRMCODE_DASHBOARD_WORKSPACE_ID = originalWorkspaceId;
-    process.env.FIRMCODE_DASHBOARD_CLERK_USER_ID = originalClerkUserId;
-    process.env.FIRMCODE_DASHBOARD_CLERK_BILLING_CAPABILITY = originalBillingCapability;
+    restoreEnv("FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID", originalTestWorkspaceId);
+    restoreEnv("FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN", originalTestToken);
     vi.unstubAllGlobals();
   });
 
   it("maps every findings filter into the API query string", async () => {
     process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
+    process.env.FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN = "session-token";
     const fetcher = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => jsonResponse(findingsResponse));
 
     vi.stubGlobal("fetch", fetcher);
@@ -47,6 +46,8 @@ describe("dashboard findings data loader", () => {
     ).resolves.toMatchObject({ status: "populated" });
 
     const url = new URL(String(fetcher.mock.calls[0]?.[0]));
+    const init = fetcher.mock.calls[0]?.[1] as RequestInit;
+    const headers = new Headers(init.headers);
 
     expect(url.pathname).toBe("/api/findings");
     expect(url.searchParams.get("severity")).toBe("high");
@@ -58,12 +59,14 @@ describe("dashboard findings data loader", () => {
     expect(url.searchParams.get("postedInline")).toBe("true");
     expect(url.searchParams.get("dateFrom")).toBe("2026-05-22");
     expect(url.searchParams.get("dateTo")).toBe("2026-05-23");
+    expect(headers.get("authorization")).toBe("Bearer session-token");
+    expect(headers.get("x-firmcode-user-id")).toBeNull();
   });
 
-  it("fetches settings data with the temporary Clerk workspace headers", async () => {
+  it("fetches settings data with Clerk bearer auth and the optional workspace selector", async () => {
     process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
-    process.env.FIRMCODE_DASHBOARD_WORKSPACE_ID = "workspace-1";
-    process.env.FIRMCODE_DASHBOARD_CLERK_USER_ID = "user-1";
+    process.env.FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN = "session-token";
+    process.env.FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID = "workspace-1";
     const fetcher = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => jsonResponse(settingsResponse));
 
     vi.stubGlobal("fetch", fetcher);
@@ -76,11 +79,12 @@ describe("dashboard findings data loader", () => {
 
     expect(url.pathname).toBe("/api/settings");
     expect(headers.get("x-firmcode-workspace-id")).toBe("workspace-1");
-    expect(headers.get("x-firmcode-user-id")).toBe("user-1");
+    expect(headers.get("x-firmcode-user-id")).toBeNull();
   });
 
   it("treats settings with no GitHub installation as empty", async () => {
     process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
+    process.env.FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN = "session-token";
     const fetcher = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
       jsonResponse({
         ...settingsResponse,
@@ -98,8 +102,8 @@ describe("dashboard findings data loader", () => {
 
   it("fetches rules policies with dashboard auth headers and repository selection", async () => {
     process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
-    process.env.FIRMCODE_DASHBOARD_WORKSPACE_ID = "workspace-1";
-    process.env.FIRMCODE_DASHBOARD_CLERK_USER_ID = "user-1";
+    process.env.FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN = "session-token";
+    process.env.FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID = "workspace-1";
     const fetcher = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => jsonResponse(rulesPolicyResponse));
 
     vi.stubGlobal("fetch", fetcher);
@@ -113,22 +117,23 @@ describe("dashboard findings data loader", () => {
     expect(url.pathname).toBe("/api/rules");
     expect(url.searchParams.get("repositoryId")).toBe("repo-1");
     expect(headers.get("x-firmcode-workspace-id")).toBe("workspace-1");
-    expect(headers.get("x-firmcode-user-id")).toBe("user-1");
+    expect(headers.get("x-firmcode-user-id")).toBeNull();
   });
 
-  it("maps GitHub installation entrypoint 401 responses to signed-out state", async () => {
+  it("maps a missing Clerk session to signed-out state before calling the API", async () => {
     process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
     const fetcher = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => jsonResponse({ message: "Unauthorized" }, 401));
 
     vi.stubGlobal("fetch", fetcher);
 
     await expect(loadGitHubInstallationsState()).resolves.toEqual({ status: "signed-out" });
+    expect(fetcher).not.toHaveBeenCalled();
   });
 
   it("loads GitHub installation entrypoint status from workspace settings", async () => {
     process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
-    process.env.FIRMCODE_DASHBOARD_WORKSPACE_ID = "workspace-1";
-    process.env.FIRMCODE_DASHBOARD_CLERK_USER_ID = "user-1";
+    process.env.FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN = "session-token";
+    process.env.FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID = "workspace-1";
     const fetcher = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
       const pathname = new URL(String(input)).pathname;
 
@@ -159,13 +164,13 @@ describe("dashboard findings data loader", () => {
 
     expect(url.pathname).toBe("/api/settings");
     expect(headers.get("x-firmcode-workspace-id")).toBe("workspace-1");
-    expect(headers.get("x-firmcode-user-id")).toBe("user-1");
+    expect(headers.get("x-firmcode-user-id")).toBeNull();
   });
 
   it("loads repository GitHub control status without routing controls to missing pages", async () => {
     process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
-    process.env.FIRMCODE_DASHBOARD_WORKSPACE_ID = "workspace-1";
-    process.env.FIRMCODE_DASHBOARD_CLERK_USER_ID = "user-1";
+    process.env.FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN = "session-token";
+    process.env.FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID = "workspace-1";
     const fetcher = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
       const pathname = new URL(String(input)).pathname;
       return jsonResponse(pathname === "/api/github/oauth/status" ? oauthResponse : settingsResponse);
@@ -183,8 +188,8 @@ describe("dashboard findings data loader", () => {
 
   it("fetches review run detail with dashboard auth headers for artifact role gating", async () => {
     process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
-    process.env.FIRMCODE_DASHBOARD_WORKSPACE_ID = "workspace-1";
-    process.env.FIRMCODE_DASHBOARD_CLERK_USER_ID = "user-1";
+    process.env.FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN = "session-token";
+    process.env.FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID = "workspace-1";
     const fetcher = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => jsonResponse(reviewRunDetailResponse));
 
     vi.stubGlobal("fetch", fetcher);
@@ -197,13 +202,13 @@ describe("dashboard findings data loader", () => {
 
     expect(url.pathname).toBe("/api/review-runs/run-1");
     expect(headers.get("x-firmcode-workspace-id")).toBe("workspace-1");
-    expect(headers.get("x-firmcode-user-id")).toBe("user-1");
+    expect(headers.get("x-firmcode-user-id")).toBeNull();
   });
 
   it("maps CI failure filters into the authenticated API query string", async () => {
     process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
-    process.env.FIRMCODE_DASHBOARD_WORKSPACE_ID = "workspace-1";
-    process.env.FIRMCODE_DASHBOARD_CLERK_USER_ID = "user-1";
+    process.env.FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN = "session-token";
+    process.env.FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID = "workspace-1";
     const fetcher = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
       jsonResponse({ ciFailures: [{ id: "failure-1" }], filters: {}, pagination: { limit: 25, returned: 1 } })
     );
@@ -235,13 +240,13 @@ describe("dashboard findings data loader", () => {
     expect(url.searchParams.get("dateTo")).toBe("2026-05-24");
     expect(url.searchParams.get("limit")).toBe("25");
     expect(headers.get("x-firmcode-workspace-id")).toBe("workspace-1");
-    expect(headers.get("x-firmcode-user-id")).toBe("user-1");
+    expect(headers.get("x-firmcode-user-id")).toBeNull();
   });
 
   it("fetches CI failure detail with dashboard auth headers and maps 404 to empty", async () => {
     process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
-    process.env.FIRMCODE_DASHBOARD_WORKSPACE_ID = "workspace-1";
-    process.env.FIRMCODE_DASHBOARD_CLERK_USER_ID = "user-1";
+    process.env.FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN = "session-token";
+    process.env.FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID = "workspace-1";
     const fetcher = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
       const pathname = new URL(String(input)).pathname;
       return pathname.endsWith("/missing") ? jsonResponse({ message: "CI failure not found" }, 404) : jsonResponse({ id: "failure-1" });
@@ -258,13 +263,13 @@ describe("dashboard findings data loader", () => {
 
     expect(url.pathname).toBe("/api/ci-failures/failure-1%3Aunit-tests");
     expect(headers.get("x-firmcode-workspace-id")).toBe("workspace-1");
-    expect(headers.get("x-firmcode-user-id")).toBe("user-1");
+    expect(headers.get("x-firmcode-user-id")).toBeNull();
   });
 
   it("fetches repository detail with dashboard auth headers and maps 404 to empty", async () => {
     process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
-    process.env.FIRMCODE_DASHBOARD_WORKSPACE_ID = "workspace-1";
-    process.env.FIRMCODE_DASHBOARD_CLERK_USER_ID = "user-1";
+    process.env.FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN = "session-token";
+    process.env.FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID = "workspace-1";
     const fetcher = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
       const pathname = new URL(String(input)).pathname;
       return pathname.endsWith("/missing") ? jsonResponse({ message: "Repository not found" }, 404) : jsonResponse(repositoryDetailResponse);
@@ -281,14 +286,13 @@ describe("dashboard findings data loader", () => {
 
     expect(url.pathname).toBe("/api/repositories/repo-1");
     expect(headers.get("x-firmcode-workspace-id")).toBe("workspace-1");
-    expect(headers.get("x-firmcode-user-id")).toBe("user-1");
+    expect(headers.get("x-firmcode-user-id")).toBeNull();
   });
 
-  it("fetches billing with Clerk-managed billing capability forwarded when present", async () => {
+  it("fetches billing with Clerk bearer auth and no billing capability shim", async () => {
     process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
-    process.env.FIRMCODE_DASHBOARD_WORKSPACE_ID = "workspace-1";
-    process.env.FIRMCODE_DASHBOARD_CLERK_USER_ID = "user-1";
-    process.env.FIRMCODE_DASHBOARD_CLERK_BILLING_CAPABILITY = "manage_billing";
+    process.env.FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN = "session-token";
+    process.env.FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID = "workspace-1";
     const fetcher = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => jsonResponse(billingResponse));
 
     vi.stubGlobal("fetch", fetcher);
@@ -300,7 +304,8 @@ describe("dashboard findings data loader", () => {
     const headers = new Headers(init.headers);
 
     expect(url.pathname).toBe("/api/billing");
-    expect(headers.get("x-firmcode-clerk-billing-capability")).toBe("manage_billing");
+    expect(headers.get("authorization")).toBe("Bearer session-token");
+    expect(headers.get("x-firmcode-clerk-billing-capability")).toBeNull();
   });
 });
 
@@ -582,4 +587,13 @@ function jsonResponse(body: unknown, status = 200): Response {
       "content-type": "application/json"
     }
   });
+}
+
+function restoreEnv(name: string, value: string | undefined): void {
+  if (value === undefined) {
+    delete process.env[name];
+    return;
+  }
+
+  process.env[name] = value;
 }

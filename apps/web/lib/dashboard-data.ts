@@ -317,6 +317,11 @@ function pickCiFailureFilters(searchParams: SearchParams): CiFailureListFilters 
 
 async function requestJson<T>(path: string, query: object): Promise<T> {
   const url = new URL(path, getApiBaseUrl());
+  const headers = await createDashboardApiHeaders(process.env, false);
+
+  if (headers === null) {
+    throw new DashboardApiError("A signed-in Clerk session is required.", 401);
+  }
 
   for (const [key, value] of Object.entries(query)) {
     if (value !== undefined) {
@@ -326,7 +331,7 @@ async function requestJson<T>(path: string, query: object): Promise<T> {
 
   const response = await fetch(url, {
     cache: "no-store",
-    headers: await createDashboardApiHeaders(process.env, false)
+    headers
   });
 
   if (!response.ok) {
@@ -338,6 +343,11 @@ async function requestJson<T>(path: string, query: object): Promise<T> {
 
 async function requestAuthenticatedJsonWithQuery<T>(path: string, query: object): Promise<T> {
   const url = new URL(path, getApiBaseUrl());
+  const headers = await createDashboardApiHeaders(process.env, false);
+
+  if (headers === null) {
+    throw new DashboardApiError("A signed-in Clerk session is required.", 401);
+  }
 
   for (const [key, value] of Object.entries(query)) {
     if (value !== undefined) {
@@ -347,7 +357,7 @@ async function requestAuthenticatedJsonWithQuery<T>(path: string, query: object)
 
   const response = await fetch(url, {
     cache: "no-store",
-    headers: await createDashboardApiHeaders(process.env, false)
+    headers
   });
 
   if (!response.ok) {
@@ -359,9 +369,15 @@ async function requestAuthenticatedJsonWithQuery<T>(path: string, query: object)
 
 async function requestAuthenticatedJson<T>(path: string): Promise<T> {
   const url = new URL(path, getApiBaseUrl());
+  const headers = await createDashboardApiHeaders(process.env, false);
+
+  if (headers === null) {
+    throw new DashboardApiError("A signed-in Clerk session is required.", 401);
+  }
+
   const response = await fetch(url, {
     cache: "no-store",
-    headers: await createDashboardApiHeaders(process.env, false)
+    headers
   });
 
   if (!response.ok) {

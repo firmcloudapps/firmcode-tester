@@ -4,13 +4,18 @@ import { createDashboardApiHeaders } from "../../../../../lib/dashboard-api-prox
 export async function GET(request: Request): Promise<Response> {
   const callbackUrl = new URL("/auth/github/callback", process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001");
   const incomingUrl = new URL(request.url);
+  const headers = await createDashboardApiHeaders(process.env, false);
+
+  if (headers === null) {
+    return NextResponse.redirect(new URL("/sign-in", getDashboardBaseUrl()));
+  }
 
   copySearchParam(incomingUrl, callbackUrl, "code");
   copySearchParam(incomingUrl, callbackUrl, "state");
 
   const response = await fetch(callbackUrl, {
     cache: "no-store",
-    headers: await createDashboardApiHeaders(process.env, false)
+    headers
   });
 
   if (!response.ok) {

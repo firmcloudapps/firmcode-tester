@@ -106,7 +106,7 @@ describe("dashboard to API Clerk token integration", () => {
       body: { installationId: 123 },
       env: {
         NEXT_PUBLIC_API_URL: "http://dashboard-api.test",
-        FIRMCODE_DASHBOARD_CLERK_TOKEN: "session-token"
+        FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN: "session-token"
       },
       fetcher
     });
@@ -117,5 +117,23 @@ describe("dashboard to API Clerk token integration", () => {
     expect(new URL(String(fetcher.mock.calls[0]![0])).pathname).toBe("/api/github/installations/sync");
     expect(headers.get("authorization")).toBe("Bearer session-token");
     expect(headers.get("x-firmcode-user-id")).toBeNull();
+  });
+
+  it("returns a local 401 from protected route handlers before API calls when Clerk auth is missing", async () => {
+    const fetcher = vi.fn(async () => new Response(JSON.stringify({ ok: true }), { status: 200 }));
+
+    const response = await forwardDashboardApiMutation({
+      method: "POST",
+      path: "/api/github/installations/sync",
+      body: { installationId: 123 },
+      env: {
+        NEXT_PUBLIC_API_URL: "http://dashboard-api.test"
+      },
+      fetcher
+    });
+
+    expect(response.status).toBe(401);
+    expect(fetcher).not.toHaveBeenCalled();
+    await expect(response.json()).resolves.toMatchObject({ message: expect.stringContaining("Clerk session") });
   });
 });

@@ -10,9 +10,8 @@ Firmcode should use typed configuration validation in every runtime. Missing req
 | `APP_URL` | yes | Public web app URL. The API uses this to build the GitHub OAuth callback URL. |
 | `API_URL` | yes | Public API URL for webhooks and dashboard calls. |
 | `NEXT_PUBLIC_API_URL` | web | Public API URL used by the Vercel dashboard. |
-| `FIRMCODE_DASHBOARD_WORKSPACE_ID` | test/local bypass only | Internal workspace ID for isolated tests or seed-only local workflows. This must not be used in production request authentication. |
-| `FIRMCODE_DASHBOARD_CLERK_USER_ID` | test/local bypass only | Clerk user ID for isolated tests or seed-only local workflows. This must not be used in production request authentication. |
-| `FIRMCODE_DASHBOARD_CLERK_BILLING_CAPABILITY` | test/local bypass only | Optional local/test billing capability fixture. Production billing capability must come from verified Clerk session/organization/billing state. |
+| `FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN` | tests only | Explicit web unit-test fixture token used to avoid live Clerk calls. This must not be set in production. |
+| `FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID` | tests only | Optional workspace selector fixture sent only with a Clerk/test bearer token outside production. This must not be used as caller identity. |
 | `CORS_ALLOWED_ORIGINS` | api | Comma-separated Vercel production, Vercel preview, and local web origins. |
 | `VERCEL_URL` | Vercel | Auto-provided Vercel deployment URL, useful for preview handling. |
 | `LOG_LEVEL` | no | `debug`, `info`, `warn`, or `error`. Default `info`. |
@@ -74,7 +73,7 @@ The production dashboard authentication flow is:
 2. Web server code reads Clerk auth state with `auth()` and obtains a Clerk session token for `CLERK_JWT_AUDIENCE`.
 3. Web-to-API calls send `Authorization: Bearer <Clerk session token>`.
 4. The NestJS API verifies the token with Clerk, derives the Clerk user and organization claims, resolves the Firmcode workspace/membership, and then applies role/capability checks.
-5. The API must ignore client-provided user identity headers outside explicit test/local bypass code paths.
+5. The API must ignore client-provided user identity headers. Web tests may use `FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN` as an isolated bearer-token fixture, but production and normal local development must use Clerk sessions.
 
 Required Clerk dashboard configuration:
 

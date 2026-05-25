@@ -7,9 +7,9 @@ export interface DashboardApiProxyInput {
 }
 
 const WORKSPACE_HEADER = "x-firmcode-workspace-id";
-const USER_HEADER = "x-firmcode-user-id";
-const BILLING_CAPABILITY_HEADER = "x-firmcode-clerk-billing-capability";
 const AUTHORIZATION_HEADER = "authorization";
+const TEST_SESSION_TOKEN_ENV = "FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN";
+const TEST_WORKSPACE_ID_ENV = "FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID";
 
 type DashboardProxyEnvironment = Record<string, string | undefined>;
 
@@ -18,6 +18,10 @@ export async function forwardDashboardApiMutation(input: DashboardApiProxyInput)
   const fetcher = input.fetcher ?? fetch;
   const url = new URL(input.path, getApiBaseUrl(env));
   const headers = await createDashboardApiHeaders(env, input.body !== undefined);
+
+  if (headers === null) {
+    return createUnauthenticatedDashboardResponse();
+  }
 
   const response = await fetcher(url, {
     method: input.method,
@@ -39,53 +43,48 @@ export async function forwardDashboardApiMutation(input: DashboardApiProxyInput)
   });
 }
 
-export async function createDashboardApiHeaders(env: DashboardProxyEnvironment, hasBody: boolean): Promise<Headers> {
+export async function createDashboardApiHeaders(env: DashboardProxyEnvironment, hasBody: boolean): Promise<Headers | null> {
   const headers = new Headers({
     accept: "application/json"
   });
   const token = await readClerkToken(env);
 
-  if (token !== null) {
-    headers.set(AUTHORIZATION_HEADER, `Bearer ${token}`);
+  if (token === null) {
+    return null;
   }
+
+  headers.set(AUTHORIZATION_HEADER, `Bearer ${token}`);
 
   if (hasBody) {
     headers.set("content-type", "application/json");
   }
 
-  if (token !== null || env.NODE_ENV === "production") {
-    return headers;
-  }
-
-  return applyLocalDashboardBypassHeaders(headers, env);
-}
-
-export function applyLocalDashboardBypassHeaders(headers: Headers, env: DashboardProxyEnvironment): Headers {
-  const workspaceId = env.FIRMCODE_DASHBOARD_WORKSPACE_ID;
-  const clerkUserId = env.FIRMCODE_DASHBOARD_CLERK_USER_ID;
-
-  if (workspaceId !== undefined && workspaceId !== "") {
+  const workspaceId = env.NODE_ENV === "production" ? undefined : env[TEST_WORKSPACE_ID_ENV];
+  if (workspaceId !== undefined && workspaceId.trim() !== "") {
     headers.set(WORKSPACE_HEADER, workspaceId);
-  }
-
-  if (clerkUserId !== undefined && clerkUserId !== "") {
-    headers.set(USER_HEADER, clerkUserId);
-  }
-
-  if (env.FIRMCODE_DASHBOARD_CLERK_BILLING_CAPABILITY !== undefined && env.FIRMCODE_DASHBOARD_CLERK_BILLING_CAPABILITY !== "") {
-    headers.set(BILLING_CAPABILITY_HEADER, env.FIRMCODE_DASHBOARD_CLERK_BILLING_CAPABILITY);
   }
 
   return headers;
 }
 
 async function readClerkToken(env: DashboardProxyEnvironment): Promise<string | null> {
-  if (env.FIRMCODE_DASHBOARD_CLERK_TOKEN !== undefined && env.FIRMCODE_DASHBOARD_CLERK_TOKEN !== "") {
-    return env.FIRMCODE_DASHBOARD_CLERK_TOKEN;
+  const testToken = env[TEST_SESSION_TOKEN_ENV];
+
+  if (env.NODE_ENV !== "production" && testToken !== undefined && testToken.trim() !== "") {
+    return testToken;
   }
 
   const { getClerkApiBearerToken } = await import("./clerk-auth");
   return getClerkApiBearerToken(env);
+}
+
+function createUnauthenticatedDashboardResponse(): Response {
+  return new Response(JSON.stringify({ message: "A signed-in Clerk session is required." }), {
+    status: 401,
+    headers: {
+      "content-type": "application/json"
+    }
+  });
 }
 
 function getApiBaseUrl(env: DashboardProxyEnvironment): string {

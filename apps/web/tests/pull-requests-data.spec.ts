@@ -3,20 +3,20 @@ import { loadPullRequestDetailState, loadPullRequestsState } from "../lib/dashbo
 
 describe("dashboard pull request data loader", () => {
   const originalApiUrl = process.env.NEXT_PUBLIC_API_URL;
-  const originalWorkspaceId = process.env.FIRMCODE_DASHBOARD_WORKSPACE_ID;
-  const originalClerkUserId = process.env.FIRMCODE_DASHBOARD_CLERK_USER_ID;
+  const originalTestWorkspaceId = process.env.FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID;
+  const originalTestToken = process.env.FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN;
 
   afterEach(() => {
     process.env.NEXT_PUBLIC_API_URL = originalApiUrl;
-    process.env.FIRMCODE_DASHBOARD_WORKSPACE_ID = originalWorkspaceId;
-    process.env.FIRMCODE_DASHBOARD_CLERK_USER_ID = originalClerkUserId;
+    restoreEnv("FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID", originalTestWorkspaceId);
+    restoreEnv("FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN", originalTestToken);
     vi.unstubAllGlobals();
   });
 
   it("maps pull request filters into the authenticated API query string", async () => {
     process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
-    process.env.FIRMCODE_DASHBOARD_WORKSPACE_ID = "workspace-1";
-    process.env.FIRMCODE_DASHBOARD_CLERK_USER_ID = "user-1";
+    process.env.FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN = "session-token";
+    process.env.FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID = "workspace-1";
     const fetcher = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => jsonResponse(pullRequests));
 
     vi.stubGlobal("fetch", fetcher);
@@ -49,14 +49,15 @@ describe("dashboard pull request data loader", () => {
     expect(url.searchParams.get("dateFrom")).toBe("2026-05-20");
     expect(url.searchParams.get("dateTo")).toBe("2026-05-24");
     expect(url.searchParams.get("limit")).toBe("25");
+    expect(headers.get("authorization")).toBe("Bearer session-token");
     expect(headers.get("x-firmcode-workspace-id")).toBe("workspace-1");
-    expect(headers.get("x-firmcode-user-id")).toBe("user-1");
+    expect(headers.get("x-firmcode-user-id")).toBeNull();
   });
 
   it("loads pull request detail with auth headers and maps 404 to empty", async () => {
     process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
-    process.env.FIRMCODE_DASHBOARD_WORKSPACE_ID = "workspace-1";
-    process.env.FIRMCODE_DASHBOARD_CLERK_USER_ID = "user-1";
+    process.env.FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN = "session-token";
+    process.env.FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID = "workspace-1";
     const fetcher = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
       const pathname = new URL(String(input)).pathname;
       return pathname.endsWith("/missing") ? jsonResponse({ message: "Pull request not found" }, 404) : jsonResponse(pullRequestDetail);
@@ -72,8 +73,9 @@ describe("dashboard pull request data loader", () => {
     const headers = new Headers(init.headers);
 
     expect(url.pathname).toBe("/api/pull-requests/pr-1");
+    expect(headers.get("authorization")).toBe("Bearer session-token");
     expect(headers.get("x-firmcode-workspace-id")).toBe("workspace-1");
-    expect(headers.get("x-firmcode-user-id")).toBe("user-1");
+    expect(headers.get("x-firmcode-user-id")).toBeNull();
   });
 });
 
@@ -84,6 +86,15 @@ function jsonResponse(body: unknown, status = 200): Response {
       "content-type": "application/json"
     }
   });
+}
+
+function restoreEnv(name: string, value: string | undefined): void {
+  if (value === undefined) {
+    delete process.env[name];
+    return;
+  }
+
+  process.env[name] = value;
 }
 
 const pullRequests: PullRequestListResponse = {
