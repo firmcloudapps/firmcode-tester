@@ -17,6 +17,7 @@ The MVP is scoped as a 10-week build. A solo developer can compress or stretch t
 | 8 | 4 days | CI/CD failure explanation |
 | 9 | 5 days | Next.js TypeScript/Tailwind dashboard |
 | 10 | 5 days | Hardening, observability, privacy, docs, release candidate |
+| 11 | 5 days | Continuous repository scanning, persisted codebase findings, and PR review enrichment |
 
 ## Phase 0: Scaffold And Local Runtime
 
@@ -765,3 +766,98 @@ Acceptance criteria:
 Tests:
 
 - E2E smoke test in CI/local.
+
+## Phase 11: Continuous Codebase Scanning And Review Enrichment
+
+### Task 11.1: Codebase Scan Persistence And Contracts
+
+Add PR-independent persistence and shared contracts for repository scan runs, scan artifacts, and scan findings.
+
+Acceptance criteria:
+
+- Migrations add `codebase_scan_runs` and `codebase_scan_findings` with repository ownership, status, trigger, commit SHA, stable dedupe keys, finding status, first/last seen timestamps, and resolved timestamps.
+- Shared TypeScript and Python contracts define codebase scan job input, scan run artifact metadata, normalized scan finding, and review-enrichment payloads.
+- Finding categories, severities, confidence, evidence, recommendations, and source values match the existing PR finding model where practical.
+- Database indexes support repository scan history, open finding inbox queries, dedupe, and touched-file lookup.
+- Retention and redaction expectations are documented for scan artifacts and findings.
+
+Tests:
+
+- Migration smoke tests.
+- Contract fixture tests in TypeScript and Python.
+- Store tests for inserting/updating scan runs, upserting findings by dedupe key, and resolving stale findings after a successful scan.
+
+### Task 11.2: Codebase Scan Queue And Scheduling
+
+Add BullMQ scheduling for initial, manual, and recurring repository scans.
+
+Acceptance criteria:
+
+- Repository sync, GitHub App installation connection, and repository automation enablement enqueue an initial codebase scan for enabled repositories.
+- A repeatable schedule enqueues scans on a configurable cadence without duplicating active jobs for the same repository and commit SHA.
+- Dashboard/manual scan requests create idempotent scan jobs after authorization and repository ownership checks.
+- Scan jobs use GitHub App installation tokens, not user OAuth tokens.
+- Queue metrics and structured logs include scan run ID, repository, trigger, commit SHA, status, and duration.
+
+Tests:
+
+- API integration tests for initial scan enqueue after installation/repository sync.
+- Queue tests for repeatable schedule idempotency and active-job dedupe.
+- Authorization tests for manual scan enqueue.
+
+### Task 11.3: Worker Codebase Scan Pipeline
+
+Implement the Python worker pipeline that scans an enabled repository at its default branch.
+
+Acceptance criteria:
+
+- Worker resolves the latest default branch commit SHA and skips already-successful scans for that SHA.
+- Worker creates a bounded temporary checkout or file workspace with ignored paths, generated-file handling, file count limits, byte limits, and skipped-path accounting.
+- Semgrep scans supported repository files and infrastructure code using existing scanner normalization.
+- Tree-sitter extracts symbol/component context for supported files where practical.
+- Optional LLM review produces concise bug/debug summaries and recommendations from deterministic evidence only.
+- Findings are normalized, redacted, persisted, deduplicated, and stale findings are marked resolved.
+- Scan failures persist structured errors and never leave repository tokens or raw secrets in logs.
+
+Tests:
+
+- Worker unit tests for skip-if-same-SHA, workspace selection, skipped paths, Semgrep normalization, and stale finding resolution.
+- Golden fixture test for a small repository producing persisted bug/security findings and recommendations.
+- Failure-path tests for GitHub fetch errors, Semgrep process errors, oversized repos, and redaction.
+
+### Task 11.4: Review Enrichment From Codebase Findings
+
+Enrich PR review summaries with relevant unresolved findings from recent repository scans.
+
+Acceptance criteria:
+
+- PR review loads unresolved codebase scan findings for changed files and touched components.
+- High/critical repository findings from touched components can appear in the Code Review summary even when they are not on changed lines.
+- Inline comments remain restricted to current PR changed lines.
+- Code Review section clearly separates current PR findings from existing codebase findings when both are present.
+- Existing codebase findings include severity, path, evidence summary, and recommendation.
+- Dedupe prevents reposting the same issue as both a PR finding and a codebase finding.
+
+Tests:
+
+- Summary renderer tests for PR-only findings, codebase-only findings, and mixed findings.
+- Deduplication tests between current review findings and codebase findings.
+- Integration test from stored scan finding plus PR changed file to enriched summary comment.
+
+### Task 11.5: Dashboard And Operations For Codebase Scans
+
+Expose codebase scan status, findings, and controls in the dashboard and runbooks.
+
+Acceptance criteria:
+
+- Repository list/detail show latest codebase scan status, last scan time, open finding count, and manual scan action.
+- Findings inbox can filter PR findings and codebase scan findings by repository, severity, source, category, status, and date.
+- Repository configuration exposes scan cadence, enabled state, ignored paths, severity threshold, and maximum scan limits.
+- Owners/Admins can suppress or mark scan findings false positive; Developers can view findings and trigger scans where policy allows; Viewers are read-only.
+- Operations runbook covers scan backlog, GitHub rate limits, scan failures, Semgrep timeouts, stale findings, and retention cleanup.
+
+Tests:
+
+- Dashboard API tests for scan runs, scan findings, manual scan, and finding status updates.
+- Component tests for repository scan status, manual scan states, findings filters, and role-gated actions.
+- Runbook/readiness documentation check for scan operations.
