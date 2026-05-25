@@ -1133,9 +1133,10 @@ def render_summary_comment(
     semgrep_errors = _read_list(semgrep_artifact.get("errors"))
     risk_level = _risk_level(semgrep_findings, semgrep_errors)
     component_lines = _changed_component_lines(changed_files)
+    code_review_lines = _code_review_summary_lines(semgrep_findings, semgrep_errors)
     review_blocks = [_render_summary_semgrep_finding(finding, changed_files) for finding in semgrep_findings[:8]]
-    if not review_blocks:
-        review_blocks = ["No actionable issues were found in the selected changed files."]
+    if review_blocks:
+        code_review_lines.extend(["", "**Actionable findings**", "", *review_blocks])
     suggestions = _test_suggestions(changed_files, semgrep_findings)
 
     return "\n".join(
@@ -1150,11 +1151,11 @@ def render_summary_comment(
             "",
             "### Code Review",
             "",
-            *review_blocks,
+            *code_review_lines,
             "",
-            *_details_section("Risk", [f"- Level: {risk_level}"]),
-            *_details_section("Changed Components", component_lines),
-            *_details_section("Suggested Tests", [f"- {suggestion}" for suggestion in suggestions]),
+            *_report_section("Risk", [f"- Level: {risk_level}"]),
+            *_report_section("Changed Components", component_lines),
+            *_report_section("Suggested Tests", [f"- {suggestion}" for suggestion in suggestions]),
             "<sub>FirmcodeAI grounds this summary in changed files and automated review evidence.</sub>",
         ]
     )
@@ -1425,9 +1426,61 @@ def _semgrep_evidence(finding: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
-def _details_section(title: str, lines: Sequence[str]) -> list[str]:
+def _report_section(title: str, lines: Sequence[str]) -> list[str]:
     content = list(lines) or ["- No details available."]
-    return ["<details>", f"<summary>{title}</summary>", "", *content, "", "</details>", ""]
+    return [f"### {title}", "", *content, ""]
+
+
+def _code_review_summary_lines(findings: Sequence[Any], errors: Sequence[Any]) -> list[str]:
+    if findings:
+        finding_count = len(findings)
+        lines = [
+            (
+                "FirmcodeAI generated this actionable-issue summary from "
+                f"{finding_count} grounded finding{'s' if finding_count != 1 else ''}:"
+            )
+        ]
+        for finding in findings[:5]:
+            lines.append(f"- {_actionable_issue_summary_line(_read_object(finding))}")
+        hidden_count = max(0, finding_count - 5)
+        if hidden_count:
+            lines.append(f"- ...and {hidden_count} more grounded finding{'s' if hidden_count != 1 else ''}.")
+        return lines
+
+    if errors:
+        return [
+            (
+                "FirmcodeAI could not generate a complete actionable-issue summary because "
+                "some automated checks reported errors. Review the risk and suggested tests below before merging."
+            )
+        ]
+
+    return [
+        (
+            "FirmcodeAI did not generate actionable issue summaries because the current "
+            "evidence set did not contain grounded findings."
+        )
+    ]
+
+
+def _actionable_issue_summary_line(finding: Mapping[str, Any]) -> str:
+    severity = _read_str(finding.get("severity"), "info").lower()
+    message = _public_message(_single_line(_read_str(finding.get("message"), "Automated finding")))[:220]
+    location = _finding_summary_location(finding)
+    remediation = _summary_remediation(finding)
+    suffix = f" Suggested action: {_public_message(_single_line(remediation))[:220]}" if remediation else ""
+    return f"{severity.capitalize()}: {message}{location}.{suffix}"
+
+
+def _finding_summary_location(finding: Mapping[str, Any]) -> str:
+    path = _read_str(finding.get("path"), "")
+    if not path:
+        return ""
+    start = _read_object(finding.get("start"))
+    line = _read_int(start.get("line"), 0)
+    if line > 0:
+        return f" at `{path}:{line}`"
+    return f" in `{path}`"
 
 
 def _render_summary_semgrep_finding(value: Any, changed_files: Sequence[ChangedFile]) -> str:
@@ -1917,7 +1970,7 @@ def _render_changed_component_patch(patch: str) -> str:
         if raw_line.startswith("-"):
             rendered.append(f"- {raw_line[1:200]}")
         elif raw_line.startswith("+"):
-            rendered.append(f"! {raw_line[1:200]}")
+            rendered.append(f"+ {raw_line[1:200]}")
         elif raw_line.startswith(" "):
             rendered.append(f"  {raw_line[1:200]}")
         else:

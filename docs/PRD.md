@@ -46,6 +46,7 @@ Supporting production-planning docs:
 - Parse changed files with Tree-sitter for semantic context.
 - Run Semgrep scans against changed files and infrastructure code.
 - Generate grounded AI review comments, PR summaries, test suggestions, and CI failure explanations.
+- Run scheduled repository codebase scans after GitHub App installation so existing bugs, security issues, and maintainability risks are persisted and can be referenced in future PR reviews.
 - Post summaries and inline review comments back to GitHub.
 - Provide a local dashboard for review runs, findings, repositories, pull requests, CI failures, rules/policies, settings, billing, and GitHub App setup.
 - Use Clerk for authentication and billing.
@@ -61,7 +62,7 @@ Supporting production-planning docs:
 - Kubernetes deployment.
 - Organization billing.
 - Browser-based code editing.
-- Full repository-wide code intelligence indexing.
+- Full repository-wide code intelligence indexing beyond scheduled static/semantic scan artifacts.
 - Autonomous code fixes or direct commits.
 - Enterprise SSO.
 - Fine-tuned model training.
@@ -99,6 +100,7 @@ Supporting production-planning docs:
 - Changed-file download for supported file types.
 - Tree-sitter parsing for JavaScript, TypeScript, Python, Go, Java, YAML, JSON, Dockerfile, HCL/Terraform where practical.
 - Semgrep CLI scan for changed files and infrastructure files.
+- Scheduled repository codebase scans for enabled repositories, using GitHub App installation tokens, persisted findings, and stable dedupe keys.
 - LLM review generation using structured prompts.
 - Inline review comment posting through GitHub Reviews API.
 - PR summary as a normal issue comment or review body.
@@ -108,6 +110,7 @@ Supporting production-planning docs:
 - Webhook idempotency, superseded-run protection, and delivery replay handling.
 - Large-PR handling with prioritized and summary-only modes.
 - Configurable data retention and raw artifact redaction.
+- Code Review summaries that can include both PR-specific findings and unresolved findings from recent codebase scans when they affect touched files or components.
 
 ### Deferred
 
@@ -341,6 +344,45 @@ docs/
 - `post_as_inline`
 - `created_at`
 
+### `codebase_scan_runs`
+
+- `id`
+- `repository_id`
+- `installation_id`
+- `trigger`: `install | scheduled | manual | push`
+- `commit_sha`
+- `default_branch`
+- `status`: `queued | running | succeeded | failed | cancelled | superseded`
+- `started_at`
+- `finished_at`
+- `error_code`
+- `error_message`
+- `metrics_json`
+- `created_at`
+- `updated_at`
+
+### `codebase_scan_findings`
+
+- `id`
+- `scan_run_id`
+- `repository_id`
+- `source`: `semgrep | llm | tree_sitter | ci | policy`
+- `category`: `bug | security | performance | maintainability | test | infra | ci`
+- `severity`: `info | low | medium | high | critical`
+- `confidence`: `low | medium | high`
+- `file_path`
+- `start_line`
+- `end_line`
+- `title`
+- `body`
+- `evidence_json`
+- `recommendation`
+- `dedupe_key`
+- `status`: `open | resolved | suppressed | false_positive`
+- `first_seen_at`
+- `last_seen_at`
+- `resolved_at`
+
 ### `published_comments`
 
 - `id`
@@ -368,6 +410,11 @@ docs/
 - `GET /api/repositories/:id/configuration`: repository review configuration.
 - `PATCH /api/repositories/:id/configuration`: update repository review configuration.
 - `POST /api/repositories/:id/sync`: sync one repository from GitHub.
+- `POST /api/repositories/:id/codebase-scans`: enqueue a manual codebase scan for one repository.
+- `GET /api/repositories/:id/codebase-scans`: list codebase scan runs for one repository.
+- `GET /api/codebase-scans/:id`: scan detail with stage metrics, artifacts, and findings.
+- `GET /api/codebase-findings`: filterable repository scan findings inbox.
+- `PATCH /api/codebase-findings/:id`: mark a scan finding as suppressed, false positive, or resolved where policy allows.
 - `GET /api/review-runs`: list runs with filters.
 - `GET /api/review-runs/:id`: run detail, metrics, findings, artifacts.
 - `POST /api/review-runs/:id/retry`: retry failed run.
@@ -416,6 +463,7 @@ Unsupported events should return `202 Accepted` and be ignored after recording m
 - `github-events`: optional normalization queue if webhook processing grows.
 - `review-runs`: main PR review jobs.
 - `ci-analysis`: CI failure explanation jobs.
+- `codebase-scans`: scheduled and manual repository scans for enabled repositories.
 - `publish-comments`: optional publisher jobs for rate-limit isolation.
 
 ### Job Payload
@@ -559,7 +607,49 @@ Infrastructure-specific rules should cover:
 - GitHub Actions unpinned third-party actions.
 - Terraform broad IAM permissions.
 
-## 16. GitHub App Setup
+## 16. Continuous Codebase Scan Plan
+
+Firmcode should provide CodeRabbit-style background codebase awareness without building a full repository-wide code intelligence index for MVP. When a workspace connects a GitHub App installation and syncs repositories, enabled repositories should receive an initial scan and repeat scans on a configurable cadence. The scan results are persisted as repository-level findings and used to enrich future PR reviews.
+
+### Scan Triggers
+
+- GitHub App installation connected or repository added.
+- Repository automation enabled from the dashboard.
+- Scheduled cadence, defaulting to daily for MVP.
+- Manual dashboard action from repository detail.
+- Optional push event to the default branch when the repository is enabled.
+
+### Scan Pipeline
+
+1. Resolve the repository installation and verify workspace ownership.
+2. Fetch the latest default branch SHA with a short-lived GitHub App installation token.
+3. Skip the scan if the same commit SHA already has a successful codebase scan.
+4. Build a bounded temporary checkout or file workspace using repository allowlist, ignore paths, generated-file handling, and size limits.
+5. Run Semgrep and infrastructure rules across supported files.
+6. Run Tree-sitter extraction for supported languages to attach symbol and component context.
+7. Optionally call the LLM to produce concise bug/debug explanations and recommendations from deterministic evidence only.
+8. Normalize findings into `codebase_scan_findings` with stable dedupe keys.
+9. Mark previously open findings as resolved when the same dedupe key is absent from a successful scan of the same repository.
+10. Persist artifacts, metrics, skipped path accounting, errors, and stage timings.
+
+### Review Enrichment
+
+PR review should merge these evidence sources:
+
+- PR-specific changed-line findings from the current review run.
+- Unresolved codebase scan findings whose file path is touched by the PR.
+- Unresolved high/critical findings from components touched by the PR.
+
+Inline comments remain limited to findings tied to changed lines. Existing codebase findings should usually appear in the Code Review summary section with severity, path, evidence, and recommendation, unless the PR directly modifies the affected line.
+
+### Safety And Retention
+
+- OAuth tokens identify users only; scan jobs use GitHub App installation tokens.
+- Raw repository content, scan workspaces, prompts, and LLM outputs follow `docs/PRIVACY_RETENTION.md`.
+- Scan findings must never expose secrets. Secret-like evidence is redacted before persistence and before model prompts.
+- Scan cadence, enabled status, ignored paths, severity threshold, and maximum files/bytes are repository policy settings.
+
+## 17. GitHub App Setup
 
 Every Firmcode user must connect GitHub OAuth before using GitHub-backed dashboard workflows. OAuth is used for user identity, GitHub login display, audit trails, and membership checks. GitHub App installation remains the repository access mechanism for webhook ingestion, repository sync, diff/check/log reads, and PR comment publishing.
 
@@ -598,7 +688,7 @@ Environment variables:
 - `LLM_API_KEY`
 - `REVIEW_MAX_INLINE_COMMENTS`
 
-## 17. Docker Compose Setup
+## 18. Docker Compose Setup
 
 Services:
 
@@ -614,7 +704,7 @@ Local ports:
 
 The local setup should use NeonDB through `DATABASE_URL`; Docker Compose must not run a local PostgreSQL service. The web dashboard should run with Next.js dev locally and deploy to Vercel in production. The local setup should support webhook testing with a tunnel such as ngrok or GitHub webhook redelivery.
 
-## 18. Example AI Review Prompt
+## 19. Example AI Review Prompt
 
 System:
 
@@ -632,7 +722,7 @@ Only create inline findings when the issue is tied to a changed line.
 Each finding must include evidence and a concrete suggested fix.
 ```
 
-## 19. Example Review Output
+## 20. Example Review Output
 
 Summary:
 
@@ -655,7 +745,7 @@ Inline comment:
 Evidence: changed auth middleware branch bypasses expiry validation.
 ```
 
-## 20. Security Considerations
+## 21. Security Considerations
 
 - Verify webhook signatures using raw body.
 - Enforce replay protection where practical with delivery IDs.
@@ -666,7 +756,7 @@ Evidence: changed auth middleware branch bypasses expiry validation.
 - Validate LLM output and never execute model-generated code.
 - Add organization/repository allowlists for temporary controlled SaaS rollout.
 
-## 21. Scaling Recommendations
+## 22. Scaling Recommendations
 
 - Split publisher queue when GitHub rate limits become visible.
 - Add object storage for large artifacts.
@@ -675,7 +765,7 @@ Evidence: changed auth middleware branch bypasses expiry validation.
 - Introduce repository-level semantic index only after changed-file review is stable.
 - Move from Docker Compose to Kubernetes only after multi-user production needs appear.
 
-## 22. Cost Optimization
+## 23. Cost Optimization
 
 - Skip LLM review for docs-only or generated-file-only PRs unless configured.
 - Use Semgrep-only deterministic comments for straightforward security findings.
@@ -684,7 +774,7 @@ Evidence: changed auth middleware branch bypasses expiry validation.
 - Use cheaper models for summaries and CI log classification, stronger models for final review reasoning.
 - Cache repeated dependency and repository metadata.
 
-## 23. MVP Roadmap
+## 24. MVP Roadmap
 
 - Phase 0: Repository scaffold and local Compose.
 - Phase 1: GitHub App webhook ingestion.
@@ -697,3 +787,4 @@ Evidence: changed auth middleware branch bypasses expiry validation.
 - Phase 8: CI failure explanation.
 - Phase 9: Dashboard.
 - Phase 10: Hardening, docs, and release candidate.
+- Phase 11: Continuous codebase scanning and review enrichment.
