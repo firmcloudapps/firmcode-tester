@@ -1,10 +1,11 @@
-import { ForbiddenException, Inject, Injectable, UnauthorizedException } from "@nestjs/common";
+import { ForbiddenException, Inject, Injectable, Optional, UnauthorizedException } from "@nestjs/common";
 import type { WorkspaceBillingResponse } from "@firmcode/shared";
 import {
   DASHBOARD_AUTH_STORE,
   roleHasDashboardCapability,
   type DashboardAuthStore
 } from "../review-runs/dashboard-auth.store";
+import { BILLING_USAGE_STORE, EmptyBillingUsageStore, type BillingUsageStore } from "./billing-usage.store";
 
 export interface WorkspaceBillingRequestContext {
   readonly workspaceId: string | null;
@@ -14,7 +15,12 @@ export interface WorkspaceBillingRequestContext {
 
 @Injectable()
 export class BillingService {
-  constructor(@Inject(DASHBOARD_AUTH_STORE) private readonly dashboardAuthStore: DashboardAuthStore) {}
+  constructor(
+    @Inject(DASHBOARD_AUTH_STORE) private readonly dashboardAuthStore: DashboardAuthStore,
+    @Optional()
+    @Inject(BILLING_USAGE_STORE)
+    private readonly billingUsageStore: BillingUsageStore = new EmptyBillingUsageStore()
+  ) {}
 
   async getWorkspaceBilling(input: WorkspaceBillingRequestContext): Promise<WorkspaceBillingResponse> {
     assertAuthenticated(input);
@@ -32,27 +38,24 @@ export class BillingService {
       hasClerkBillingCapability: input.hasClerkBillingCapability
     });
 
-    if (!canManage) {
+    if (membership.role !== "owner" && membership.role !== "admin" && membership.role !== "developer" && !canManage) {
       throw new ForbiddenException("Workspace role cannot manage billing");
     }
+
+    const usage = await this.billingUsageStore.getWorkspaceUsage(membership.workspaceId);
 
     return {
       workspace: {
         id: membership.workspaceId,
         role: membership.role,
-        canManageBilling: true,
+        canManageBilling: canManage,
         source: "clerk"
       },
       plan: {
         name: "Clerk managed",
         status: "managed_by_clerk"
       },
-      usage: {
-        reviewRunsThisMonth: null,
-        aiTokensThisMonth: null,
-        repositoriesMonitored: null,
-        seats: null
-      }
+      usage
     };
   }
 }

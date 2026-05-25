@@ -1,6 +1,6 @@
 # Task 9.3d: Billing Shell
 
-```text
+Ensure you read the existing code on this task before you make any change
 Read AGENTS.md first and follow it strictly.
 Relevant planning docs: docs/TASKS.md Task 9.3, docs/TASK_PROMPTS.md Task 9.3, docs/DASHBOARD_DESIGN.md, docs/DASHBOARD_PROMPTS.md, docs/AUTHORIZATION.md, docs/ENVIRONMENT.md, docs/DEPLOYMENT.md.
 Code context requirement: Before implementing, inspect the existing billing page, Clerk configuration, environment validation, dashboard shell, tests, and any usage summary APIs before changing behavior.
@@ -21,4 +21,4 @@ Acceptance criteria:
 - Billing access is role-gated.
 - UI follows docs/DASHBOARD_DESIGN.md and does not introduce local payment management.
 - Tests and visual smoke checks pass, or inability to run them is documented with exact commands.
-```
+
