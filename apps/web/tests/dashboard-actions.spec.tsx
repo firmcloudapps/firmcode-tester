@@ -1,6 +1,8 @@
 import React from "react";
+import type { ReactElement } from "react";
 import { renderToString } from "react-dom/server";
 import type { RepositoryReviewConfiguration, ReviewRunRetryResponse } from "@firmcode/shared";
+import { GitHubInstallationSyncButton, GitHubRepositorySyncButton } from "../components/dashboard/github-sync-controls";
 import { RepositoryAutomationToggle } from "../components/dashboard/repository-automation-toggle";
 import { RetryReviewRunButton } from "../components/dashboard/retry-review-run-button";
 import {
@@ -191,6 +193,78 @@ describe("GitHub sync controls", () => {
     releaseRequest("synced");
     await expect(firstRequest).resolves.toBe("synced");
   });
+
+  it("shows installation sync loading and success feedback from the button click handler", async () => {
+    const { button, feedbackSetter, pendingSetter, restore } = renderSyncButtonForClick(
+      <GitHubInstallationSyncButton installationId={301} />
+    );
+    const fetcher = vi.fn(async () => jsonResponse(installationSyncResponse));
+    vi.stubGlobal("fetch", fetcher);
+
+    try {
+      await button.props.onClick();
+
+      expect(fetcher).toHaveBeenCalledTimes(1);
+      expect(pendingSetter).toHaveBeenCalledWith(true);
+      expect(feedbackSetter).toHaveBeenCalledWith(null);
+      expect(feedbackSetter).toHaveBeenCalledWith({
+        tone: "success",
+        message: "Synced 2 GitHub repositories."
+      });
+      expect(pendingSetter).toHaveBeenLastCalledWith(false);
+    } finally {
+      restore();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("shows repository sync error feedback from the button click handler", async () => {
+    const { button, feedbackSetter, restore } = renderSyncButtonForClick(
+      <GitHubRepositorySyncButton repositoryId="repo-1" />
+    );
+    const fetcher = vi.fn(async () => jsonResponse({ message: "Repository not found" }, 404));
+    vi.stubGlobal("fetch", fetcher);
+
+    try {
+      await button.props.onClick();
+
+      expect(fetcher).toHaveBeenCalledTimes(1);
+      expect(feedbackSetter).toHaveBeenCalledWith({
+        tone: "error",
+        message: "Repository not found"
+      });
+    } finally {
+      restore();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("blocks duplicate installation sync button clicks while the first request is in flight", async () => {
+    const { button, restore } = renderSyncButtonForClick(<GitHubInstallationSyncButton />);
+    let releaseRequest!: () => void;
+    const fetcher = vi.fn(
+      () =>
+        new Promise<Response>((resolve) => {
+          releaseRequest = () => resolve(jsonResponse(installationSyncResponse));
+        })
+    );
+    vi.stubGlobal("fetch", fetcher);
+
+    try {
+      const firstClick = button.props.onClick();
+      const duplicateClick = button.props.onClick();
+
+      expect(fetcher).toHaveBeenCalledTimes(1);
+
+      releaseRequest();
+
+      await Promise.all([firstClick, duplicateClick]);
+      expect(fetcher).toHaveBeenCalledTimes(1);
+    } finally {
+      restore();
+      vi.unstubAllGlobals();
+    }
+  });
 });
 
 const retryResponse: ReviewRunRetryResponse = {
@@ -256,4 +330,67 @@ function jsonResponse(body: unknown, status = 200): Response {
       "content-type": "application/json"
     }
   });
+}
+
+function renderSyncButtonForClick(element: ReactElement): {
+  button: ReactElement<{ onClick: () => Promise<void> }>;
+  pendingSetter: ReturnType<typeof vi.fn>;
+  feedbackSetter: ReturnType<typeof vi.fn>;
+  restore: () => void;
+} {
+  const pendingSetter = vi.fn();
+  const feedbackSetter = vi.fn();
+  const stateSetters = [pendingSetter, feedbackSetter];
+  const useStateSpy = vi.spyOn(React, "useState");
+  const useRefSpy = vi.spyOn(React, "useRef");
+
+  useStateSpy.mockImplementation(((initialState?: unknown) => {
+    const setter = stateSetters.shift() ?? vi.fn();
+    return [initialState, setter] as never;
+  }) as never);
+  useRefSpy.mockImplementation((initialValue: unknown) => ({ current: initialValue }) as never);
+
+  if (typeof element.type !== "function") {
+    throw new Error("Sync control must be a function component.");
+  }
+
+  const rendered = (element.type as (props: unknown) => ReactElement)(element.props);
+  const button = findElementByType(rendered, "button");
+
+  if (button === null || typeof button.props.onClick !== "function") {
+    throw new Error("Sync button click handler could not be found.");
+  }
+
+  return {
+    button: button as ReactElement<{ onClick: () => Promise<void> }>,
+    pendingSetter,
+    feedbackSetter,
+    restore: () => {
+      useStateSpy.mockRestore();
+      useRefSpy.mockRestore();
+    }
+  };
+}
+
+function findElementByType(element: unknown, type: string): ReactElement | null {
+  if (!React.isValidElement(element)) {
+    return null;
+  }
+
+  if (element.type === type) {
+    return element;
+  }
+
+  const props = element.props as { children?: React.ReactNode };
+  const children = React.Children.toArray(props.children);
+
+  for (const child of children) {
+    const found = findElementByType(child, type);
+
+    if (found !== null) {
+      return found;
+    }
+  }
+
+  return null;
 }

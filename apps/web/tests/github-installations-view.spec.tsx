@@ -100,6 +100,7 @@ describe("GitHubInstallationsView", () => {
     expect(html).toContain("openclaw/firmcode");
     expect(html).toContain("Ready");
     expect(html).toContain("Configure");
+    expect(html).toContain('href="/repositories/00000000-0000-4000-8000-000000000201?tab=configuration"');
     expect(html).toContain("Run");
   });
 
@@ -205,6 +206,7 @@ describe("GitHubInstallationsView", () => {
     expect(html).toContain("Developer or Admin required");
     expect(html).toContain("Developer or Admin required to sync GitHub installations.");
     expect(html).not.toContain('href="https://github.com/apps/firmcode/installations/new"');
+    expect(html).not.toContain('?tab=configuration"');
   });
 
   it("keeps the route inside the Clerk-authenticated dashboard shell", () => {

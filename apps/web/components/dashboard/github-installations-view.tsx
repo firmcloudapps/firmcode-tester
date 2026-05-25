@@ -472,15 +472,28 @@ function RepositoryAutomationRow({
         )}
       </div>
       <div className="flex flex-wrap gap-2">
-        <button
-          className="cursor-not-allowed rounded-md border border-border bg-subtle px-2 py-1 text-xs font-medium text-secondary opacity-70"
-          type="button"
-          disabled
-          title="Repository detail configuration is planned"
-        >
-          Configure
-        </button>
-        <GitHubRepositorySyncButton repositoryId={repository.id} disabled={syncDisabled} disabledReason={rowSyncDisabledReason({ hasOAuth, canManageRepositories, hasInstallations })} />
+        {canManageRepositories && hasOAuth && hasInstallations ? (
+          <a
+            className="rounded-md border border-border px-2 py-1 text-xs font-medium text-primary"
+            href={`/repositories/${encodeURIComponent(repository.id)}?tab=configuration`}
+          >
+            Configure
+          </a>
+        ) : (
+          <button
+            className="cursor-not-allowed rounded-md border border-border bg-subtle px-2 py-1 text-xs font-medium text-secondary opacity-70"
+            type="button"
+            disabled
+            title={rowSyncDisabledReason({ hasOAuth, canManageRepositories, hasInstallations }) ?? "Repository configuration is unavailable."}
+          >
+            Configure
+          </button>
+        )}
+        <GitHubRepositorySyncButton
+          repositoryId={repository.id}
+          disabled={syncDisabled}
+          disabledReason={rowSyncDisabledReason({ hasOAuth, canManageRepositories, hasInstallations })}
+        />
         {repository.lastReview?.status === "failed" ? (
           <RetryReviewRunButton
             compact
