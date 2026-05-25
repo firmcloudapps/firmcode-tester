@@ -109,35 +109,37 @@ describe("repository automation controls", () => {
     expect(html).toContain("Enabled");
   });
 
-  it("forwards dashboard auth headers from the explicit local bypass environment", async () => {
+  it("forwards a Clerk bearer token and optional workspace selector from the explicit test environment", async () => {
     const headers = await createDashboardApiHeaders(
       {
-        FIRMCODE_DASHBOARD_WORKSPACE_ID: "00000000-0000-4000-8000-000000000101",
-        FIRMCODE_DASHBOARD_CLERK_USER_ID: "user_admin",
-        FIRMCODE_DASHBOARD_CLERK_BILLING_CAPABILITY: "manage_billing"
+        FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN: "session-token",
+        FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID: "00000000-0000-4000-8000-000000000101"
       },
       true
     );
 
-    expect(headers.get("x-firmcode-workspace-id")).toBe("00000000-0000-4000-8000-000000000101");
-    expect(headers.get("x-firmcode-user-id")).toBe("user_admin");
-    expect(headers.get("x-firmcode-clerk-billing-capability")).toBe("manage_billing");
-    expect(headers.get("content-type")).toBe("application/json");
+    expect(headers).not.toBeNull();
+    expect(headers?.get("authorization")).toBe("Bearer session-token");
+    expect(headers?.get("x-firmcode-workspace-id")).toBe("00000000-0000-4000-8000-000000000101");
+    expect(headers?.get("x-firmcode-user-id")).toBeNull();
+    expect(headers?.get("x-firmcode-clerk-billing-capability")).toBeNull();
+    expect(headers?.get("content-type")).toBe("application/json");
   });
 
-  it("uses Clerk bearer tokens for server-side dashboard API calls", async () => {
+  it("ignores legacy dashboard user-id shim variables when a Clerk token is available", async () => {
     const headers = await createDashboardApiHeaders(
       {
-        FIRMCODE_DASHBOARD_CLERK_TOKEN: "session-token",
+        FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN: "session-token",
         FIRMCODE_DASHBOARD_WORKSPACE_ID: "00000000-0000-4000-8000-000000000101",
         FIRMCODE_DASHBOARD_CLERK_USER_ID: "user_admin"
       },
       false
     );
 
-    expect(headers.get("authorization")).toBe("Bearer session-token");
-    expect(headers.get("x-firmcode-user-id")).toBeNull();
-    expect(headers.get("x-firmcode-workspace-id")).toBeNull();
+    expect(headers).not.toBeNull();
+    expect(headers?.get("authorization")).toBe("Bearer session-token");
+    expect(headers?.get("x-firmcode-user-id")).toBeNull();
+    expect(headers?.get("x-firmcode-workspace-id")).toBeNull();
   });
 });
 

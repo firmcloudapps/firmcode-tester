@@ -63,7 +63,7 @@ The expected local auth flow is:
 6. API dashboard endpoints reject requests without a valid Clerk token.
 7. Connect GitHub OAuth from `/github/installations` before using GitHub-backed workflows.
 
-Do not use `FIRMCODE_DASHBOARD_WORKSPACE_ID` or `FIRMCODE_DASHBOARD_CLERK_USER_ID` for normal local development once Task 9.0 is implemented. Those variables are reserved for isolated tests and explicit seed/debug bypass workflows.
+Do not use dashboard user or workspace environment shims for normal local development once Task 9.0 is implemented. Web-to-API calls should use Clerk sessions. `FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN` and `FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID` are reserved for isolated web unit tests only.
 
 ## Docker-First Workflow
 

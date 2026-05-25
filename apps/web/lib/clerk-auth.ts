@@ -3,6 +3,10 @@ import { auth } from "@clerk/nextjs/server";
 export async function getClerkApiBearerToken(env: Record<string, string | undefined> = process.env): Promise<string | null> {
   try {
     const session = await auth();
+    if (session.userId == null || session.sessionId == null) {
+      return null;
+    }
+
     const template = env.CLERK_JWT_AUDIENCE;
     const token =
       template !== undefined && template !== ""
