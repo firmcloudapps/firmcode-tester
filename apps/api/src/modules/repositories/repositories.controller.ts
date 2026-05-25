@@ -6,6 +6,7 @@ import {
   Headers,
   Inject,
   NotFoundException,
+  Optional,
   Param,
   Patch,
   Post,
@@ -39,7 +40,11 @@ export class RepositoriesController {
   constructor(
     @Inject(REPOSITORIES_STORE) private readonly repositoriesStore: RepositoriesStore,
     @Inject(DASHBOARD_AUTH_STORE) dashboardAuthOrConfiguration: DashboardAuthStore | RepositoryConfigurationService = new EmptyDashboardAuthStore(),
+    @Optional()
+    @Inject(RepositoryConfigurationService)
     configurationService?: RepositoryConfigurationService | CodebaseScanEnqueueService,
+    @Optional()
+    @Inject(CodebaseScanEnqueueService)
     private readonly codebaseScanEnqueueService?: CodebaseScanEnqueueService
   ) {
     if (dashboardAuthOrConfiguration instanceof RepositoryConfigurationService) {

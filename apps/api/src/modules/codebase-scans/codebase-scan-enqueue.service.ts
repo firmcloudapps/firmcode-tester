@@ -4,6 +4,7 @@ import {
   Inject,
   Injectable,
   NotFoundException,
+  Optional,
   UnauthorizedException
 } from "@nestjs/common";
 import { randomUUID } from "crypto";
@@ -32,6 +33,7 @@ import {
 } from "./codebase-scan.store";
 
 export const CODEBASE_SCAN_TARGET_STORE = Symbol("CODEBASE_SCAN_TARGET_STORE");
+export const CODEBASE_SCAN_CORRELATION_ID_FACTORY = Symbol("CODEBASE_SCAN_CORRELATION_ID_FACTORY");
 
 export interface CodebaseScanTargetStore {
   findRepositoryTarget(repositoryId: string): Promise<CodebaseScanRepositoryTarget | null>;
@@ -70,6 +72,8 @@ export class CodebaseScanEnqueueService {
     @Inject(CODEBASE_SCAN_QUEUE) private readonly queue: CodebaseScanQueueProducer,
     @Inject(DASHBOARD_AUTH_STORE) private readonly dashboardAuthStore: DashboardAuthStore,
     @Inject(API_RUNTIME_CONFIG) private readonly config: ApiRuntimeConfig,
+    @Optional()
+    @Inject(CODEBASE_SCAN_CORRELATION_ID_FACTORY)
     private readonly createCorrelationId: () => string = randomUUID
   ) {}
 
