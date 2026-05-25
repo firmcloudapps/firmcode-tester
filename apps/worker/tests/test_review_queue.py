@@ -14,6 +14,7 @@ from firmcode_worker.review_queue import (
     ReviewWorkerError,
     codebase_scan_job_payload_from_mapping,
     process_codebase_scan_job,
+    process_codebase_scan_pipeline_job,
     process_review_pull_request_job,
     review_job_payload_from_mapping,
 )
@@ -51,6 +52,14 @@ class RecordingCodebaseScanRunRepository:
     async def create_queued_scan_for_scheduled_job(self, payload: CodebaseScanJobPayload) -> str:
         self.payloads.append(payload)
         return "scan-created"
+
+
+@dataclass
+class StubCodebaseScanPipeline:
+    payloads: list[CodebaseScanJobPayload] = field(default_factory=list)
+
+    async def run(self, payload: CodebaseScanJobPayload) -> None:
+        self.payloads.append(payload)
 
 
 def test_review_job_payload_from_mapping_validates_required_fields() -> None:
@@ -174,6 +183,23 @@ def test_codebase_scan_worker_rejects_null_scan_run_for_manual_job() -> None:
         asyncio.run(process_codebase_scan_job(payload, repository))
 
     assert error.value.error_code == "invalid_job_payload"
+
+
+def test_codebase_scan_pipeline_worker_creates_scheduled_run_then_processes_effective_payload() -> None:
+    repository = RecordingCodebaseScanRunRepository()
+    pipeline = StubCodebaseScanPipeline()
+
+    scan_run_id = asyncio.run(
+        process_codebase_scan_pipeline_job(
+            _codebase_scan_payload(scan_run_id=None),
+            repository,
+            pipeline,
+        )
+    )
+
+    assert scan_run_id == "scan-created"
+    assert pipeline.payloads[0].scan_run_id == "scan-created"
+    assert pipeline.payloads[0].repository_id == "repo-1"
 
 
 def test_review_worker_lock_window_covers_long_publish_steps() -> None:

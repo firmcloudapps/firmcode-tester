@@ -12,6 +12,7 @@ def test_worker_config_requires_database_and_redis_urls() -> None:
     assert config.database_url.startswith("postgresql://")
     assert config.redis_url == "redis://redis:6379"
     assert config.queue_name == "review-runs"
+    assert config.codebase_scan_queue_name == "codebase-scans"
     assert config.semgrep_executable == "semgrep"
     assert config.semgrep_startup_timeout_seconds == 20.0
     assert config.semgrep_startup_version_check is False
