@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import { randomUUID } from "crypto";
 import { Pool } from "pg";
 import type { ApiRuntimeConfig } from "@firmcode/shared";
 import { API_RUNTIME_CONFIG, apiRuntimeConfigProvider } from "../../config/api-config.provider";
@@ -9,6 +10,7 @@ import {
   PostgresDashboardAuthStore
 } from "../review-runs/dashboard-auth.store";
 import {
+  CODEBASE_SCAN_CORRELATION_ID_FACTORY,
   CODEBASE_SCAN_TARGET_STORE,
   CodebaseScanEnqueueService,
   EmptyCodebaseScanTargetStore,
@@ -67,6 +69,10 @@ import { CODEBASE_SCAN_STORE, EmptyCodebaseScanStore, PostgresCodebaseScanStore 
         );
       },
       inject: [API_RUNTIME_CONFIG]
+    },
+    {
+      provide: CODEBASE_SCAN_CORRELATION_ID_FACTORY,
+      useValue: randomUUID
     },
     CodebaseScanEnqueueService
   ],

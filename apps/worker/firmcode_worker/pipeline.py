@@ -987,12 +987,6 @@ class DeterministicReviewPipeline:
             tree_sitter_artifact = _run_tree_sitter(payload.review_run_id, changed_files)
             await self.store.save_artifact(payload.review_run_id, "treesitter", "tree-sitter-artifact/v1", tree_sitter_artifact)
 
-            codebase_enrichment = await self.store.load_codebase_review_enrichment(
-                context=context,
-                review_run_id=payload.review_run_id,
-                changed_files=changed_files,
-                limit=_read_positive_int(self.env.get("REVIEW_MAX_CODEBASE_FINDINGS"), 12),
-            )
             publish_check = await self.store.verify_publishable(review_run_id=payload.review_run_id)
             if not publish_check.publishable:
                 _log(
@@ -1004,6 +998,11 @@ class DeterministicReviewPipeline:
                 )
                 return
 
+            codebase_enrichment = await self._load_codebase_review_enrichment(
+                context=context,
+                payload=payload,
+                changed_files=changed_files,
+            )
             inline_comments = _build_semgrep_inline_review_comments(
                 semgrep_artifact=semgrep_artifact,
                 changed_files=changed_files,
@@ -1259,6 +1258,31 @@ class DeterministicReviewPipeline:
                 error=error.__class__.__name__,
                 message=str(error)[:500],
             )
+
+    async def _load_codebase_review_enrichment(
+        self,
+        *,
+        context: ReviewContext,
+        payload: ReviewJobInput,
+        changed_files: Sequence[ChangedFile],
+    ) -> CodebaseReviewEnrichment:
+        try:
+            return await self.store.load_codebase_review_enrichment(
+                context=context,
+                review_run_id=payload.review_run_id,
+                changed_files=changed_files,
+                limit=_read_positive_int(self.env.get("REVIEW_MAX_CODEBASE_FINDINGS"), 12),
+            )
+        except Exception as error:
+            _log(
+                "review.codebase_enrichment.load_failed",
+                reviewRunId=payload.review_run_id,
+                repositoryFullName=context.repository_full_name,
+                pullRequestNumber=context.pull_request_number,
+                error=error.__class__.__name__,
+                message=str(error)[:500],
+            )
+            return _empty_codebase_review_enrichment(context=context, review_run_id=payload.review_run_id, changed_files=changed_files)
 
 
 def parse_patch_hunks(patch: str) -> list[dict[str, Any]]:
@@ -1763,6 +1787,23 @@ def _timestamp_to_text(value: Any) -> str:
     if hasattr(value, "isoformat"):
         return value.isoformat()
     return str(value or "")
+
+
+def _empty_codebase_review_enrichment(
+    *,
+    context: ReviewContext,
+    review_run_id: str,
+    changed_files: Sequence[ChangedFile],
+) -> CodebaseReviewEnrichment:
+    return CodebaseReviewEnrichment(
+        review_run_id=review_run_id,
+        repository_id=context.repository_id,
+        repository_full_name=context.repository_full_name,
+        pull_request_number=context.pull_request_number,
+        head_sha=context.head_sha,
+        touched_file_paths=tuple(sorted({file.path for file in changed_files if file.path})),
+        findings=(),
+    )
 
 
 def _semgrep_category(finding: Mapping[str, Any]) -> str:
