@@ -1,6 +1,6 @@
 # Task 9.6b: Rules And Policies API
 
-```text
+Ensure you read the existing code on this task before you make any change
 Read AGENTS.md first and follow it strictly.
 Relevant planning docs: docs/TASKS.md Task 9.6, docs/TASK_PROMPTS.md Task 9.6, docs/PRD.md, docs/AUTHORIZATION.md, docs/LARGE_PR_HANDLING.md, docs/LLM_STRATEGY.md, docs/PRIVACY_RETENTION.md.
 Code context requirement: Before implementing, inspect existing repository configuration services, policy/config DTOs, authorization helpers, database schema, settings APIs, validation patterns, and tests.
@@ -19,4 +19,4 @@ Acceptance criteria:
 - Mutations are role-gated and ownership-gated.
 - Policy updates preserve unrelated fields.
 - Tests pass through the documented local command, or inability to run them is documented with exact command and failure.
-```
+
