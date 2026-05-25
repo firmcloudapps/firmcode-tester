@@ -2,10 +2,11 @@ import React from "react";
 import { renderToString } from "react-dom/server";
 import SignInPage from "../app/sign-in/[[...sign-in]]/page";
 import SignUpPage from "../app/sign-up/[[...sign-up]]/page";
+import { clerkAppearance } from "../components/auth/auth-page";
 import { DashboardShell } from "../components/dashboard/dashboard-shell";
 import { forwardDashboardApiMutation } from "../lib/dashboard-api-proxy";
 import { isProtectedDashboardPath, PROTECTED_DASHBOARD_ROUTES } from "../lib/protected-routes";
-import middlewareConfig from "../middleware";
+import middlewareConfig, { protectDashboardRequest } from "../middleware";
 import { config as nextMiddlewareConfig } from "../middleware";
 
 describe("Clerk route protection", () => {
@@ -21,8 +22,31 @@ describe("Clerk route protection", () => {
   it("keeps sign-in and sign-up public for unauthenticated users", () => {
     expect(isProtectedDashboardPath("/sign-in")).toBe(false);
     expect(isProtectedDashboardPath("/sign-up")).toBe(false);
-    expect(nextMiddlewareConfig.matcher).toEqual(["/((?!_next|.*\\..*).*)"]);
+    expect(nextMiddlewareConfig.matcher).toContain("/(api|trpc)(.*)");
     expect(middlewareConfig).toBeTypeOf("function");
+  });
+
+  it("redirects unauthenticated dashboard requests to sign-in through Clerk protect", async () => {
+    const auth = {
+      protect: vi.fn(async () => undefined)
+    };
+
+    await protectDashboardRequest(auth, new Request("https://firmcode.test/repositories"));
+
+    expect(auth.protect).toHaveBeenCalledWith({
+      unauthenticatedUrl: "https://firmcode.test/sign-in"
+    });
+  });
+
+  it("does not invoke Clerk protect for public auth pages or static assets", async () => {
+    const auth = {
+      protect: vi.fn(async () => undefined)
+    };
+
+    await protectDashboardRequest(auth, new Request("https://firmcode.test/sign-in"));
+    await protectDashboardRequest(auth, new Request("https://firmcode.test/assets/logo.svg"));
+
+    expect(auth.protect).not.toHaveBeenCalled();
   });
 });
 
@@ -46,6 +70,13 @@ describe("Clerk auth pages", () => {
     expect(html).toContain("md:grid-cols-[minmax(0,0.9fr)_minmax(400px,460px)]");
     expect(html).toContain('data-clerk-component="SignUp"');
   });
+
+  it("keeps Clerk appearance hooks compact and dashboard-token aligned", () => {
+    expect(clerkAppearance.elements.cardBox).toContain("border-border");
+    expect(clerkAppearance.elements.cardBox).toContain("rounded-lg");
+    expect(clerkAppearance.elements.formButtonPrimary).toContain("bg-accent");
+    expect(clerkAppearance.elements.formButtonPrimary).toContain("focus:ring-accent");
+  });
 });
 
 describe("Clerk dashboard shell controls", () => {
@@ -65,7 +96,10 @@ describe("Clerk dashboard shell controls", () => {
 
 describe("dashboard to API Clerk token integration", () => {
   it("forwards a Clerk bearer token through protected route handlers", async () => {
-    const fetcher = vi.fn(async () => new Response(JSON.stringify({ ok: true }), { status: 200 }));
+    const fetcher = vi.fn(
+      async (_input: Parameters<typeof fetch>[0], _init?: Parameters<typeof fetch>[1]) =>
+        new Response(JSON.stringify({ ok: true }), { status: 200 })
+    );
     const response = await forwardDashboardApiMutation({
       method: "POST",
       path: "/api/github/installations/sync",
@@ -76,11 +110,11 @@ describe("dashboard to API Clerk token integration", () => {
       },
       fetcher
     });
-    const init = fetcher.mock.calls[0]?.[1] as RequestInit;
+    const init = fetcher.mock.calls[0]![1] as RequestInit;
     const headers = new Headers(init.headers);
 
     expect(response.status).toBe(200);
-    expect(new URL(String(fetcher.mock.calls[0]?.[0])).pathname).toBe("/api/github/installations/sync");
+    expect(new URL(String(fetcher.mock.calls[0]![0])).pathname).toBe("/api/github/installations/sync");
     expect(headers.get("authorization")).toBe("Bearer session-token");
     expect(headers.get("x-firmcode-user-id")).toBeNull();
   });

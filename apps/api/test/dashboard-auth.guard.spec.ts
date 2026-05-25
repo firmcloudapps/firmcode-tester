@@ -42,7 +42,7 @@ describe("DashboardAuthGuard", () => {
   });
 
   it("resolves a valid personal workspace token into trusted request context headers", async () => {
-    const request = { headers: { authorization: "Bearer personal-token" } };
+    const request = createRequest({ authorization: "Bearer personal-token" });
     const guard = createGuard();
 
     await expect(guard.canActivate(createHttpContext(request.headers, request))).resolves.toBe(true);
@@ -60,7 +60,7 @@ describe("DashboardAuthGuard", () => {
   });
 
   it("resolves a valid organization token into workspace membership and role", async () => {
-    const request = { headers: { authorization: "Bearer organization-token" } };
+    const request = createRequest({ authorization: "Bearer organization-token" });
     const guard = createGuard({
       verifier: {
         async verify() {
@@ -163,4 +163,8 @@ function createHttpContext(headers: Record<string, string | string[] | undefined
       getRequest: () => request
     })
   } as unknown as ExecutionContext;
+}
+
+function createRequest(headers: Record<string, string | string[] | undefined>): { headers: Record<string, string | string[] | undefined> } {
+  return { headers };
 }

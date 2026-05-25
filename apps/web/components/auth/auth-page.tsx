@@ -1,5 +1,6 @@
 import React from "react";
 import { ClerkLoaded, ClerkLoading, SignIn, SignUp } from "@clerk/nextjs";
+import { loadWebClerkConfig } from "../../config/clerk";
 
 type AuthMode = "sign-in" | "sign-up";
 
@@ -7,14 +8,15 @@ interface AuthPageProps {
   mode: AuthMode;
 }
 
-const clerkAppearance = {
+export const clerkAppearance = {
   elements: {
     cardBox: "shadow-none border border-border rounded-lg",
     card: "shadow-none rounded-lg",
     headerTitle: "text-primary",
     headerSubtitle: "text-secondary",
-    formButtonPrimary: "bg-accent hover:bg-accent text-white rounded-md",
-    footerActionLink: "text-accent"
+    formFieldInput: "rounded-md border-border text-primary focus:border-accent focus:ring-accent",
+    formButtonPrimary: "rounded-md bg-accent text-white hover:bg-accent focus:ring-2 focus:ring-accent focus:ring-offset-2",
+    footerActionLink: "text-accent hover:text-accent"
   }
 };
 
@@ -87,9 +89,23 @@ function renderClerkAuthComponent(mode: AuthMode) {
     );
   }
 
+  const clerk = loadWebClerkConfig();
+
   return mode === "sign-in" ? (
-    <SignIn routing="path" path="/sign-in" signUpUrl="/sign-up" appearance={clerkAppearance} />
+    <SignIn
+      routing="path"
+      path={clerk.signInUrl}
+      signUpUrl={clerk.signUpUrl}
+      fallbackRedirectUrl={clerk.afterSignInUrl}
+      appearance={clerkAppearance}
+    />
   ) : (
-    <SignUp routing="path" path="/sign-up" signInUrl="/sign-in" appearance={clerkAppearance} />
+    <SignUp
+      routing="path"
+      path={clerk.signUpUrl}
+      signInUrl={clerk.signInUrl}
+      fallbackRedirectUrl={clerk.afterSignUpUrl}
+      appearance={clerkAppearance}
+    />
   );
 }

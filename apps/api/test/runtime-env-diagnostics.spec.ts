@@ -10,6 +10,7 @@ describe("runtime environment diagnostics", () => {
       GITHUB_CLIENT_ID: "",
       GITHUB_CLIENT_SECRET: undefined,
       CLERK_SECRET_KEY: "sk_test_example",
+      CLERK_JWT_AUDIENCE: "firmcode-api",
       REDIS_URL: "\"redis://redis:6379\""
     });
 
@@ -35,6 +36,10 @@ describe("runtime environment diagnostics", () => {
     expect(diagnostics).toContainEqual({
       variable: "GITHUB_CLIENT_SECRET",
       state: "missing"
+    });
+    expect(diagnostics).toContainEqual({
+      variable: "CLERK_JWT_AUDIENCE",
+      state: "present"
     });
     expect(diagnostics).toContainEqual({
       variable: "REDIS_URL",

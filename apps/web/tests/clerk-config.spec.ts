@@ -11,19 +11,25 @@ describe("web Clerk config", () => {
       publishableKey: "pk_test_example",
       signInUrl: "/sign-in",
       signUpUrl: "/sign-up",
+      afterSignInUrl: "/",
+      afterSignUpUrl: "/",
       billingPortalUrl: "https://accounts.clerk.example/billing"
     });
   });
 
-  it("accepts explicit Clerk sign-in and sign-up routes", () => {
+  it("accepts explicit Clerk sign-in, sign-up, and after-auth routes", () => {
     const config = createWebClerkConfig({
       NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_example",
       NEXT_PUBLIC_CLERK_SIGN_IN_URL: "/sign-in",
-      NEXT_PUBLIC_CLERK_SIGN_UP_URL: "/sign-up"
+      NEXT_PUBLIC_CLERK_SIGN_UP_URL: "/sign-up",
+      NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL: "/repositories",
+      NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL: "/github/installations"
     });
 
     expect(config.signInUrl).toBe("/sign-in");
     expect(config.signUpUrl).toBe("/sign-up");
+    expect(config.afterSignInUrl).toBe("/repositories");
+    expect(config.afterSignUpUrl).toBe("/github/installations");
   });
 
   it("fails when the Clerk publishable key is missing", () => {
@@ -37,5 +43,14 @@ describe("web Clerk config", () => {
         CLERK_BILLING_PORTAL_URL: "/billing"
       })
     ).toThrow(/CLERK_BILLING_PORTAL_URL must be an absolute/);
+  });
+
+  it("rejects invalid Clerk route values", () => {
+    expect(() =>
+      createWebClerkConfig({
+        NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_example",
+        NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL: "dashboard"
+      })
+    ).toThrow(/NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL must be an absolute http\(s\) URL or app-relative path/);
   });
 });
