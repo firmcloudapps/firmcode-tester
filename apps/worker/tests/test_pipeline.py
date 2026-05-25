@@ -7,15 +7,19 @@ from typing import Any, Mapping, Sequence
 
 from firmcode_worker.pipeline import (
     ChangedFile,
+    CodebaseFinding,
+    CodebaseReviewEnrichment,
     DeterministicReviewPipeline,
     GitHubFile,
     ReviewContext,
+    ReviewPublishCheck,
     _code_review_summary_lines,
     _inline_review_body,
     _partition_existing_inline_comments,
     _render_changed_component_patch,
     _render_resolution_bullets,
     _render_semgrep_fix_diff,
+    render_summary_comment,
     normalize_private_key,
     parse_patch_hunks,
 )
@@ -27,6 +31,9 @@ class RecordingStore:
     artifacts: list[tuple[str, str, Mapping[str, Any]]] = field(default_factory=list)
     changed_files: list[ChangedFile] = field(default_factory=list)
     semgrep_findings: list[Mapping[str, Any]] = field(default_factory=list)
+    codebase_findings: list[CodebaseFinding] = field(default_factory=list)
+    publishable: bool = True
+    publish_skip_reason: str | None = None
     inline_comments: list[Any] = field(default_factory=list)
     summary_body: str | None = None
     dry_run: bool | None = None
@@ -34,6 +41,7 @@ class RecordingStore:
     async def load_context(self, review_run_id: str) -> ReviewContext:
         assert review_run_id == "run-1"
         return ReviewContext(
+            repository_id="repo-1",
             installation_id=123,
             repository_full_name="acme/widgets",
             repository_owner="acme",
@@ -42,6 +50,7 @@ class RecordingStore:
             pull_request_title="Add widget parser",
             base_sha="base123",
             head_sha="head123",
+            current_head_sha="head123",
         )
 
     async def save_changed_files(self, _review_run_id: str, files: Sequence[ChangedFile]) -> None:
@@ -52,6 +61,29 @@ class RecordingStore:
 
     async def save_semgrep_findings(self, _review_run_id: str, findings: Sequence[Mapping[str, Any]]) -> None:
         self.semgrep_findings.extend(findings)
+
+    async def load_codebase_review_enrichment(
+        self,
+        *,
+        context: ReviewContext,
+        review_run_id: str,
+        changed_files: Sequence[ChangedFile],
+        limit: int = 12,
+    ) -> CodebaseReviewEnrichment:
+        _ = (limit,)
+        return CodebaseReviewEnrichment(
+            review_run_id=review_run_id,
+            repository_id=context.repository_id,
+            repository_full_name=context.repository_full_name,
+            pull_request_number=context.pull_request_number,
+            head_sha=context.head_sha,
+            touched_file_paths=tuple(file.path for file in changed_files),
+            findings=tuple(self.codebase_findings),
+        )
+
+    async def verify_publishable(self, *, review_run_id: str) -> ReviewPublishCheck:
+        assert review_run_id == "run-1"
+        return ReviewPublishCheck(publishable=self.publishable, reason=self.publish_skip_reason)
 
     async def record_inline_comments(self, review_run_id: str, comments: Sequence[Any]) -> None:
         assert review_run_id == "run-1"
@@ -74,6 +106,7 @@ class RecordingStore:
 class FakeGitHub:
     def __init__(self) -> None:
         self.scanning_bodies: list[str] = []
+        self.summary_bodies: list[str] = []
         self.inline_review_comments: list[Mapping[str, Any]] = []
 
     def fetch_pull_request_files(self, *, installation_id: int, repository_full_name: str, pull_number: int) -> list[GitHubFile]:
@@ -114,9 +147,10 @@ class FakeGitHub:
         pull_number: int,
         body: str,
     ) -> tuple[int | None, bool]:
-        assert "FirmcodeAI reviewed this PR and found 1 actionable issue(s)." in body
+        assert "FirmcodeAI reviewed this PR" in body
         assert "Semgrep" not in body
         assert "Tree-sitter" not in body
+        self.summary_bodies.append(body)
         return None, True
 
     def publish_scanning_comment(
@@ -386,6 +420,126 @@ def test_code_review_summary_replaces_empty_actionable_placeholder() -> None:
     assert "No actionable issues were found in the selected changed files." not in "\n".join(lines)
 
 
+def test_summary_renderer_separates_current_pr_and_existing_codebase_findings() -> None:
+    summary = render_summary_comment(
+        context=_context(),
+        payload=_payload(),
+        changed_files=[_changed_file()],
+        skipped_files=[],
+        semgrep_artifact=_stub_semgrep_runner().artifact,
+        tree_sitter_artifact={"files": []},
+        codebase_enrichment=CodebaseReviewEnrichment(
+            review_run_id="run-1",
+            repository_id="repo-1",
+            repository_full_name="acme/widgets",
+            pull_request_number=7,
+            head_sha="head123",
+            touched_file_paths=("src/widget.ts",),
+            findings=(_codebase_finding(),),
+        ),
+    )
+
+    assert "1 current PR actionable issue(s), plus 1 relevant pre-existing codebase issue(s)" in summary
+    assert "**Current PR findings**" in summary
+    assert "**Existing codebase findings**" in summary
+    assert "Pre-existing parser authorization gap" in summary
+    assert "`src/parser/auth.ts:8` shows if (user.role)" in summary
+    assert "Recommendation: Require an explicit permission check." in summary
+
+
+def test_summary_renderer_handles_codebase_only_findings() -> None:
+    summary = render_summary_comment(
+        context=_context(),
+        payload=_payload(),
+        changed_files=[_changed_file()],
+        skipped_files=[],
+        semgrep_artifact=_empty_semgrep_artifact_for_test(),
+        tree_sitter_artifact={"files": []},
+        codebase_enrichment=CodebaseReviewEnrichment(
+            review_run_id="run-1",
+            repository_id="repo-1",
+            repository_full_name="acme/widgets",
+            pull_request_number=7,
+            head_sha="head123",
+            touched_file_paths=("src/widget.ts",),
+            findings=(_codebase_finding(),),
+        ),
+    )
+
+    assert "found 0 current PR actionable issue(s), plus 1 relevant pre-existing codebase issue(s)" in summary
+    assert "did not find new changed-line issues in this PR" in summary
+    assert "**Current PR findings**" not in summary
+    assert "**Existing codebase findings**" in summary
+
+
+def test_summary_renderer_dedupes_current_pr_and_codebase_findings() -> None:
+    duplicate = _codebase_finding(
+        dedupe_key="semgrep:typescript.eval",
+        title="Avoid eval on untrusted input",
+        path="src/widget.ts",
+        line=2,
+        excerpt="const value = eval(input);",
+        recommendation="Validate and parse trusted input instead of evaluating it.",
+    )
+
+    summary = render_summary_comment(
+        context=_context(),
+        payload=_payload(),
+        changed_files=[_changed_file()],
+        skipped_files=[],
+        semgrep_artifact=_stub_semgrep_runner().artifact,
+        tree_sitter_artifact={"files": []},
+        codebase_enrichment=CodebaseReviewEnrichment(
+            review_run_id="run-1",
+            repository_id="repo-1",
+            repository_full_name="acme/widgets",
+            pull_request_number=7,
+            head_sha="head123",
+            touched_file_paths=("src/widget.ts",),
+            findings=(duplicate,),
+        ),
+    )
+
+    assert "pre-existing codebase issue" not in summary
+    assert "**Existing codebase findings**" not in summary
+    assert summary.count("Avoid eval on untrusted input") >= 1
+
+
+def test_deterministic_pipeline_enriches_summary_without_extra_inline_comments() -> None:
+    store = RecordingStore(codebase_findings=[_codebase_finding()])
+    github = FakeGitHub()
+    pipeline = DeterministicReviewPipeline(
+        store=store,  # type: ignore[arg-type]
+        github=github,  # type: ignore[arg-type]
+        semgrep_runner=_stub_semgrep_runner,
+        env={"SEMGREP_CONFIGS": "auto"},
+    )
+
+    asyncio.run(pipeline.run(_payload()))
+
+    assert len(github.inline_review_comments) == 1
+    assert store.summary_body is not None
+    assert "Existing codebase findings" in store.summary_body
+    assert "Pre-existing parser authorization gap" in store.summary_body
+
+
+def test_deterministic_pipeline_skips_publish_when_run_is_not_publishable() -> None:
+    store = RecordingStore(publishable=False, publish_skip_reason="head_sha_changed")
+    github = FakeGitHub()
+    pipeline = DeterministicReviewPipeline(
+        store=store,  # type: ignore[arg-type]
+        github=github,  # type: ignore[arg-type]
+        semgrep_runner=_stub_semgrep_runner,
+        env={"SEMGREP_CONFIGS": "auto"},
+    )
+
+    asyncio.run(pipeline.run(_payload()))
+
+    assert github.inline_review_comments == []
+    assert github.summary_bodies == []
+    assert store.summary_body is None
+
+
 def _stub_semgrep_runner(**_kwargs: Any) -> StubSemgrepResult:
     return StubSemgrepResult(
         artifact={
@@ -413,6 +567,86 @@ def _stub_semgrep_runner(**_kwargs: Any) -> StubSemgrepResult:
             "errors": [],
             "paths": {"scanned": ["src/widget.ts"], "skipped": []},
         }
+    )
+
+
+def _empty_semgrep_artifact_for_test() -> Mapping[str, Any]:
+    return {
+        "schemaVersion": "semgrep-artifact/v1",
+        "reviewRunId": "run-1",
+        "toolVersion": "1.0.0",
+        "exitCode": 0,
+        "durationMs": 1,
+        "findings": [],
+        "errors": [],
+        "paths": {"scanned": ["src/widget.ts"], "skipped": []},
+    }
+
+
+def _context() -> ReviewContext:
+    return ReviewContext(
+        repository_id="repo-1",
+        installation_id=123,
+        repository_full_name="acme/widgets",
+        repository_owner="acme",
+        repository_name="widgets",
+        pull_request_number=7,
+        pull_request_title="Add widget parser",
+        base_sha="base123",
+        head_sha="head123",
+        current_head_sha="head123",
+    )
+
+
+def _changed_file() -> ChangedFile:
+    return ChangedFile(
+        path="src/widget.ts",
+        previous_path=None,
+        status="modified",
+        additions=2,
+        deletions=0,
+        patch="@@ -1,2 +1,4 @@\n export function parseWidget(input: string) {\n+  const value = eval(input);\n+  return value;\n }\n",
+        language="typescript",
+        content="export function parseWidget(input: string) {\n  const value = eval(input);\n  return value;\n}\n",
+        size_bytes=91,
+        changed_new_lines=(2, 3),
+        hunks=tuple(parse_patch_hunks("@@ -1,2 +1,4 @@\n export function parseWidget(input: string) {\n+  const value = eval(input);\n+  return value;\n }\n")),
+    )
+
+
+def _codebase_finding(
+    *,
+    dedupe_key: str = "semgrep:auth-gap:src/parser/auth.ts:8",
+    title: str = "Pre-existing parser authorization gap",
+    path: str = "src/parser/auth.ts",
+    line: int = 8,
+    excerpt: str = "if (user.role)",
+    recommendation: str = "Require an explicit permission check.",
+) -> CodebaseFinding:
+    return CodebaseFinding(
+        finding_id="codebase-finding-1",
+        dedupe_key=dedupe_key,
+        source="semgrep",
+        category="security",
+        severity="high",
+        confidence="high",
+        file_path=path,
+        start_line=line,
+        end_line=line,
+        title=title,
+        evidence=(
+            {
+                "source": "semgrep",
+                "artifactType": "semgrep",
+                "path": path,
+                "lineRange": {"startLine": line, "endLine": line},
+                "excerpt": excerpt,
+                "redacted": True,
+            },
+        ),
+        recommendation=recommendation,
+        first_seen_at="2026-05-25T10:00:00.000Z",
+        last_seen_at="2026-05-25T10:00:00.000Z",
     )
 
 

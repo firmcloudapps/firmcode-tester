@@ -93,6 +93,7 @@ class ReviewPipelineError(Exception):
 
 @dataclass(frozen=True)
 class ReviewContext:
+    repository_id: str
     installation_id: int
     repository_full_name: str
     repository_owner: str
@@ -101,6 +102,7 @@ class ReviewContext:
     pull_request_title: str
     base_sha: str
     head_sha: str
+    current_head_sha: str
 
 
 @dataclass(frozen=True)
@@ -150,6 +152,41 @@ class PublishedInlineComment:
     line: int
     body: str
     dry_run: bool
+
+
+@dataclass(frozen=True)
+class CodebaseFinding:
+    finding_id: str
+    dedupe_key: str
+    source: str
+    category: str
+    severity: str
+    confidence: str
+    file_path: str | None
+    start_line: int | None
+    end_line: int | None
+    title: str
+    evidence: tuple[Mapping[str, Any], ...]
+    recommendation: str | None
+    first_seen_at: str
+    last_seen_at: str
+
+
+@dataclass(frozen=True)
+class CodebaseReviewEnrichment:
+    review_run_id: str
+    repository_id: str
+    repository_full_name: str
+    pull_request_number: int
+    head_sha: str
+    touched_file_paths: tuple[str, ...]
+    findings: tuple[CodebaseFinding, ...]
+
+
+@dataclass(frozen=True)
+class ReviewPublishCheck:
+    publishable: bool
+    reason: str | None
 
 
 class GitHubClient:
@@ -456,6 +493,7 @@ class PostgresReviewPipelineStore:
                 await cursor.execute(
                     """
 SELECT
+  r.id AS repository_id,
   gi.installation_id,
   r.full_name AS repository_full_name,
   r.owner AS repository_owner,
@@ -463,7 +501,8 @@ SELECT
   pr.number AS pull_request_number,
   pr.title AS pull_request_title,
   pr.base_sha,
-  pr.head_sha
+  rr.head_sha AS review_head_sha,
+  pr.head_sha AS current_head_sha
 FROM review_runs rr
 JOIN repositories r ON r.id = rr.repository_id
 JOIN github_installations gi ON gi.id = r.installation_id
@@ -478,6 +517,7 @@ WHERE rr.id = %s
             raise ReviewPipelineError("review_context_not_found", f"Review run {review_run_id} was not found.")
 
         return ReviewContext(
+            repository_id=str(row["repository_id"]),
             installation_id=int(row["installation_id"]),
             repository_full_name=str(row["repository_full_name"]),
             repository_owner=str(row["repository_owner"]),
@@ -485,7 +525,8 @@ WHERE rr.id = %s
             pull_request_number=int(row["pull_request_number"]),
             pull_request_title=str(row["pull_request_title"]),
             base_sha=str(row["base_sha"]),
-            head_sha=str(row["head_sha"]),
+            head_sha=str(row["review_head_sha"]),
+            current_head_sha=str(row["current_head_sha"]),
         )
 
     async def save_changed_files(self, review_run_id: str, files: Sequence[ChangedFile]) -> None:
@@ -602,6 +643,134 @@ SET severity = EXCLUDED.severity,
                             _read_str(finding.get("id"), _dedupe_hash(finding)),
                         ),
                     )
+
+    async def load_codebase_review_enrichment(
+        self,
+        *,
+        context: ReviewContext,
+        review_run_id: str,
+        changed_files: Sequence[ChangedFile],
+        limit: int = 12,
+    ) -> CodebaseReviewEnrichment:
+        touched_file_paths = tuple(sorted({file.path for file in changed_files if file.path}))
+        component_prefixes = tuple(_touched_component_prefixes(changed_files))
+        if not touched_file_paths and not component_prefixes:
+            return CodebaseReviewEnrichment(
+                review_run_id=review_run_id,
+                repository_id=context.repository_id,
+                repository_full_name=context.repository_full_name,
+                pull_request_number=context.pull_request_number,
+                head_sha=context.head_sha,
+                touched_file_paths=touched_file_paths,
+                findings=(),
+            )
+
+        import psycopg
+
+        async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
+            async with connection.cursor(row_factory=psycopg.rows.dict_row) as cursor:
+                await cursor.execute(
+                    """
+SELECT
+  id,
+  scan_run_id,
+  repository_id,
+  source,
+  category,
+  severity,
+  confidence,
+  file_path,
+  start_line,
+  end_line,
+  title,
+  evidence_json,
+  recommendation,
+  dedupe_key,
+  first_seen_at,
+  last_seen_at,
+  file_path = ANY(%s) AS direct_file_match
+FROM codebase_scan_findings
+WHERE repository_id = %s
+  AND status = 'open'
+  AND (
+    file_path = ANY(%s)
+    OR (
+      severity IN ('critical', 'high')
+      AND file_path IS NOT NULL
+      AND EXISTS (
+        SELECT 1
+        FROM unnest(%s::text[]) AS component(component_prefix)
+        WHERE file_path = component.component_prefix
+           OR file_path LIKE component.component_prefix || '/%%'
+      )
+    )
+  )
+ORDER BY
+  CASE severity
+    WHEN 'critical' THEN 0
+    WHEN 'high' THEN 1
+    WHEN 'medium' THEN 2
+    WHEN 'low' THEN 3
+    ELSE 4
+  END,
+  direct_file_match DESC,
+  last_seen_at DESC,
+  file_path ASC
+LIMIT %s
+""",
+                    (list(touched_file_paths), context.repository_id, list(touched_file_paths), list(component_prefixes), max(0, limit)),
+                )
+                rows = await cursor.fetchall()
+
+        return CodebaseReviewEnrichment(
+            review_run_id=review_run_id,
+            repository_id=context.repository_id,
+            repository_full_name=context.repository_full_name,
+            pull_request_number=context.pull_request_number,
+            head_sha=context.head_sha,
+            touched_file_paths=touched_file_paths,
+            findings=tuple(_row_to_codebase_finding(row) for row in rows),
+        )
+
+    async def verify_publishable(self, *, review_run_id: str) -> ReviewPublishCheck:
+        import psycopg
+
+        async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
+            async with connection.cursor(row_factory=psycopg.rows.dict_row) as cursor:
+                await cursor.execute(
+                    """
+SELECT
+  rr.status,
+  rr.head_sha AS review_head_sha,
+  pr.head_sha AS current_head_sha
+FROM review_runs rr
+JOIN pull_requests pr ON pr.id = rr.pull_request_id
+WHERE rr.id = %s
+""",
+                    (review_run_id,),
+                )
+                row = await cursor.fetchone()
+
+                if row is None:
+                    return ReviewPublishCheck(publishable=False, reason="review_run_not_found")
+                if str(row["status"]) == "superseded":
+                    return ReviewPublishCheck(publishable=False, reason="review_run_superseded")
+                if str(row["review_head_sha"]) != str(row["current_head_sha"]):
+                    await cursor.execute(
+                        """
+UPDATE review_runs
+SET status = 'superseded',
+    finished_at = COALESCE(finished_at, now()),
+    error_code = 'current_head_sha_changed',
+    error_message = %s,
+    updated_at = now()
+WHERE id = %s
+""",
+                        (f"Skipped publishing because current PR head is {row['current_head_sha']}", review_run_id),
+                    )
+                    return ReviewPublishCheck(publishable=False, reason="head_sha_changed")
+
+        return ReviewPublishCheck(publishable=True, reason=None)
 
     async def record_summary_comment(
         self,
@@ -818,6 +987,23 @@ class DeterministicReviewPipeline:
             tree_sitter_artifact = _run_tree_sitter(payload.review_run_id, changed_files)
             await self.store.save_artifact(payload.review_run_id, "treesitter", "tree-sitter-artifact/v1", tree_sitter_artifact)
 
+            codebase_enrichment = await self.store.load_codebase_review_enrichment(
+                context=context,
+                review_run_id=payload.review_run_id,
+                changed_files=changed_files,
+                limit=_read_positive_int(self.env.get("REVIEW_MAX_CODEBASE_FINDINGS"), 12),
+            )
+            publish_check = await self.store.verify_publishable(review_run_id=payload.review_run_id)
+            if not publish_check.publishable:
+                _log(
+                    "review.pipeline.publish_skipped",
+                    reviewRunId=payload.review_run_id,
+                    repositoryFullName=context.repository_full_name,
+                    pullRequestNumber=context.pull_request_number,
+                    reason=publish_check.reason,
+                )
+                return
+
             inline_comments = _build_semgrep_inline_review_comments(
                 semgrep_artifact=semgrep_artifact,
                 changed_files=changed_files,
@@ -855,6 +1041,7 @@ class DeterministicReviewPipeline:
                 skipped_files=skipped_files,
                 semgrep_artifact=semgrep_artifact,
                 tree_sitter_artifact=tree_sitter_artifact,
+                codebase_enrichment=codebase_enrichment,
                 inline_comment_count=inline_comment_count,
             )
             github_comment_id, dry_run = self.github.publish_summary_comment(
@@ -1127,17 +1314,32 @@ def render_summary_comment(
     skipped_files: Sequence[SkippedFile],
     semgrep_artifact: Mapping[str, Any],
     tree_sitter_artifact: Mapping[str, Any],
+    codebase_enrichment: CodebaseReviewEnrichment | None = None,
     inline_comment_count: int = 0,
 ) -> str:
     semgrep_findings = _read_list(semgrep_artifact.get("findings"))
     semgrep_errors = _read_list(semgrep_artifact.get("errors"))
+    codebase_findings = _dedupe_codebase_findings(semgrep_findings, codebase_enrichment.findings if codebase_enrichment else ())
     risk_level = _risk_level(semgrep_findings, semgrep_errors)
     component_lines = _changed_component_lines(changed_files)
-    code_review_lines = _code_review_summary_lines(semgrep_findings, semgrep_errors)
+    code_review_lines = _code_review_summary_lines(semgrep_findings, semgrep_errors, codebase_findings=codebase_findings)
     review_blocks = [_render_summary_semgrep_finding(finding, changed_files) for finding in semgrep_findings[:8]]
     if review_blocks:
-        code_review_lines.extend(["", "**Actionable findings**", "", *review_blocks])
+        heading = "**Current PR findings**" if codebase_findings else "**Actionable findings**"
+        code_review_lines.extend(["", heading, "", *review_blocks])
+    if codebase_findings:
+        code_review_lines.extend(["", "**Existing codebase findings**", ""])
+        code_review_lines.extend(_render_codebase_finding_summary(finding) for finding in codebase_findings[:6])
+        hidden_codebase_count = max(0, len(codebase_findings) - 6)
+        if hidden_codebase_count:
+            code_review_lines.append(f"- ...and {hidden_codebase_count} more relevant existing codebase issue{'s' if hidden_codebase_count != 1 else ''}.")
     suggestions = _test_suggestions(changed_files, semgrep_findings)
+    lead = f"FirmcodeAI reviewed this PR and found {len(semgrep_findings)} actionable issue(s)."
+    if codebase_findings:
+        lead = (
+            f"FirmcodeAI reviewed this PR and found {len(semgrep_findings)} current PR actionable issue(s), "
+            f"plus {len(codebase_findings)} relevant pre-existing codebase issue(s)."
+        )
 
     return "\n".join(
         [
@@ -1145,9 +1347,7 @@ def render_summary_comment(
             FIRMCODEAI_BANNER,
             "## FirmcodeAI Summary",
             "",
-            (
-                f"FirmcodeAI reviewed this PR and found {len(semgrep_findings)} actionable issue(s)."
-            ),
+            lead,
             "",
             "### Code Review",
             "",
@@ -1374,6 +1574,128 @@ def _skipped_to_semgrep_path(file: SkippedFile) -> dict[str, Any]:
     return {"path": file.path, "reason": file.reason, "detail": file.detail}
 
 
+def _dedupe_codebase_findings(current_findings: Sequence[Any], codebase_findings: Sequence[CodebaseFinding]) -> list[CodebaseFinding]:
+    current_dedupe_keys: set[str] = set()
+    current_exact_keys: set[tuple[str, str, int | None, str, str]] = set()
+    current_cross_source_keys: set[tuple[str, int | None, str, str]] = set()
+
+    for finding in current_findings:
+        item = _read_object(finding)
+        dedupe_key = _read_str(item.get("id"), "")
+        if dedupe_key:
+            current_dedupe_keys.add(dedupe_key)
+        exact_key = _current_finding_exact_key(item)
+        current_exact_keys.add(exact_key)
+        current_cross_source_keys.add(_finding_cross_source_key(exact_key))
+
+    selected: list[CodebaseFinding] = []
+    seen_dedupe_keys: set[str] = set()
+    seen_exact_keys: set[tuple[str, str, int | None, str, str]] = set()
+    seen_cross_source_keys: set[tuple[str, int | None, str, str]] = set()
+
+    for finding in codebase_findings:
+        exact_key = _codebase_finding_exact_key(finding)
+        cross_source_key = _finding_cross_source_key(exact_key)
+        if (
+            finding.dedupe_key in current_dedupe_keys
+            or exact_key in current_exact_keys
+            or cross_source_key in current_cross_source_keys
+            or finding.dedupe_key in seen_dedupe_keys
+            or exact_key in seen_exact_keys
+            or cross_source_key in seen_cross_source_keys
+        ):
+            continue
+        selected.append(finding)
+        seen_dedupe_keys.add(finding.dedupe_key)
+        seen_exact_keys.add(exact_key)
+        seen_cross_source_keys.add(cross_source_key)
+
+    return selected
+
+
+def _current_finding_exact_key(finding: Mapping[str, Any]) -> tuple[str, str, int | None, str, str]:
+    start = _read_object(finding.get("start"))
+    return (
+        _read_str(finding.get("source"), "semgrep"),
+        _read_str(finding.get("path"), ""),
+        _read_optional_int(start.get("line")),
+        _normalized_finding_text(_read_str(finding.get("message"), "")),
+        _semgrep_finding_evidence_hash(finding),
+    )
+
+
+def _codebase_finding_exact_key(finding: CodebaseFinding) -> tuple[str, str, int | None, str, str]:
+    return (
+        finding.source,
+        finding.file_path or "",
+        finding.start_line,
+        _normalized_finding_text(finding.title),
+        _codebase_finding_evidence_hash(finding),
+    )
+
+
+def _finding_cross_source_key(key: tuple[str, str, int | None, str, str]) -> tuple[str, int | None, str, str]:
+    _source, path, line, title, evidence_hash = key
+    return (path, line, title, evidence_hash)
+
+
+def _semgrep_finding_evidence_hash(finding: Mapping[str, Any]) -> str:
+    start = _read_object(finding.get("start"))
+    end = _read_object(finding.get("end"))
+    return _evidence_hash_parts(
+        (
+            (
+                "semgrep",
+                _read_str(finding.get("path"), ""),
+                _read_optional_int(start.get("line")),
+                _read_optional_int(end.get("line")),
+                _read_str(finding.get("lines"), "") or _read_str(finding.get("message"), ""),
+            ),
+        )
+    )
+
+
+def _codebase_finding_evidence_hash(finding: CodebaseFinding) -> str:
+    parts: list[tuple[str, str, int | None, int | None, str]] = []
+    for evidence in finding.evidence:
+        line_range = _read_object(evidence.get("lineRange"))
+        parts.append(
+            (
+                _read_str(evidence.get("source"), finding.source),
+                _read_optional_str(evidence.get("path")) or finding.file_path or "",
+                _read_optional_int(line_range.get("startLine")),
+                _read_optional_int(line_range.get("endLine")),
+                _read_str(evidence.get("excerpt"), ""),
+            )
+        )
+    if not parts:
+        parts.append((finding.source, finding.file_path or "", finding.start_line, finding.end_line, finding.title))
+    return _evidence_hash_parts(tuple(parts))
+
+
+def _evidence_hash_parts(parts: Sequence[tuple[str, str, int | None, int | None, str]]) -> str:
+    hasher = hashlib.sha256()
+    for source, path, start_line, end_line, excerpt in sorted(
+        parts,
+        key=lambda part: (part[0], part[1], part[2] or 0, part[3] or 0, _normalized_finding_text(part[4])),
+    ):
+        hasher.update(source.encode("utf-8"))
+        hasher.update(b"\0")
+        hasher.update(path.encode("utf-8"))
+        hasher.update(b"\0")
+        hasher.update(str(start_line or "").encode("utf-8"))
+        hasher.update(b":")
+        hasher.update(str(end_line or "").encode("utf-8"))
+        hasher.update(b"\0")
+        hasher.update(_normalized_finding_text(excerpt).encode("utf-8"))
+        hasher.update(b"\0")
+    return hasher.hexdigest()
+
+
+def _normalized_finding_text(value: str) -> str:
+    return " ".join(value.casefold().split())
+
+
 def _normalize_file_status(value: str) -> str:
     normalized = value.lower()
     if normalized in DELETED_STATUSES:
@@ -1397,6 +1719,50 @@ def _is_infrastructure_path(path: str) -> bool:
         "docker-compose.yml",
         "docker-compose.prod.yml",
     }
+
+
+def _touched_component_prefixes(files: Sequence[ChangedFile]) -> list[str]:
+    prefixes: list[str] = []
+    seen: set[str] = set()
+    for file in files:
+        prefix = _component_prefix(file.path)
+        if prefix and prefix not in seen:
+            prefixes.append(prefix)
+            seen.add(prefix)
+    return prefixes
+
+
+def _component_prefix(path: str) -> str:
+    parts = [part for part in path.split("/") if part]
+    if not parts:
+        return ""
+    return "/".join(parts[:2]) if len(parts) > 1 else parts[0]
+
+
+def _row_to_codebase_finding(row: Mapping[str, Any]) -> CodebaseFinding:
+    evidence = _read_list(row.get("evidence_json"))
+    return CodebaseFinding(
+        finding_id=str(row["id"]),
+        dedupe_key=str(row["dedupe_key"]),
+        source=str(row["source"]),
+        category=str(row["category"]),
+        severity=str(row["severity"]),
+        confidence=str(row["confidence"]),
+        file_path=_read_optional_str(row.get("file_path")),
+        start_line=_read_optional_int(row.get("start_line")),
+        end_line=_read_optional_int(row.get("end_line")),
+        title=str(row["title"]),
+        evidence=tuple(_read_object(item) for item in evidence),
+        recommendation=_read_optional_str(row.get("recommendation")),
+        first_seen_at=_timestamp_to_text(row.get("first_seen_at")),
+        last_seen_at=_timestamp_to_text(row.get("last_seen_at")),
+    )
+
+
+def _timestamp_to_text(value: Any) -> str:
+    if hasattr(value, "isoformat"):
+        return value.isoformat()
+    return str(value or "")
 
 
 def _semgrep_category(finding: Mapping[str, Any]) -> str:
@@ -1431,7 +1797,20 @@ def _report_section(title: str, lines: Sequence[str]) -> list[str]:
     return [f"### {title}", "", *content, ""]
 
 
-def _code_review_summary_lines(findings: Sequence[Any], errors: Sequence[Any]) -> list[str]:
+def _code_review_summary_lines(
+    findings: Sequence[Any],
+    errors: Sequence[Any],
+    *,
+    codebase_findings: Sequence[CodebaseFinding] = (),
+) -> list[str]:
+    if codebase_findings and not findings:
+        return [
+            (
+                "FirmcodeAI did not find new changed-line issues in this PR, but recent repository scans "
+                "found pre-existing issues in the touched codebase area."
+            )
+        ]
+
     if findings:
         finding_count = len(findings)
         lines = [
@@ -1470,6 +1849,44 @@ def _actionable_issue_summary_line(finding: Mapping[str, Any]) -> str:
     remediation = _summary_remediation(finding)
     suffix = f" Suggested action: {_public_message(_single_line(remediation))[:220]}" if remediation else ""
     return f"{severity.capitalize()}: {message}{location}.{suffix}"
+
+
+def _render_codebase_finding_summary(finding: CodebaseFinding) -> str:
+    location = _codebase_finding_location(finding)
+    evidence = _codebase_evidence_summary(finding)
+    recommendation = _public_message(_single_line(finding.recommendation or "Review the existing issue before expanding this component."))
+    title = _public_message(_single_line(finding.title))[:220]
+    return (
+        f"- {finding.severity.capitalize()}: {title}{location}. "
+        f"Evidence: {evidence}. Recommendation: {recommendation[:220]}"
+    )
+
+
+def _codebase_finding_location(finding: CodebaseFinding) -> str:
+    if not finding.file_path:
+        return ""
+    if finding.start_line and finding.start_line > 0:
+        if finding.end_line and finding.end_line > finding.start_line:
+            return f" at `{finding.file_path}:{finding.start_line}-{finding.end_line}`"
+        return f" at `{finding.file_path}:{finding.start_line}`"
+    return f" in `{finding.file_path}`"
+
+
+def _codebase_evidence_summary(finding: CodebaseFinding) -> str:
+    for evidence in finding.evidence:
+        excerpt = _public_message(_single_line(_read_str(evidence.get("excerpt"), "")))
+        if excerpt:
+            path = _read_optional_str(evidence.get("path")) or finding.file_path
+            line_range = _read_object(evidence.get("lineRange"))
+            start_line = _read_optional_int(line_range.get("startLine"))
+            end_line = _read_optional_int(line_range.get("endLine"))
+            if path and start_line:
+                line = f"{start_line}-{end_line}" if end_line and end_line > start_line else str(start_line)
+                return f"`{path}:{line}` shows {excerpt[:180]}"
+            if path:
+                return f"`{path}` shows {excerpt[:180]}"
+            return excerpt[:180]
+    return "recent repository scan evidence"
 
 
 def _finding_summary_location(finding: Mapping[str, Any]) -> str:
