@@ -1,6 +1,6 @@
 # Task 9.5c: GitHub Sync Dashboard UI
 
-```text
+Ensure you read the existing code on this task before you make any change
 Read AGENTS.md first and follow it strictly.
 Relevant planning docs: docs/TASKS.md Task 9.5, docs/TASK_PROMPTS.md Task 9.5, docs/DASHBOARD_DESIGN.md, docs/DASHBOARD_PROMPTS.md, docs/AUTHORIZATION.md.
 Code context requirement: Before implementing, inspect the repository list, settings GitHub App tab, dashboard API client/fetch patterns, toast or status components, authorization-aware UI patterns, and existing component tests.
@@ -24,4 +24,4 @@ Acceptance criteria:
 - Unauthorized or plan-limited actions show read-only or disabled states.
 - No sync/connect control routes to a missing page.
 - Tests pass through the documented local command, or inability to run them is documented with exact command and failure.
-```
+
