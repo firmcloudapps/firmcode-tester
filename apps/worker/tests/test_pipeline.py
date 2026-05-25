@@ -32,6 +32,7 @@ class RecordingStore:
     changed_files: list[ChangedFile] = field(default_factory=list)
     semgrep_findings: list[Mapping[str, Any]] = field(default_factory=list)
     codebase_findings: list[CodebaseFinding] = field(default_factory=list)
+    codebase_enrichment_error: Exception | None = None
     publishable: bool = True
     publish_skip_reason: str | None = None
     inline_comments: list[Any] = field(default_factory=list)
@@ -71,6 +72,8 @@ class RecordingStore:
         limit: int = 12,
     ) -> CodebaseReviewEnrichment:
         _ = (limit,)
+        if self.codebase_enrichment_error is not None:
+            raise self.codebase_enrichment_error
         return CodebaseReviewEnrichment(
             review_run_id=review_run_id,
             repository_id=context.repository_id,
@@ -538,6 +541,26 @@ def test_deterministic_pipeline_skips_publish_when_run_is_not_publishable() -> N
     assert github.inline_review_comments == []
     assert github.summary_bodies == []
     assert store.summary_body is None
+
+
+def test_deterministic_pipeline_still_publishes_when_codebase_enrichment_fails() -> None:
+    store = RecordingStore(codebase_enrichment_error=RuntimeError("codebase scan table is unavailable"))
+    github = FakeGitHub()
+    pipeline = DeterministicReviewPipeline(
+        store=store,  # type: ignore[arg-type]
+        github=github,  # type: ignore[arg-type]
+        semgrep_runner=_stub_semgrep_runner,
+        env={"SEMGREP_CONFIGS": "auto"},
+    )
+
+    asyncio.run(pipeline.run(_payload()))
+
+    assert len(github.inline_review_comments) == 1
+    assert len(github.summary_bodies) == 1
+    assert store.summary_body is not None
+    assert "FirmcodeAI reviewed this PR and found 1 actionable issue(s)." in store.summary_body
+    assert "**Actionable findings**" in store.summary_body
+    assert "Existing codebase findings" not in store.summary_body
 
 
 def _stub_semgrep_runner(**_kwargs: Any) -> StubSemgrepResult:
