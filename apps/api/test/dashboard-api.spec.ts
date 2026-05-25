@@ -124,7 +124,7 @@ describe("dashboard API controllers", () => {
       canRetryReviewRuns: true,
       canAccessRawArtifacts: false,
       canTriggerCodebaseScans: true,
-      canManageCodebaseScans: false
+      canManageCodebaseScans: true
     });
     expect(JSON.stringify(detail)).not.toContain("artifacts/run-6");
   });
@@ -380,7 +380,7 @@ function dashboardAuth(
     clerkOrgId: "org_firmcode",
     sessionId: "sess_test",
     role: "developer",
-    capabilities: ["retry_review_run", "trigger_codebase_scan"],
+    capabilities: ["retry_review_run", "trigger_codebase_scan", "manage_codebase_scan_findings"],
     clerkCapabilities: [],
     ...overrides
   };

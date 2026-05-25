@@ -22,6 +22,7 @@ describe("dashboard authorization policy", () => {
     const allowed: readonly DashboardCapability[] = [
       "retry_review_run",
       "trigger_codebase_scan",
+      "manage_codebase_scan_findings",
       "manage_repository_configuration",
       "manage_github_installations"
     ];

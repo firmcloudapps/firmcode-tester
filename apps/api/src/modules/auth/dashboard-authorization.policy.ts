@@ -23,6 +23,7 @@ export const DASHBOARD_ROLE_CAPABILITY_MATRIX: Readonly<Record<DashboardAppRole,
   developer: [
     "retry_review_run",
     "trigger_codebase_scan",
+    "manage_codebase_scan_findings",
     "manage_repository_configuration",
     "manage_github_installations"
   ]
