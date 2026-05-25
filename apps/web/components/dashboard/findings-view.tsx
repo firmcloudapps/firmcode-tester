@@ -4,11 +4,13 @@ import {
   FINDING_INBOX_SOURCES,
   REVIEW_FINDING_SEVERITIES,
   REVIEW_FINDING_STATUSES,
+  type CodebaseScanFindingInboxItem,
   type FindingInboxItem,
   type FindingsListFilters,
   type FindingsListResponse
 } from "@firmcode/shared";
 import type { ViewState } from "../../lib/view-state";
+import { CodebaseFindingStatusActions } from "./codebase-finding-status-actions";
 import { formatDateTime } from "./format";
 import { FindingStatusBadge, SeverityBadge } from "./status-badge";
 
@@ -165,6 +167,8 @@ function FindingsEmptyState() {
 }
 
 function FindingsList({ data }: { data: FindingsListResponse }) {
+  const canManageCodebaseFindings = data.permissions?.canManageCodebaseFindings ?? false;
+
   return (
     <section className="overflow-hidden rounded-lg border border-border bg-surface">
       <div className="overflow-x-auto">
@@ -179,7 +183,7 @@ function FindingsList({ data }: { data: FindingsListResponse }) {
             <span>Created</span>
           </div>
           {data.findings.map((finding) => (
-            <FindingRow key={finding.id} finding={finding} />
+            <FindingRow key={finding.id} finding={finding} canManageCodebaseFindings={canManageCodebaseFindings} />
           ))}
         </div>
       </div>
@@ -187,7 +191,13 @@ function FindingsList({ data }: { data: FindingsListResponse }) {
   );
 }
 
-function FindingRow({ finding }: { finding: FindingInboxItem }) {
+function FindingRow({
+  finding,
+  canManageCodebaseFindings
+}: {
+  finding: FindingInboxItem;
+  canManageCodebaseFindings: boolean;
+}) {
   return (
     <article className="px-4 py-4">
       <div className="grid grid-cols-[120px_110px_130px_1fr_90px_120px_170px] gap-3 text-sm">
@@ -258,6 +268,9 @@ function FindingRow({ finding }: { finding: FindingInboxItem }) {
                 </a>
               )}
             </div>
+            {isCodebaseScanFinding(finding) ? (
+              <CodebaseFindingStatusActions finding={finding} canManage={canManageCodebaseFindings} />
+            ) : null}
           </aside>
         </div>
       </details>
@@ -269,6 +282,10 @@ function formatFindingContext(finding: FindingInboxItem): string {
   return finding.pullRequestNumber === null
     ? `${finding.repositoryFullName} / codebase scan`
     : `${finding.repositoryFullName} / PR #${finding.pullRequestNumber}`;
+}
+
+function isCodebaseScanFinding(finding: FindingInboxItem): finding is CodebaseScanFindingInboxItem {
+  return finding.findingType === "codebase_scan" && finding.scanRunId !== null && finding.scanRunId !== undefined;
 }
 
 function DetailBlock({ children, title }: { children: React.ReactNode; title: string }) {

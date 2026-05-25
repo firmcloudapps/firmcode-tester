@@ -276,7 +276,7 @@ export function canTriggerCodebaseScans(role: DashboardWorkspaceRole): boolean {
 }
 
 export function canManageCodebaseScans(role: DashboardWorkspaceRole): boolean {
-  return role === "owner" || role === "admin";
+  return role === "owner" || role === "admin" || role === "developer";
 }
 
 export function canAccessRawReviewArtifacts(role: DashboardWorkspaceRole): boolean {

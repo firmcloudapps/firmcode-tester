@@ -31,6 +31,9 @@ describe("RepositoriesView", () => {
 
     expect(html).toContain("openclaw/firmcode");
     expect(html).toContain("Enabled");
+    expect(html).toContain("Succeeded");
+    expect(html).toContain("1<!-- --> scan");
+    expect(html).toContain("Scan now");
     expect(html).toContain("PR #");
     expect(html).toContain(">7</a>");
     expect(html).toContain("View runs");
@@ -180,6 +183,28 @@ describe("FindingsView", () => {
     expect(html).toContain("Check workspace ownership");
     expect(html).toContain('href="/review-runs/00000000-0000-4000-8000-000000000006"');
     expect(html).toContain('href="https://github.com/openclaw/firmcode/pull/7#discussion_r8002"');
+    expect(html).toContain("Avoid shell execution");
+    expect(html).toContain("openclaw/firmcode / codebase scan");
+    expect(html).toContain("Suppress");
+    expect(html).toContain("False positive");
+    expect(html).toContain("Resolve");
+  });
+
+  it("does not expose active codebase finding status controls to read-only roles", () => {
+    const html = renderToString(
+      <FindingsView
+        state={{
+          status: "populated",
+          data: {
+            ...findingsList,
+            permissions: { canManageCodebaseFindings: false }
+          }
+        }}
+      />
+    );
+
+    expect(html).toContain("Status changes require Developer or Admin access.");
+    expect(html).not.toContain("False positive");
   });
 });
 
@@ -196,6 +221,17 @@ const repositoryList: RepositoryListResponse = {
       enabled: true,
       primaryLanguage: "TypeScript",
       openFindingsCount: 2,
+      openCodebaseFindingsCount: 1,
+      codebaseScan: {
+        latestScanRunId: "scan-1",
+        latestScanStatus: "succeeded",
+        latestScanTrigger: "scheduled",
+        latestScanCommitSha: "def456",
+        latestScanStartedAt: "2026-05-22T09:00:00.000Z",
+        latestScanFinishedAt: "2026-05-22T09:01:00.000Z",
+        latestScanCreatedAt: "2026-05-22T09:00:00.000Z",
+        openCodebaseFindingsCount: 1
+      },
       updatedAt: "2026-05-22T10:00:00.000Z",
       lastReview: {
         reviewRunId: "00000000-0000-4000-8000-000000000006",
@@ -436,6 +472,9 @@ const emptyFindingsList: FindingsListResponse = {
 };
 
 const findingsList: FindingsListResponse = {
+  permissions: {
+    canManageCodebaseFindings: true
+  },
   filters: {
     severity: "high",
     source: "semgrep",
@@ -481,6 +520,46 @@ const findingsList: FindingsListResponse = {
       githubCommentUrl: "https://github.com/openclaw/firmcode/pull/7#discussion_r8002",
       reviewRunCreatedAt: "2026-05-22T10:00:00.000Z",
       createdAt: "2026-05-22T10:00:00.000Z"
+    },
+    {
+      findingType: "codebase_scan",
+      id: "codebase-finding-1",
+      reviewRunId: null,
+      scanRunId: "scan-1",
+      repositoryId: "repo-1",
+      repositoryFullName: "openclaw/firmcode",
+      pullRequestNumber: null,
+      pullRequestTitle: null,
+      scanStatus: "succeeded",
+      source: "semgrep",
+      category: "security",
+      severity: "critical",
+      confidence: "high",
+      filePath: "src/server.ts",
+      startLine: 12,
+      endLine: 12,
+      title: "Avoid shell execution",
+      body: "A background scan found request-controlled data reaching shell execution.",
+      evidence: [
+        {
+          source: "semgrep",
+          ruleId: "typescript.lang.security.audit.dangerous-exec",
+          excerpt: "exec(input)"
+        }
+      ],
+      suggestion: "Use an allowlisted command wrapper.",
+      dedupeKey: "codebase-finding-dashboard-1",
+      postAsInline: false,
+      postedInline: false,
+      status: "open",
+      semgrepRuleId: "typescript.lang.security.audit.dangerous-exec",
+      postedAt: null,
+      githubCommentId: null,
+      githubCommentUrl: null,
+      reviewRunCreatedAt: null,
+      scanRunCreatedAt: "2026-05-22T09:00:00.000Z",
+      statusUpdatedAt: "2026-05-22T09:01:00.000Z",
+      createdAt: "2026-05-22T09:00:00.000Z"
     }
   ]
 };

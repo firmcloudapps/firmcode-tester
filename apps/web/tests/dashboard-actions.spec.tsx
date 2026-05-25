@@ -9,9 +9,11 @@ import {
   createPendingActionGuard,
   DashboardMutationError,
   DuplicateDashboardActionError,
+  requestCodebaseScan,
   requestReviewRunRetry,
   syncGitHubInstallations,
   syncGitHubRepository,
+  updateCodebaseFindingStatus,
   updateRepositoryAutomation
 } from "../lib/dashboard-actions";
 import { createDashboardApiHeaders } from "../lib/dashboard-api-proxy";
@@ -142,6 +144,50 @@ describe("repository automation controls", () => {
     expect(headers?.get("authorization")).toBe("Bearer session-token");
     expect(headers?.get("x-firmcode-user-id")).toBeNull();
     expect(headers?.get("x-firmcode-workspace-id")).toBeNull();
+  });
+});
+
+describe("codebase scan dashboard actions", () => {
+  it("queues manual codebase scans through the typed dashboard mutation endpoint", async () => {
+    const response = {
+      scanRunId: "scan-1",
+      jobId: "job-1",
+      repositoryId: "repo-1",
+      repositoryFullName: "openclaw/firmcode",
+      trigger: "manual",
+      status: "queued",
+      commitSha: null,
+      correlationId: "correlation-1",
+      created: true,
+      duplicate: false
+    } as const;
+    const fetcher = vi.fn(async () => jsonResponse(response));
+
+    await expect(requestCodebaseScan("repo-1", fetcher)).resolves.toEqual(response);
+    expect(fetcher).toHaveBeenCalledWith("/api/repositories/repo-1/codebase-scans", {
+      method: "POST",
+      headers: {
+        accept: "application/json"
+      }
+    });
+  });
+
+  it("updates codebase finding status with an auditable reason", async () => {
+    const response = {
+      id: "finding-1",
+      status: "false_positive"
+    };
+    const fetcher = vi.fn(async () => jsonResponse(response));
+
+    await expect(updateCodebaseFindingStatus("finding-1", "false_positive", "Generated fixture.", fetcher)).resolves.toEqual(response);
+    expect(fetcher).toHaveBeenCalledWith("/api/codebase-findings/finding-1", {
+      method: "PATCH",
+      headers: {
+        accept: "application/json",
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({ status: "false_positive", reason: "Generated fixture." })
+    });
   });
 });
 

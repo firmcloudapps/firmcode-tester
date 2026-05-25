@@ -102,7 +102,7 @@ describe("DashboardAuthGuard", () => {
         clerkOrgId: null,
         workspaceId: "00000000-0000-4000-8000-000000000101",
         role: "developer",
-        capabilities: expect.arrayContaining(["retry_review_run", "trigger_codebase_scan"])
+        capabilities: expect.arrayContaining(["retry_review_run", "trigger_codebase_scan", "manage_codebase_scan_findings"])
       }
     });
   });

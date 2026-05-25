@@ -54,6 +54,17 @@ describe("RepositoryDetailView", () => {
     expect(html).toContain("High");
   });
 
+  it("renders the scans tab with manual scan controls, scan history, and open scan findings", () => {
+    const html = renderToString(<RepositoryDetailView state={{ status: "populated", data: repositoryDetail }} activeTab="scans" />);
+
+    expect(html).toContain("Codebase scans");
+    expect(html).toContain("Scan now");
+    expect(html).toContain("manual");
+    expect(html).toContain("1<!-- --> open / <!-- -->2<!-- --> total");
+    expect(html).toContain("Avoid shell execution");
+    expect(html).toContain('href="/findings?findingType=codebase_scan&amp;repositoryId=repo-1"');
+  });
+
   it("renders editable configuration for Developers and read-only configuration when denied", () => {
     const developerHtml = renderToString(
       <RepositoryDetailView state={{ status: "populated", data: repositoryDetail }} activeTab="configuration" />
@@ -119,6 +130,17 @@ const repositoryDetail: RepositoryDetailResponse = {
     enabled: true,
     primaryLanguage: "TypeScript",
     openFindingsCount: 1,
+    openCodebaseFindingsCount: 1,
+    codebaseScan: {
+      latestScanRunId: "scan-1",
+      latestScanStatus: "succeeded",
+      latestScanTrigger: "manual",
+      latestScanCommitSha: "def456",
+      latestScanStartedAt: "2026-05-22T09:00:00.000Z",
+      latestScanFinishedAt: "2026-05-22T09:01:00.000Z",
+      latestScanCreatedAt: "2026-05-22T09:00:00.000Z",
+      openCodebaseFindingsCount: 1
+    },
     updatedAt: "2026-05-22T10:00:00.000Z",
     lastReview: {
       reviewRunId: "run-1",
@@ -141,6 +163,12 @@ const repositoryDetail: RepositoryDetailResponse = {
     ciExplanationEnabled: true,
     infrastructureReviewEnabled: true,
     dryRunEnabled: true,
+    codebaseScanEnabled: true,
+    codebaseScanCadenceHours: 24,
+    codebaseScanIgnoredPaths: ["dist/**"],
+    codebaseScanSeverityThreshold: "medium",
+    codebaseScanMaxFiles: 500,
+    codebaseScanMaxBytes: 10000000,
     updatedByClerkUserId: null,
     createdAt: "2026-05-22T09:00:00.000Z",
     updatedAt: "2026-05-22T09:00:00.000Z"
@@ -222,6 +250,62 @@ const repositoryDetail: RepositoryDetailResponse = {
       createdAt: "2026-05-22T10:00:00.000Z"
     }
   ],
+  codebaseScans: [
+    {
+      id: "scan-1",
+      repositoryId: "repo-1",
+      repositoryFullName: "openclaw/firmcode",
+      trigger: "manual",
+      defaultBranch: "main",
+      commitSha: "def456",
+      status: "succeeded",
+      startedAt: "2026-05-22T09:00:00.000Z",
+      finishedAt: "2026-05-22T09:01:00.000Z",
+      durationMs: 60000,
+      findingsCount: 2,
+      openFindingsCount: 1,
+      errorCode: null,
+      errorMessage: null,
+      createdAt: "2026-05-22T09:00:00.000Z",
+      updatedAt: "2026-05-22T09:01:00.000Z"
+    }
+  ],
+  codebaseFindings: [
+    {
+      findingType: "codebase_scan",
+      id: "codebase-finding-1",
+      reviewRunId: null,
+      scanRunId: "scan-1",
+      repositoryId: "repo-1",
+      repositoryFullName: "openclaw/firmcode",
+      pullRequestNumber: null,
+      pullRequestTitle: null,
+      scanStatus: "succeeded",
+      source: "semgrep",
+      category: "security",
+      severity: "critical",
+      confidence: "high",
+      filePath: "src/server.ts",
+      startLine: 12,
+      endLine: 12,
+      title: "Avoid shell execution",
+      body: "A background scan found request-controlled data reaching shell execution.",
+      evidence: [],
+      suggestion: "Use an allowlisted command wrapper.",
+      dedupeKey: "codebase-finding-dashboard-1",
+      postAsInline: false,
+      postedInline: false,
+      status: "open",
+      semgrepRuleId: null,
+      postedAt: null,
+      githubCommentId: null,
+      githubCommentUrl: null,
+      reviewRunCreatedAt: null,
+      scanRunCreatedAt: "2026-05-22T09:00:00.000Z",
+      statusUpdatedAt: "2026-05-22T09:01:00.000Z",
+      createdAt: "2026-05-22T09:00:00.000Z"
+    }
+  ],
   activity: [
     {
       id: "run:run-1",
@@ -234,6 +318,8 @@ const repositoryDetail: RepositoryDetailResponse = {
   permissions: {
     canManageConfiguration: true,
     canRetryReviewRuns: true,
-    canAccessRawArtifacts: true
+    canAccessRawArtifacts: true,
+    canTriggerCodebaseScans: true,
+    canManageCodebaseScans: true
   }
 };
