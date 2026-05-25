@@ -1,5 +1,7 @@
 export const PROTECTED_DASHBOARD_ROUTES = [
   "/",
+  "/admin(.*)",
+  "/developer(.*)",
   "/repositories(.*)",
   "/review-runs(.*)",
   "/findings(.*)",
@@ -10,15 +12,24 @@ export const PROTECTED_DASHBOARD_ROUTES = [
   "/billing(.*)",
   "/github/installations(.*)",
   "/auth/github(.*)",
+  "/auth/redirect(.*)",
   "/api/(.*)"
 ] as const;
 
 export function isProtectedDashboardPath(pathname: string): boolean {
-  if (pathname === "/" || pathname === "/auth/github" || pathname.startsWith("/auth/github/")) {
+  if (
+    pathname === "/" ||
+    pathname === "/auth/github" ||
+    pathname.startsWith("/auth/github/") ||
+    pathname === "/auth/redirect" ||
+    pathname.startsWith("/auth/redirect/")
+  ) {
     return true;
   }
 
   return [
+    "/admin",
+    "/developer",
     "/repositories",
     "/review-runs",
     "/findings",

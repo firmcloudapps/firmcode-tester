@@ -44,8 +44,8 @@ Set these variables in Vercel for Production, Preview, and Development as approp
 | `CLERK_JWT_AUDIENCE` | web server | Clerk token audience/template used when sending bearer tokens to the Coolify API. |
 | `NEXT_PUBLIC_CLERK_SIGN_IN_URL` | web | Sign-in route, normally `/sign-in`. |
 | `NEXT_PUBLIC_CLERK_SIGN_UP_URL` | web | Sign-up route, normally `/sign-up`. |
-| `NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL` | web | Post sign-in destination, normally `/`. |
-| `NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL` | web | Post sign-up destination, normally `/`. |
+| `NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL` | web | Post sign-in fallback destination, normally `/auth/redirect` for role-based dashboard routing. |
+| `NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL` | web | Post sign-up fallback destination, normally `/auth/redirect` for role-based dashboard routing. |
 | `CLERK_BILLING_PORTAL_URL` | web | Clerk-managed billing portal or account billing URL. |
 | `VERCEL_URL` | Vercel | Auto-provided by Vercel and useful for preview callback handling. |
 
@@ -70,7 +70,7 @@ Configure Clerk with:
 - Production dashboard URL in allowed redirect and callback URLs.
 - Sign-in URL: `https://firmcode.firmoncloud.com/sign-in`.
 - Sign-up URL: `https://firmcode.firmoncloud.com/sign-up`.
-- After sign-in and after sign-up URL: `https://firmcode.firmoncloud.com/`.
+- After sign-in and after sign-up URL: `https://firmcode.firmoncloud.com/auth/redirect`.
 - GitHub App OAuth callback URL: `https://firmcode.firmoncloud.com/api/auth/github/callback`.
 - Vercel preview URL pattern if preview deployments need authenticated dashboard access.
 - API token audience/template matching `CLERK_JWT_AUDIENCE`.

@@ -14,12 +14,15 @@ export interface DashboardDestinationReadiness {
 
 export const DASHBOARD_IMPLEMENTED_ROUTE_PATTERNS: readonly DashboardRoutePattern[] = [
   { pattern: "/", kind: "page" },
+  { pattern: "/admin", kind: "page" },
   { pattern: "/auth/github", kind: "route-handler" },
+  { pattern: "/auth/redirect", kind: "route-handler" },
   { pattern: "/api/auth/github/callback", kind: "route-handler" },
   { pattern: "/billing", kind: "page" },
   { pattern: "/ci-failures", kind: "page" },
   { pattern: "/ci-failures/[id]", kind: "page" },
   { pattern: "/findings", kind: "page" },
+  { pattern: "/developer", kind: "page" },
   { pattern: "/github/installations", kind: "page" },
   { pattern: "/pull-requests", kind: "page" },
   { pattern: "/pull-requests/[id]", kind: "page" },

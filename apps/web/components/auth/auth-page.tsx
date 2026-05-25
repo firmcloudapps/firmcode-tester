@@ -1,6 +1,7 @@
 import React from "react";
 import { ClerkLoaded, ClerkLoading, SignIn, SignUp } from "@clerk/nextjs";
 import { loadWebClerkConfig } from "../../config/clerk";
+import { ROLE_BASED_AUTH_REDIRECT_PATH } from "../../lib/auth-redirect";
 
 type AuthMode = "sign-in" | "sign-up";
 
@@ -83,7 +84,11 @@ export function AuthPage({ mode }: AuthPageProps) {
 function renderClerkAuthComponent(mode: AuthMode) {
   if (process.env.NODE_ENV === "test") {
     return (
-      <div className="rounded-md border border-border bg-shell p-5" data-clerk-component={mode === "sign-in" ? "SignIn" : "SignUp"}>
+      <div
+        className="rounded-md border border-border bg-shell p-5"
+        data-clerk-component={mode === "sign-in" ? "SignIn" : "SignUp"}
+        data-clerk-force-redirect-url={ROLE_BASED_AUTH_REDIRECT_PATH}
+      >
         {mode === "sign-in" ? "Clerk SignIn" : "Clerk SignUp"}
       </div>
     );
@@ -96,6 +101,7 @@ function renderClerkAuthComponent(mode: AuthMode) {
       routing="path"
       path={clerk.signInUrl}
       signUpUrl={clerk.signUpUrl}
+      forceRedirectUrl={ROLE_BASED_AUTH_REDIRECT_PATH}
       fallbackRedirectUrl={clerk.afterSignInUrl}
       appearance={clerkAppearance}
     />
@@ -104,6 +110,7 @@ function renderClerkAuthComponent(mode: AuthMode) {
       routing="path"
       path={clerk.signUpUrl}
       signInUrl={clerk.signInUrl}
+      forceRedirectUrl={ROLE_BASED_AUTH_REDIRECT_PATH}
       fallbackRedirectUrl={clerk.afterSignUpUrl}
       appearance={clerkAppearance}
     />

@@ -12,6 +12,7 @@ Use these prompts in order where possible. Each prompt is intended to be indepen
 3. `task-9.0c-api-clerk-token-guard-and-request-context.md`
 4. `task-9.0d-workspace-membership-and-role-resolution.md`
 5. `task-9.0e-auth-flow-e2e-hardening-and-docs.md`
+6. `task-9.0f-role-based-auth-redirects.md`
 
 ## Task 9.2: Retry And Configuration Controls
 

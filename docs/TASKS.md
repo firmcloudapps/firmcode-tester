@@ -561,6 +561,9 @@ Acceptance criteria:
 - The root layout uses a real `ClerkProvider`.
 - Clerk sign-in and sign-up pages exist at `/sign-in/[[...sign-in]]` and `/sign-up/[[...sign-up]]`.
 - Sign-in and sign-up use the dedicated auth-page design from `docs/DASHBOARD_DESIGN.md`: light-mode unauthenticated shell, constrained Clerk panel, compact Firmcode context, responsive mobile layout, and no marketing hero treatment.
+- Successful sign-in and sign-up route through a protected `/auth/redirect` handler so authenticated users do not remain on `/sign-in`.
+- `/auth/redirect` resolves the verified workspace role and sends Admin or owner-equivalent users to `/admin`, Developer or member-equivalent users to `/developer`, and unsupported/read-only roles to `/developer` without granting extra privileges.
+- Explicit `/admin` and `/developer` dashboard routes exist, use the dashboard shell, and reuse existing role-gated workspace controls instead of creating a parallel authorization path.
 - Next.js middleware protects all dashboard pages and dashboard route handlers.
 - Dashboard shell uses Clerk `UserButton` and `OrganizationSwitcher` where organizations are enabled.
 - The active workspace displayed in the shell comes from Clerk organization/personal workspace state, not static placeholder text.
@@ -578,6 +581,8 @@ Tests:
 - Web route protection tests for authenticated and unauthenticated users.
 - Sign-in/sign-up route rendering tests.
 - Sign-in/sign-up visual or rendered-markup tests for desktop/mobile layout, Clerk appearance hooks, and no dashboard shell leakage.
+- Role-based auth redirect tests for Admin, owner-equivalent, Developer, member-equivalent, missing session, invalid session, and API failure fallback.
+- Route and component tests proving `/auth/redirect`, `/admin`, and `/developer` are protected and route-ready.
 - Dashboard shell tests for Clerk user menu, organization switcher, and active workspace display.
 - API guard tests for missing token, invalid token, expired token, valid personal workspace token, and valid organization token.
 - Tests proving client-provided user headers cannot impersonate another Clerk user.
