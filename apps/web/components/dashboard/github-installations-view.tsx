@@ -7,6 +7,7 @@ import {
 } from "@firmcode/shared";
 import type { GitHubAppInstallConfig } from "../../config/github-app-installation";
 import type { GitHubInstallationsState, GitHubSyncDashboardData } from "../../lib/dashboard-data";
+import { isAllowedExternalDashboardUrl } from "../../lib/dashboard-route-readiness";
 import { formatDateTime, shortSha } from "./format";
 import { GitHubInstallationSyncButton, GitHubRepositorySyncButton } from "./github-sync-controls";
 import { RepositoryAutomationToggle } from "./repository-automation-toggle";
@@ -36,7 +37,12 @@ export function GitHubInstallationsView({ state, installConfig }: GitHubInstalla
               disabledReason={syncDisabledReason(state.data)}
             />
           ) : (
-            <button className="rounded-md border border-border bg-subtle px-3 py-2 text-sm font-medium text-secondary" type="button" disabled>
+            <button
+              className="rounded-md border border-border bg-subtle px-3 py-2 text-sm font-medium text-secondary"
+              type="button"
+              disabled
+              title="GitHub connection status must load before syncing."
+            >
               Sync GitHub
             </button>
           )}
@@ -100,7 +106,12 @@ function SignedOutState({ installConfig }: { installConfig: GitHubAppInstallConf
         <p className="mt-2 text-sm leading-6 text-amber-800">
           Firmcode needs a Clerk workspace session before it can connect a GitHub account or map a GitHub App installation.
         </p>
-        <button className="mt-4 rounded-md bg-slate-200 px-3 py-2 text-sm font-medium text-secondary" type="button" disabled>
+        <button
+          className="mt-4 rounded-md bg-slate-200 px-3 py-2 text-sm font-medium text-secondary"
+          type="button"
+          disabled
+          title="Sign in before connecting GitHub."
+        >
           Connect GitHub
         </button>
       </section>
@@ -274,7 +285,12 @@ function InstallAction({
 }) {
   if (!hasOAuth) {
     return (
-      <button className="rounded-md bg-slate-200 px-3 py-2 text-sm font-medium text-secondary" type="button" disabled>
+      <button
+        className="rounded-md bg-slate-200 px-3 py-2 text-sm font-medium text-secondary"
+        type="button"
+        disabled
+        title="Connect GitHub OAuth before installing the GitHub App."
+      >
         Connect GitHub first
       </button>
     );
@@ -282,7 +298,12 @@ function InstallAction({
 
   if (!canManage) {
     return (
-      <button className="rounded-md bg-slate-200 px-3 py-2 text-sm font-medium text-secondary" type="button" disabled>
+      <button
+        className="rounded-md bg-slate-200 px-3 py-2 text-sm font-medium text-secondary"
+        type="button"
+        disabled
+        title="Owner or Admin required to install the GitHub App."
+      >
         Owner or Admin required
       </button>
     );
@@ -290,16 +311,40 @@ function InstallAction({
 
   if (installConfig.status !== "configured") {
     return (
-      <button className="rounded-md bg-slate-200 px-3 py-2 text-sm font-medium text-secondary" type="button" disabled>
+      <button
+        className="rounded-md bg-slate-200 px-3 py-2 text-sm font-medium text-secondary"
+        type="button"
+        disabled
+        title="Set GITHUB_APP_INSTALL_URL or GITHUB_APP_SLUG before installing the GitHub App."
+      >
         Install URL not configured
       </button>
     );
   }
 
+  if (isAllowedExternalDashboardUrl(installConfig.installUrl, "github")) {
+    return (
+      <a
+        className="rounded-md bg-accent px-3 py-2 text-sm font-medium text-white"
+        data-dashboard-destination="external"
+        data-dashboard-provider="github"
+        href={installConfig.installUrl}
+        rel="noreferrer"
+      >
+        Install GitHub App
+      </a>
+    );
+  }
+
   return (
-    <a className="rounded-md bg-accent px-3 py-2 text-sm font-medium text-white" href={installConfig.installUrl} rel="noreferrer">
+    <button
+      className="rounded-md bg-slate-200 px-3 py-2 text-sm font-medium text-secondary"
+      type="button"
+      disabled
+      title="GitHub App install URL must be an external GitHub URL."
+    >
       Install GitHub App
-    </a>
+    </button>
   );
 }
 
@@ -338,6 +383,7 @@ function RepositoryAutomationRow({
             className="rounded-md border border-border bg-subtle px-2 py-1 text-xs font-medium text-secondary"
             disabled
             type="button"
+            title={rowSyncDisabledReason({ hasOAuth, canManageRepositories, hasInstallations }) ?? "Repository automation is unavailable."}
           >
             {repository.enabled ? "Enabled" : "Disabled"}
           </button>

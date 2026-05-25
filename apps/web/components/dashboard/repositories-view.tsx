@@ -235,7 +235,12 @@ function GitHubConnectionAction({ controls }: { controls: RepositoryControls }) 
   }
 
   return (
-    <button className="rounded-md bg-subtle px-3 py-2 text-sm font-medium text-secondary" type="button" disabled>
+    <button
+      className="rounded-md bg-subtle px-3 py-2 text-sm font-medium text-secondary"
+      type="button"
+      disabled
+      title={controls.syncDisabledReason ?? "GitHub App connection is unavailable."}
+    >
       Connect GitHub App
     </button>
   );

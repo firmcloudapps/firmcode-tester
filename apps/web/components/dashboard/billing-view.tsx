@@ -1,5 +1,6 @@
 import React from "react";
 import type { WorkspaceBillingResponse } from "@firmcode/shared";
+import { isAllowedExternalDashboardUrl } from "../../lib/dashboard-route-readiness";
 import type { ViewState } from "../../lib/view-state";
 
 interface BillingViewProps {
@@ -14,7 +15,12 @@ export function BillingView({ state, billingPortalUrl }: BillingViewProps) {
         <section className="rounded-lg border border-red-200 bg-red-50 p-4">
           <h2 className="text-sm font-semibold text-red-800">Billing could not be loaded</h2>
           <p className="mt-2 text-sm leading-6 text-red-700">{state.message}</p>
-          <button className="mt-4 rounded-md bg-slate-200 px-3 py-2 text-sm font-medium text-secondary" type="button" disabled>
+          <button
+            className="mt-4 rounded-md bg-slate-200 px-3 py-2 text-sm font-medium text-secondary"
+            type="button"
+            disabled
+            title="Billing management is unavailable until billing status loads."
+          >
             Manage subscription
           </button>
         </section>
@@ -39,12 +45,29 @@ export function BillingView({ state, billingPortalUrl }: BillingViewProps) {
           <BillingMetric label="Usage" value={formatNullableMetric(data?.usage.reviewRunsThisMonth, "runs")} />
           <BillingMetric label="Seats" value={formatNullableMetric(data?.usage.seats, "seats")} />
         </dl>
-        {data?.workspace.canManageBilling === true && billingPortalUrl !== null ? (
-          <a className="mt-6 inline-flex h-10 items-center rounded-md bg-accent px-4 text-sm font-medium text-white" href={billingPortalUrl}>
+        {data?.workspace.canManageBilling === true &&
+        billingPortalUrl !== null &&
+        isAllowedExternalDashboardUrl(billingPortalUrl, "clerk") ? (
+          <a
+            className="mt-6 inline-flex h-10 items-center rounded-md bg-accent px-4 text-sm font-medium text-white"
+            data-dashboard-destination="external"
+            data-dashboard-provider="clerk"
+            href={billingPortalUrl}
+            rel="noreferrer"
+          >
             Manage subscription
           </a>
         ) : (
-          <button className="mt-6 inline-flex h-10 items-center rounded-md bg-slate-200 px-4 text-sm font-medium text-secondary" type="button" disabled>
+          <button
+            className="mt-6 inline-flex h-10 items-center rounded-md bg-slate-200 px-4 text-sm font-medium text-secondary"
+            type="button"
+            disabled
+            title={
+              data?.workspace.canManageBilling === true
+                ? "Clerk billing portal URL is not configured."
+                : "Owner billing permission is required to manage subscriptions."
+            }
+          >
             Manage subscription
           </button>
         )}
