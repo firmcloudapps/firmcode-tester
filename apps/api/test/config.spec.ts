@@ -9,6 +9,8 @@ const RAW_PRIVATE_KEY = [
 
 const VALID_ENV = {
   NODE_ENV: "development",
+  APP_URL: "https://firmcode.firmoncloud.com",
+  API_URL: "https://firmcodeapi.firmoncloud.com",
   DATABASE_URL: "postgresql://firmcode:secret@localhost:5432/firmcode",
   DATABASE_SSL: "false",
   REDIS_URL: "redis://:secret@localhost:6379",
@@ -28,6 +30,8 @@ describe("API runtime config", () => {
     expect(config.database.ssl).toBe(false);
     expect(config.queue.redactedRedisUrl).toBe("redis://:REDACTED@localhost:6379");
     expect(config.clerk.secretKey).toBe("sk_test_example");
+    expect(config.publicAppUrl).toBe("https://firmcode.firmoncloud.com");
+    expect(config.publicApiUrl).toBe("https://firmcodeapi.firmoncloud.com");
     expect(config.github?.appId).toBe(12345);
     expect(config.github?.privateKey).toBe(RAW_PRIVATE_KEY);
     expect(config.port).toBe(3001);

@@ -7,7 +7,7 @@ Firmcode should use typed configuration validation in every runtime. Missing req
 | Variable | Required | Description |
 | --- | --- | --- |
 | `NODE_ENV` | yes | `development`, `test`, or `production`. |
-| `APP_URL` | yes | Public web app URL. |
+| `APP_URL` | yes | Public web app URL. The API uses this to build the GitHub OAuth callback URL. |
 | `API_URL` | yes | Public API URL for webhooks and dashboard calls. |
 | `NEXT_PUBLIC_API_URL` | web | Public API URL used by the Vercel dashboard. |
 | `FIRMCODE_DASHBOARD_WORKSPACE_ID` | web server, temporary | Internal workspace ID forwarded by dashboard mutation proxy routes until Clerk-backed API session validation replaces the local header shim. |
@@ -74,6 +74,14 @@ Clerk owns SaaS sign-in, sign-up, sessions, user profile, organizations/workspac
 | `GITHUB_ALLOWED_INSTALLATIONS` | no | Comma-separated installation IDs for temporary MVP allowlisting during controlled SaaS rollout. |
 | `GITHUB_APP_INSTALL_URL` | web | Public GitHub App installation URL shown by `/github/installations`, for example `https://github.com/apps/<slug>/installations/new`. |
 | `GITHUB_APP_SLUG` | web | GitHub App slug used to derive the install URL when `GITHUB_APP_INSTALL_URL` is not set. |
+
+Configure the GitHub App OAuth callback URL to the dashboard callback route:
+
+```text
+https://firmcode.firmoncloud.com/api/auth/github/callback
+```
+
+Keep `APP_URL=https://firmcode.firmoncloud.com` on the API service and `NEXT_PUBLIC_API_URL=https://firmcodeapi.firmoncloud.com` on the web service so the dashboard callback can forward securely to the API token exchange endpoint.
 
 ## LLM
 

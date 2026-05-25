@@ -72,6 +72,7 @@ export interface GitHubAppConfig {
 export interface ApiRuntimeConfig {
   nodeEnv: RuntimeEnvironment;
   port: number;
+  publicAppUrl?: string | null;
   publicApiUrl?: string | null;
   corsAllowedOrigins: string[];
   database: DatabaseConfig;
@@ -114,6 +115,7 @@ export function createApiRuntimeConfig(env: EnvironmentVariables): ApiRuntimeCon
   const review = readReviewConfig(env, issues);
   const codebaseScan = readCodebaseScanConfig(env, issues);
   const port = readPort(env.PORT, 3001, issues);
+  const publicAppUrl = readOptionalHttpUrl(env, "APP_URL", issues);
   const publicApiUrl = readOptionalHttpUrl(env, "API_URL", issues);
 
   if (issues.length > 0 || database === null || queue === null || clerk === null) {
@@ -123,6 +125,7 @@ export function createApiRuntimeConfig(env: EnvironmentVariables): ApiRuntimeCon
   return {
     nodeEnv,
     port,
+    publicAppUrl,
     publicApiUrl,
     corsAllowedOrigins: readList(env.CORS_ALLOWED_ORIGINS),
     database,

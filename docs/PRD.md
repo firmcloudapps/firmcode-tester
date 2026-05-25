@@ -433,7 +433,8 @@ docs/
 ### GitHub App API
 
 - `GET /auth/github`: start required GitHub OAuth account connection for the signed-in Firmcode user.
-- `GET /auth/github/callback`: OAuth callback for required user GitHub account connection.
+- `GET /api/auth/github/callback`: dashboard OAuth callback that forwards to the API token exchange endpoint.
+- `GET /auth/github/callback`: API OAuth callback/token exchange endpoint for required user GitHub account connection.
 - `GET /api/github/oauth/status`: return the caller's GitHub OAuth connection status without exposing OAuth access tokens.
 - `GET /github/installations`: web entry point for GitHub App installation/status.
 - `GET /github/installations/callback`: GitHub App installation callback.

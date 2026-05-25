@@ -131,7 +131,7 @@ describe("GitHub OAuth, installation, and repository sync API", () => {
     });
     expect(accountClient.lastExchange).toMatchObject({
       code: "oauth-code",
-      redirectUri: "http://localhost:3001/auth/github/callback"
+      redirectUri: "https://firmcode.firmoncloud.com/api/auth/github/callback"
     });
     expect(rows.rows[0]).toMatchObject({
       github_login: "octo-user"
@@ -417,6 +417,8 @@ class FakeGitHubInstallationSyncClient implements GitHubInstallationSyncClient {
 const testConfig: ApiRuntimeConfig = {
   nodeEnv: "test",
   port: 3001,
+  publicAppUrl: "https://firmcode.firmoncloud.com",
+  publicApiUrl: "https://firmcodeapi.firmoncloud.com",
   corsAllowedOrigins: [],
   database: {
     url: "postgres://firmcode:secret@localhost:5432/firmcode",

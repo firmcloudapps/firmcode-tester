@@ -1,4 +1,5 @@
 import { GET as startGitHubOAuth } from "../app/auth/github/route";
+import { GET as completeGitHubOAuth } from "../app/api/auth/github/callback/route";
 import { GET as listCiFailures } from "../app/api/ci-failures/route";
 import { GET as readCiFailure } from "../app/api/ci-failures/[id]/route";
 import { POST as syncInstallations } from "../app/api/github/installations/sync/route";
@@ -7,15 +8,17 @@ import { POST as syncRepository } from "../app/api/repositories/[id]/sync/route"
 
 describe("GitHub sync routes", () => {
   const originalApiUrl = process.env.NEXT_PUBLIC_API_URL;
+  const originalAppUrl = process.env.APP_URL;
   const originalDashboardUrl = process.env.NEXT_PUBLIC_DASHBOARD_URL;
   const originalWorkspaceId = process.env.FIRMCODE_DASHBOARD_WORKSPACE_ID;
   const originalClerkUserId = process.env.FIRMCODE_DASHBOARD_CLERK_USER_ID;
 
   afterEach(() => {
-    process.env.NEXT_PUBLIC_API_URL = originalApiUrl;
-    process.env.NEXT_PUBLIC_DASHBOARD_URL = originalDashboardUrl;
-    process.env.FIRMCODE_DASHBOARD_WORKSPACE_ID = originalWorkspaceId;
-    process.env.FIRMCODE_DASHBOARD_CLERK_USER_ID = originalClerkUserId;
+    restoreEnv("NEXT_PUBLIC_API_URL", originalApiUrl);
+    restoreEnv("APP_URL", originalAppUrl);
+    restoreEnv("NEXT_PUBLIC_DASHBOARD_URL", originalDashboardUrl);
+    restoreEnv("FIRMCODE_DASHBOARD_WORKSPACE_ID", originalWorkspaceId);
+    restoreEnv("FIRMCODE_DASHBOARD_CLERK_USER_ID", originalClerkUserId);
     vi.unstubAllGlobals();
   });
 
@@ -41,6 +44,30 @@ describe("GitHub sync routes", () => {
     expect(headers.get("x-firmcode-workspace-id")).toBe("workspace-1");
     expect(headers.get("x-firmcode-user-id")).toBe("user-1");
     expect(response.headers.get("location")).toBe("https://github.com/login/oauth/authorize?client_id=firmcode");
+  });
+
+  it("routes GitHub OAuth callback through the API and returns to GitHub setup", async () => {
+    process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
+    process.env.APP_URL = "https://firmcode.firmoncloud.com";
+    process.env.FIRMCODE_DASHBOARD_WORKSPACE_ID = "workspace-1";
+    process.env.FIRMCODE_DASHBOARD_CLERK_USER_ID = "user-1";
+    const fetcher = vi.fn(async () => jsonResponse({ connected: true, user: { login: "octo-user" } }));
+
+    vi.stubGlobal("fetch", fetcher);
+
+    const response = await completeGitHubOAuth(
+      new Request("https://firmcode.firmoncloud.com/api/auth/github/callback?code=oauth-code&state=oauth-state")
+    );
+    const calls = fetcher.mock.calls as unknown as Array<[RequestInfo | URL, RequestInit | undefined]>;
+    const callbackUrl = new URL(String(calls[0]?.[0]));
+    const headers = new Headers(calls[0]?.[1]?.headers);
+
+    expect(callbackUrl.pathname).toBe("/auth/github/callback");
+    expect(callbackUrl.searchParams.get("code")).toBe("oauth-code");
+    expect(callbackUrl.searchParams.get("state")).toBe("oauth-state");
+    expect(headers.get("x-firmcode-workspace-id")).toBe("workspace-1");
+    expect(headers.get("x-firmcode-user-id")).toBe("user-1");
+    expect(response.headers.get("location")).toBe("https://firmcode.firmoncloud.com/github/installations?github_oauth=connected");
   });
 
   it("routes Sync GitHub to the installation sync API with dashboard auth headers", async () => {
@@ -165,4 +192,13 @@ function jsonResponse(body: unknown, status = 200): Response {
       "content-type": "application/json"
     }
   });
+}
+
+function restoreEnv(name: string, value: string | undefined): void {
+  if (value === undefined) {
+    delete process.env[name];
+    return;
+  }
+
+  process.env[name] = value;
 }

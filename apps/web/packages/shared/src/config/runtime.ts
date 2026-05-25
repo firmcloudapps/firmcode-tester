@@ -72,6 +72,7 @@ export interface GitHubAppConfig {
 export interface ApiRuntimeConfig {
   nodeEnv: RuntimeEnvironment;
   port: number;
+  publicAppUrl?: string | null;
   corsAllowedOrigins: string[];
   database: DatabaseConfig;
   queue: QueueConfig;
@@ -106,6 +107,7 @@ export function createApiRuntimeConfig(env: EnvironmentVariables): ApiRuntimeCon
   const github = readGitHubAppConfig(env, nodeEnv, issues);
   const review = readReviewConfig(env, issues);
   const port = readPort(env.PORT, 3001, issues);
+  const publicAppUrl = readOptionalHttpUrl(env, "APP_URL", issues);
 
   if (issues.length > 0 || database === null || queue === null || clerk === null) {
     throw new ConfigValidationError("API runtime", issues);
@@ -114,6 +116,7 @@ export function createApiRuntimeConfig(env: EnvironmentVariables): ApiRuntimeCon
   return {
     nodeEnv,
     port,
+    publicAppUrl,
     corsAllowedOrigins: readList(env.CORS_ALLOWED_ORIGINS),
     database,
     queue,
