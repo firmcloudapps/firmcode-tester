@@ -27,6 +27,7 @@ export const DASHBOARD_IMPLEMENTED_ROUTE_PATTERNS: readonly DashboardRoutePatter
   { pattern: "/findings", kind: "page" },
   { pattern: "/developer", kind: "page" },
   { pattern: "/github/installations", kind: "page" },
+  { pattern: "/github/installations/callback", kind: "route-handler" },
   { pattern: "/pull-requests", kind: "page" },
   { pattern: "/pull-requests/[id]", kind: "page" },
   { pattern: "/repositories", kind: "page" },

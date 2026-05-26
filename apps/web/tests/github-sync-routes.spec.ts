@@ -2,6 +2,7 @@ import { GET as startGitHubOAuth } from "../app/auth/github/route";
 import { GET as completeGitHubOAuth } from "../app/api/auth/github/callback/route";
 import { GET as listCiFailures } from "../app/api/ci-failures/route";
 import { GET as readCiFailure } from "../app/api/ci-failures/[id]/route";
+import { GET as completeGitHubAppInstallation } from "../app/github/installations/callback/route";
 import { POST as syncInstallations } from "../app/api/github/installations/sync/route";
 import { GET as readRules, PATCH as saveRules } from "../app/api/rules/route";
 import { PATCH as updateMemberRole } from "../app/api/settings/members/[clerkUserId]/role/route";
@@ -112,6 +113,61 @@ describe("GitHub sync routes", () => {
 
     expect(fetcher).not.toHaveBeenCalled();
     expect(response.headers.get("location")).toBe("https://firmcode.firmoncloud.com/sign-in");
+  });
+
+  it("routes GitHub App installation callback through the API and returns to setup", async () => {
+    process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
+    process.env.APP_URL = "https://firmcode.firmoncloud.com";
+    process.env.FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN = "session-token";
+    process.env.FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID = "workspace-1";
+    const fetcher = vi.fn(async () => jsonResponse({ installations: [], syncedRepositoryCount: 0 }));
+
+    vi.stubGlobal("fetch", fetcher);
+
+    const response = await completeGitHubAppInstallation(
+      new Request("https://firmcode.firmoncloud.com/github/installations/callback?installation_id=301&setup_action=install")
+    );
+    const calls = fetcher.mock.calls as unknown as Array<[RequestInfo | URL, RequestInit | undefined]>;
+    const callbackUrl = new URL(String(calls[0]?.[0]));
+    const headers = new Headers(calls[0]?.[1]?.headers);
+
+    expect(callbackUrl.pathname).toBe("/github/installations/callback");
+    expect(callbackUrl.searchParams.get("installation_id")).toBe("301");
+    expect(callbackUrl.searchParams.has("setup_action")).toBe(false);
+    expect(headers.get("authorization")).toBe("Bearer session-token");
+    expect(headers.get("x-firmcode-workspace-id")).toBe("workspace-1");
+    expect(headers.get("x-firmcode-user-id")).toBeNull();
+    expect(response.headers.get("location")).toBe("https://firmcode.firmoncloud.com/github/installations?github_installation=connected");
+  });
+
+  it("redirects GitHub App installation callback to sign-in before calling the API when Clerk auth is missing", async () => {
+    process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
+    process.env.APP_URL = "https://firmcode.firmoncloud.com";
+    const fetcher = vi.fn(async () => jsonResponse({ installations: [], syncedRepositoryCount: 0 }));
+
+    vi.stubGlobal("fetch", fetcher);
+
+    const response = await completeGitHubAppInstallation(
+      new Request("https://firmcode.firmoncloud.com/github/installations/callback?installation_id=301")
+    );
+
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(response.headers.get("location")).toBe("https://firmcode.firmoncloud.com/sign-in");
+  });
+
+  it("returns a safe error notice when GitHub App installation callback fails", async () => {
+    process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
+    process.env.APP_URL = "https://firmcode.firmoncloud.com";
+    process.env.FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN = "session-token";
+    const fetcher = vi.fn(async () => new Response(JSON.stringify({ message: "GitHub installation not found" }), { status: 404 }));
+
+    vi.stubGlobal("fetch", fetcher);
+
+    const response = await completeGitHubAppInstallation(
+      new Request("https://firmcode.firmoncloud.com/github/installations/callback?installation_id=301")
+    );
+
+    expect(response.headers.get("location")).toBe("https://firmcode.firmoncloud.com/github/installations?github_installation=error");
   });
 
   it("routes Sync GitHub to the installation sync API with dashboard auth headers", async () => {

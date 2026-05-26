@@ -112,6 +112,12 @@ Configure the GitHub App OAuth callback URL to the dashboard callback route:
 https://firmcode.firmoncloud.com/api/auth/github/callback
 ```
 
+Configure the GitHub App setup URL to the dashboard installation callback route so GitHub can return `installation_id` to Firmcode after install/update:
+
+```text
+https://firmcode.firmoncloud.com/github/installations/callback
+```
+
 Keep `APP_URL=https://firmcode.firmoncloud.com` on the API service and `NEXT_PUBLIC_API_URL=https://firmcodeapi.firmoncloud.com` on the web service so the dashboard callback can forward securely to the API token exchange endpoint.
 
 ## LLM
