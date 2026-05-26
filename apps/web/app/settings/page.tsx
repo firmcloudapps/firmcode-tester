@@ -1,5 +1,6 @@
 import { DashboardShell } from "../../components/dashboard/dashboard-shell";
 import { parseSettingsTab, SettingsView } from "../../components/dashboard/settings-view";
+import { loadGitHubAppInstallConfig } from "../../config/github-app-installation";
 import { loadSettingsState } from "../../lib/dashboard-data";
 
 export const dynamic = "force-dynamic";
@@ -11,10 +12,12 @@ interface SettingsPageProps {
 export default async function SettingsPage({ searchParams = {} }: SettingsPageProps) {
   const state = await loadSettingsState();
   const activeTab = parseSettingsTab(searchParams.tab);
+  const installConfig = loadGitHubAppInstallConfig();
+  const githubAppInstallUrl = installConfig.status === "configured" ? installConfig.installUrl : null;
 
   return (
     <DashboardShell activeItem="Settings">
-      <SettingsView state={state} activeTab={activeTab} />
+      <SettingsView state={state} activeTab={activeTab} githubAppInstallUrl={githubAppInstallUrl} />
     </DashboardShell>
   );
 }
