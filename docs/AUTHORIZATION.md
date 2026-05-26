@@ -61,13 +61,12 @@ The MVP must ship with real Clerk-backed authentication before any dashboard dat
 - Clerk Organizations enabled:
   - Map each Clerk organization to one `workspaces` row by `clerk_org_id`.
   - Map Clerk organization memberships to `workspace_memberships`.
-  - Prefer explicit Firmcode role metadata when configured in trusted Clerk JWT claims. The API reads `firmcode_role`, `org_firmcode_role`, `firmcode.role`, `organization_metadata.firmcode_role`, `public_metadata.firmcode_role`, or `metadata.firmcode_role`; `admin`/legacy `owner` resolve to Admin and `developer`/`member` resolve to Developer.
-  - Fallback role mapping:
-    - New Clerk organization memberships default to `developer`; Firmcode Admin is granted only by explicit trusted Firmcode role metadata, an internal seed/support flow, or the Settings member-management UI.
-    - Clerk organization admin/owner status by itself does not grant Firmcode Admin.
+  - Treat Clerk organization roles as authoritative when Organizations are optional and active: `org:admin`/`admin` and legacy `org:owner`/`owner` resolve to Admin; `org:member`/`member` and `org:developer`/`developer` resolve to Developer.
+  - Optional trusted Firmcode role metadata is only a fallback when no recognized Clerk organization role is present. The API reads `firmcode_role`, `org_firmcode_role`, `firmcode.role`, `organization_metadata.firmcode_role`, `public_metadata.firmcode_role`, or `metadata.firmcode_role`.
 - Clerk Organizations disabled:
   - Create one personal workspace per Clerk user.
-  - The owning user is `developer` by default unless an internal seed, support flow, trusted metadata, or Admin settings action explicitly grants `admin`.
+  - All frontend signups default to Developer.
+  - Admin is granted by setting trusted Clerk user metadata such as `firmcode_role=admin` and exposing it in the Clerk session token. The API syncs that claim into `workspace_memberships` on the next authenticated request.
 - Sync membership from Clerk webhooks and also repair/ensure the active workspace on authenticated requests so first login does not require manual seed data.
 - Persist role changes with `updated_at`, allow Admins to assign Admin/Developer roles or suspend/restore workspace accounts in Settings, and write audit events for Admin grants or removals.
 

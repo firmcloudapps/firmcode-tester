@@ -74,7 +74,7 @@ export class PostgresDashboardWorkspaceResolver implements DashboardWorkspaceRes
       return toResolvedWorkspace(input.token, membership);
     }
 
-    const membership = await this.ensurePersonalWorkspace(input.token.clerkUserId);
+    const membership = await this.ensurePersonalWorkspace(input.token);
     return toResolvedWorkspace(input.token, membership);
   }
 
@@ -99,7 +99,7 @@ RETURNING id
     return result.rows[0]?.id ?? workspaceId;
   }
 
-  private async ensurePersonalWorkspace(clerkUserId: string): Promise<MembershipRow> {
+  private async ensurePersonalWorkspace(token: VerifiedClerkToken): Promise<MembershipRow> {
     const existing = await this.database.query<MembershipRow>(
       `
 SELECT wm.workspace_id, wm.clerk_user_id, wm.role, w.clerk_org_id
@@ -111,11 +111,22 @@ WHERE wm.clerk_user_id = $1
 ORDER BY wm.created_at ASC
 LIMIT 1
 `,
-      [clerkUserId]
+      [token.clerkUserId]
     );
 
     if (existing.rows[0] !== undefined) {
-      return existing.rows[0];
+      return this.ensureMembership({
+        workspaceId: existing.rows[0].workspace_id,
+        clerkUserId: token.clerkUserId,
+        role: resolvePersonalRole(token),
+        source: resolvePersonalRoleSource(token),
+        syncExistingRole: hasExplicitFirmcodeRole(token),
+        metadata: {
+          clerkOrgId: null,
+          clerkOrgRole: null,
+          firmcodeRole: token.firmcodeRole
+        }
+      });
     }
 
     const workspaceId = this.uuidFactory();
@@ -129,14 +140,14 @@ VALUES ($1, NULL, $2)
 
     return this.ensureMembership({
       workspaceId,
-      clerkUserId,
-      role: "developer",
-      source: "personal_first_login",
-      syncExistingRole: false,
+      clerkUserId: token.clerkUserId,
+      role: resolvePersonalRole(token),
+      source: resolvePersonalRoleSource(token),
+      syncExistingRole: hasExplicitFirmcodeRole(token),
       metadata: {
         clerkOrgId: null,
         clerkOrgRole: null,
-        firmcodeRole: null
+        firmcodeRole: token.firmcodeRole
       }
     });
   }
@@ -286,6 +297,14 @@ export class EmptyDashboardWorkspaceResolver implements DashboardWorkspaceResolv
   }
 }
 
+function resolvePersonalRole(token: VerifiedClerkToken): DashboardRole {
+  return normalizeFirmcodeRole(token.firmcodeRole) ?? "developer";
+}
+
+function resolvePersonalRoleSource(token: VerifiedClerkToken): string {
+  return hasExplicitFirmcodeRole(token) ? "clerk_firmcode_role_metadata" : "personal_first_login";
+}
+
 function resolveOrganizationRole(token: VerifiedClerkToken): DashboardRole {
   return normalizeClerkOrganizationRole(token.orgRole) ?? normalizeFirmcodeRole(token.firmcodeRole) ?? "developer";
 }
@@ -300,6 +319,10 @@ function resolveOrganizationRoleSource(token: VerifiedClerkToken): string {
 
 function hasExplicitTrustedRole(token: VerifiedClerkToken): boolean {
   return normalizeClerkOrganizationRole(token.orgRole) !== null || normalizeFirmcodeRole(token.firmcodeRole) !== null;
+}
+
+function hasExplicitFirmcodeRole(token: VerifiedClerkToken): boolean {
+  return normalizeFirmcodeRole(token.firmcodeRole) !== null;
 }
 
 function normalizeClerkOrganizationRole(role: string | null): DashboardRole | null {

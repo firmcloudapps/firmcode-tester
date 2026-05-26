@@ -64,6 +64,8 @@ The expected local auth flow is:
 6. `/auth/redirect` sends Admins to `/dashboard/admin` and Developers to `/dashboard/developer`.
 7. Web server requests to the API include a Clerk bearer token.
 8. API dashboard endpoints reject requests without a valid Clerk token.
+
+Frontend signups resolve to Developer by default. For local Admin testing without requiring Clerk organization membership, set trusted Clerk user metadata such as `public_metadata.firmcode_role = "admin"` in the Clerk dashboard and expose it in the session token as `firmcode_role`, `public_metadata.firmcode_role`, or `firmcode.role`.
 9. Connect GitHub OAuth from `/dashboard/developer` or `/github/installations` before using GitHub-backed workflows.
 
 Do not use dashboard user or workspace environment shims for normal local development once Task 9.0 is implemented. Web-to-API calls should use Clerk sessions. `FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN` and `FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID` are reserved for isolated web unit tests only.
