@@ -104,26 +104,36 @@ describe("PostgresDashboardWorkspaceResolver", () => {
     expect(second).toMatchObject({
       workspaceId: first.workspaceId,
       clerkOrgId: "org_firmcode",
-      role: "developer"
+      role: "admin"
     });
     expect(workspaces.rows).toEqual([{ id: first.workspaceId, clerk_org_id: "org_firmcode" }]);
   });
 
-  it("maps explicit Firmcode role metadata before Clerk organization roles", async () => {
-    const resolved = await resolver.resolve({
+  it("treats Clerk organization roles as the authoritative Firmcode role source", async () => {
+    const member = await resolver.resolve({
       token: createToken({
-        clerkUserId: "user_metadata_admin",
+        clerkUserId: "user_metadata_member",
         clerkOrgId: "org_metadata",
         orgRole: "org:member",
         firmcodeRole: "admin"
       }),
       selectedWorkspaceId: null
     });
+    const fallbackAdmin = await resolver.resolve({
+      token: createToken({
+        clerkUserId: "user_metadata_admin",
+        clerkOrgId: "org_metadata",
+        orgRole: "org:custom",
+        firmcodeRole: "admin"
+      }),
+      selectedWorkspaceId: null
+    });
 
-    expect(resolved.role).toBe("admin");
+    expect(member.role).toBe("developer");
+    expect(fallbackAdmin.role).toBe("admin");
   });
 
-  it("defaults new Clerk organization users to Developer unless Firmcode metadata grants Admin", async () => {
+  it("maps Clerk organization Admins to Admin and members to Developer", async () => {
     const admin = await resolver.resolve({
       token: createToken({
         clerkUserId: "user_admin",
@@ -150,7 +160,7 @@ describe("PostgresDashboardWorkspaceResolver", () => {
       selectedWorkspaceId: null
     });
 
-    expect(admin.role).toBe("developer");
+    expect(admin.role).toBe("admin");
     expect(owner.role).toBe("admin");
     expect(member.role).toBe("developer");
   });
@@ -223,8 +233,7 @@ describe("PostgresDashboardWorkspaceResolver", () => {
       token: createToken({
         clerkUserId: "user_audit",
         clerkOrgId: "org_audit",
-        orgRole: "org:member",
-        firmcodeRole: "admin"
+        orgRole: "org:admin"
       }),
       selectedWorkspaceId: null
     });
@@ -232,8 +241,7 @@ describe("PostgresDashboardWorkspaceResolver", () => {
       token: createToken({
         clerkUserId: "user_audit",
         clerkOrgId: "org_audit",
-        orgRole: "org:member",
-        firmcodeRole: "developer"
+        orgRole: "org:member"
       }),
       selectedWorkspaceId: null
     });
@@ -260,14 +268,14 @@ ORDER BY created_at, id
         target_clerk_user_id: "user_audit",
         previous_role: "developer",
         next_role: "admin",
-        source: "clerk_firmcode_role_metadata"
+        source: "clerk_organization_role"
       },
       {
         actor_clerk_user_id: "user_audit",
         target_clerk_user_id: "user_audit",
         previous_role: "admin",
         next_role: "developer",
-        source: "clerk_firmcode_role_metadata"
+        source: "clerk_organization_role"
       }
     ]);
   });

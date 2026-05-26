@@ -63,7 +63,7 @@ export class PostgresDashboardWorkspaceResolver implements DashboardWorkspaceRes
         clerkUserId: input.token.clerkUserId,
         role: resolveOrganizationRole(input.token),
         source: resolveOrganizationRoleSource(input.token),
-        syncExistingRole: hasExplicitFirmcodeRole(input.token),
+        syncExistingRole: hasExplicitTrustedRole(input.token),
         metadata: {
           clerkOrgId: input.token.clerkOrgId,
           clerkOrgRole: input.token.orgRole,
@@ -287,15 +287,36 @@ export class EmptyDashboardWorkspaceResolver implements DashboardWorkspaceResolv
 }
 
 function resolveOrganizationRole(token: VerifiedClerkToken): DashboardRole {
-  return normalizeFirmcodeRole(token.firmcodeRole) ?? "developer";
+  return normalizeClerkOrganizationRole(token.orgRole) ?? normalizeFirmcodeRole(token.firmcodeRole) ?? "developer";
 }
 
 function resolveOrganizationRoleSource(token: VerifiedClerkToken): string {
-  return hasExplicitFirmcodeRole(token) ? "clerk_firmcode_role_metadata" : "default_developer";
+  if (normalizeClerkOrganizationRole(token.orgRole) !== null) {
+    return "clerk_organization_role";
+  }
+
+  return normalizeFirmcodeRole(token.firmcodeRole) !== null ? "clerk_firmcode_role_metadata" : "default_developer";
 }
 
-function hasExplicitFirmcodeRole(token: VerifiedClerkToken): boolean {
-  return normalizeFirmcodeRole(token.firmcodeRole) !== null;
+function hasExplicitTrustedRole(token: VerifiedClerkToken): boolean {
+  return normalizeClerkOrganizationRole(token.orgRole) !== null || normalizeFirmcodeRole(token.firmcodeRole) !== null;
+}
+
+function normalizeClerkOrganizationRole(role: string | null): DashboardRole | null {
+  switch (role?.toLowerCase()) {
+    case "org:admin":
+    case "admin":
+    case "org:owner":
+    case "owner":
+      return "admin";
+    case "org:developer":
+    case "developer":
+    case "org:member":
+    case "member":
+      return "developer";
+    default:
+      return null;
+  }
 }
 
 function normalizeFirmcodeRole(role: string | null): DashboardRole | null {
