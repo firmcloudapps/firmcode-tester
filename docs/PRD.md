@@ -107,7 +107,7 @@ Supporting production-planning docs:
 - Inline review comment posting through GitHub Reviews API.
 - PR summary as a normal issue comment or review body.
 - Light-mode TypeScript/Tailwind dashboard with repositories, repository detail/configuration, pull requests, review runs, findings, CI failures, rules/policies, settings, billing, GitHub App setup, and raw/redacted artifacts.
-- Explicit Admin and Developer dashboard entry routes: `/dashboard/admin` focuses Admins on workspace settings, billing, members, and global controls, while `/dashboard/developer` focuses Developers on PR Review, GitHub setup, repository automation, and review activity.
+- Explicit Admin and Developer dashboard entry routes with distinct role-specific layouts: `/dashboard/admin` focuses Admins on workspace settings, billing, members, and global controls, while `/dashboard/developer` uses a developer-focused PR Review workspace for GitHub setup, repository automation, review readiness, and review activity.
 - GitHub App install entry point, installation status, and repository metadata sync controls that are functional or explicitly disabled until backend support exists.
 - Clerk-backed sign-in, user menu, organizations/workspaces where enabled, and billing portal.
 - Clerk session-token verification for every dashboard API; production APIs must never trust client-provided user identity headers or environment-provided dashboard user IDs as authentication.

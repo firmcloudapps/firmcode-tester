@@ -564,7 +564,7 @@ Acceptance criteria:
 - Successful sign-in and sign-up route through a protected `/auth/redirect` handler so authenticated users do not remain on `/sign-in`.
 - `/` renders a public holding page with sign-in and protected dashboard entry points.
 - `/auth/redirect` resolves the verified workspace role and sends Admin or owner-equivalent users to `/dashboard/admin`, Developer or member-equivalent users to `/dashboard/developer`, and unsupported/read-only roles to `/dashboard/developer` without granting extra privileges.
-- Explicit `/dashboard/admin` and `/dashboard/developer` dashboard routes exist, use the dashboard shell, and reuse existing role-gated workspace controls instead of creating a parallel authorization path.
+- Explicit `/dashboard/admin` and `/dashboard/developer` dashboard routes exist with distinct role-specific layouts: Admin uses the dashboard shell for settings and account management, while Developer uses a focused PR Review workspace instead of an Admin view with disabled controls.
 - Next.js middleware protects all dashboard pages and dashboard route handlers.
 - Dashboard shell uses Clerk `UserButton` and `OrganizationSwitcher` where organizations are enabled.
 - The active workspace displayed in the shell comes from Clerk organization/personal workspace state, not static placeholder text.
