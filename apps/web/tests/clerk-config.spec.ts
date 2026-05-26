@@ -1,4 +1,5 @@
 import { createWebClerkConfig } from "@firmcode/shared";
+import { loadWebClerkAuthRenderConfig } from "../config/clerk";
 
 describe("web Clerk config", () => {
   it("validates the Clerk publishable key and billing portal entry point", () => {
@@ -60,5 +61,35 @@ describe("web Clerk config", () => {
         NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL: "dashboard"
       })
     ).toThrow(/NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL must be an absolute http\(s\) URL or app-relative path/);
+  });
+});
+
+describe("web Clerk auth render config", () => {
+  it("keeps sign-in rendering independent from optional billing configuration", () => {
+    expect(
+      loadWebClerkAuthRenderConfig({
+        NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_example",
+        CLERK_BILLING_PORTAL_URL: "/billing"
+      })
+    ).toEqual({
+      publishableKey: "pk_test_example",
+      signInUrl: "/sign-in",
+      signUpUrl: "/sign-up",
+      afterSignInUrl: "/auth/redirect",
+      afterSignUpUrl: "/auth/redirect"
+    });
+  });
+
+  it("falls back for malformed optional auth route values instead of breaking the public auth page", () => {
+    expect(
+      loadWebClerkAuthRenderConfig({
+        NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_example",
+        NEXT_PUBLIC_CLERK_SIGN_IN_URL: "sign-in",
+        NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL: "dashboard"
+      })
+    ).toMatchObject({
+      signInUrl: "/sign-in",
+      afterSignInUrl: "/auth/redirect"
+    });
   });
 });
