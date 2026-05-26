@@ -1,6 +1,6 @@
 import React from "react";
 import { ClerkLoaded, ClerkLoading, SignIn, SignUp } from "@clerk/nextjs";
-import { loadWebClerkConfig } from "../../config/clerk";
+import { loadWebClerkAuthRenderConfig } from "../../config/clerk";
 import { ROLE_BASED_AUTH_REDIRECT_PATH } from "../../lib/auth-redirect";
 
 type AuthMode = "sign-in" | "sign-up";
@@ -94,7 +94,7 @@ function renderClerkAuthComponent(mode: AuthMode) {
     );
   }
 
-  const clerk = loadWebClerkConfig();
+  const clerk = loadWebClerkAuthRenderConfig();
 
   return mode === "sign-in" ? (
     <SignIn

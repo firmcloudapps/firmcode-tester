@@ -1,6 +1,6 @@
 import React from "react";
 import { ClerkProvider } from "@clerk/nextjs";
-import { loadWebClerkConfig } from "../config/clerk";
+import { loadWebClerkAuthRenderConfig } from "../config/clerk";
 import { ROLE_BASED_AUTH_REDIRECT_PATH } from "../lib/auth-redirect";
 
 interface ClerkProviderBoundaryProps {
@@ -8,7 +8,7 @@ interface ClerkProviderBoundaryProps {
 }
 
 export function ClerkProviderBoundary({ children }: ClerkProviderBoundaryProps) {
-  const clerk = loadWebClerkConfig();
+  const clerk = loadWebClerkAuthRenderConfig();
 
   return (
     <ClerkProvider
