@@ -38,13 +38,17 @@ describe("PostgresDashboardWorkspaceResolver", () => {
     await pool.end();
   });
 
-  it("creates a personal workspace with Developer role on first login and repeats idempotently", async () => {
+  it("creates personal workspace users as Developer by default and repeats idempotently", async () => {
     const first = await resolver.resolve({
       token: createToken({ clerkUserId: "user_personal" }),
       selectedWorkspaceId: null
     });
     const second = await resolver.resolve({
       token: createToken({ clerkUserId: "user_personal" }),
+      selectedWorkspaceId: null
+    });
+    const later = await resolver.resolve({
+      token: createToken({ clerkUserId: "user_later" }),
       selectedWorkspaceId: null
     });
     const workspaceCount = await pool.query<{ count: string }>("SELECT count(*)::text AS count FROM workspaces");
@@ -59,8 +63,14 @@ describe("PostgresDashboardWorkspaceResolver", () => {
       role: "developer"
     });
     expect(second).toEqual(first);
-    expect(workspaceCount.rows[0]).toEqual({ count: "1" });
-    expect(membershipCount.rows[0]).toEqual({ count: "1" });
+    expect(later).toMatchObject({
+      workspaceId: "00000000-0000-4000-8000-000000000002",
+      clerkUserId: "user_later",
+      clerkOrgId: null,
+      role: "developer"
+    });
+    expect(workspaceCount.rows[0]).toEqual({ count: "2" });
+    expect(membershipCount.rows[0]).toEqual({ count: "2" });
   });
 
   it("preserves an internally seeded personal Admin role instead of downgrading it", async () => {
@@ -73,6 +83,32 @@ describe("PostgresDashboardWorkspaceResolver", () => {
     });
 
     expect(resolved.role).toBe("admin");
+  });
+
+  it("syncs personal workspace Admin promotion from trusted Clerk metadata", async () => {
+    await insertWorkspace("00000000-0000-4000-8000-000000000111", null, "Existing personal workspace");
+    await insertMembership("00000000-0000-4000-8000-000000000111", "user_existing", "developer", true);
+
+    const resolved = await resolver.resolve({
+      token: createToken({
+        clerkUserId: "user_existing",
+        firmcodeRole: "admin"
+      }),
+      selectedWorkspaceId: null
+    });
+    const audits = await pool.query<{ previous_role: string | null; next_role: string | null; source: string }>(
+      "SELECT previous_role, next_role, source FROM workspace_audit_events WHERE workspace_id = $1",
+      ["00000000-0000-4000-8000-000000000111"]
+    );
+
+    expect(resolved.role).toBe("admin");
+    expect(audits.rows).toEqual([
+      {
+        previous_role: "developer",
+        next_role: "admin",
+        source: "clerk_firmcode_role_metadata"
+      }
+    ]);
   });
 
   it("creates and resolves one workspace per Clerk organization", async () => {
