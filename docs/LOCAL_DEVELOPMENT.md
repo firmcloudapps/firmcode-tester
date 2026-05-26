@@ -18,7 +18,7 @@ Firmcode should be developed Docker-first for API and worker runtime behavior. D
 
 1. Copy `.env.example` to `.env`.
 2. Create Clerk application and fill Clerk env vars.
-3. Configure Clerk sign-in/sign-up URLs and organization settings.
+3. Configure Clerk sign-in/sign-up URLs and keep organization setup optional unless specifically testing team workspaces.
 4. Create a NeonDB database and set `DATABASE_URL`.
 5. Create GitHub App with required permissions and webhook secret.
 6. Set `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, and `GITHUB_WEBHOOK_SECRET`.
@@ -38,7 +38,7 @@ Create a Clerk development application and configure:
 - After sign-in URL: `http://localhost:3000/auth/redirect`
 - After sign-up URL: `http://localhost:3000/auth/redirect`
 - Allowed redirect origin: `http://localhost:3000`
-- Organizations enabled if testing team workspaces.
+- Organizations disabled for the default signup flow. Enable Clerk Organizations only when specifically testing team workspaces, and do not require organization creation for new users.
 - A JWT template or audience matching `CLERK_JWT_AUDIENCE` for API calls.
 
 Local `.env` values should include:
@@ -51,6 +51,7 @@ NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
 NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
 NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/auth/redirect
 NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/auth/redirect
+NEXT_PUBLIC_CLERK_ORGANIZATIONS_ENABLED=false
 ```
 
 The expected local auth flow is:
@@ -59,7 +60,7 @@ The expected local auth flow is:
 2. The root holding page renders with dashboard entry points.
 3. Sign in or sign up through Clerk.
 4. Clerk sends the browser to `/auth/redirect`.
-5. The dashboard creates or resolves the active personal or organization workspace.
+5. The dashboard creates or resolves the active personal workspace by default, or an organization workspace only when Clerk Organizations are explicitly enabled.
 6. `/auth/redirect` sends Admins to `/dashboard/admin` and Developers to `/dashboard/developer`.
 7. Web server requests to the API include a Clerk bearer token.
 8. API dashboard endpoints reject requests without a valid Clerk token.

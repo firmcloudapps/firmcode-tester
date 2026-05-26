@@ -109,7 +109,7 @@ Supporting production-planning docs:
 - Light-mode TypeScript/Tailwind dashboard with repositories, repository detail/configuration, pull requests, review runs, findings, CI failures, rules/policies, settings, billing, GitHub App setup, and raw/redacted artifacts.
 - Explicit Admin and Developer dashboard entry routes with distinct role-specific layouts: `/dashboard/admin` focuses Admins on workspace settings, billing, members, and global controls, while `/dashboard/developer` uses a developer-focused PR Review workspace for GitHub setup, repository automation, review readiness, and review activity.
 - GitHub App install entry point, installation status, and repository metadata sync controls that are functional or explicitly disabled until backend support exists.
-- Clerk-backed sign-in, user menu, organizations/workspaces where enabled, and billing portal.
+- Clerk-backed sign-in, user menu, personal workspaces by default, optional organizations/team workspaces where explicitly enabled, and billing portal. New users must not be forced through Clerk organization creation during the default signup flow.
 - Clerk session-token verification for every dashboard API; production APIs must never trust client-provided user identity headers or environment-provided dashboard user IDs as authentication.
 - Webhook idempotency, superseded-run protection, and delivery replay handling.
 - Large-PR handling with prioritized and summary-only modes.

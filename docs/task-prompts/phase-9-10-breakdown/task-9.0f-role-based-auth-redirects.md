@@ -7,9 +7,9 @@ Code context requirement: Before implementing, inspect apps/web/components/auth/
 
 Implement role-based post-auth routing so successful Clerk sign-in and sign-up never leave the user on /sign-in. Add a public root holding page at /. Add a protected /auth/redirect route that uses the existing Clerk-authenticated dashboard API path, preferably /api/settings, to read the verified workspace role. Redirect Admin and owner-equivalent roles to /dashboard/admin. Redirect Developer and member-equivalent roles to /dashboard/developer. Unsupported or read-only roles must fall back to /dashboard/developer without granting additional capabilities. Missing or invalid sessions must redirect to /sign-in.
 
-Add explicit /dashboard/admin and /dashboard/developer dashboard routes. /dashboard/admin should reuse the existing dashboard shell and Admin-relevant workspace controls such as Settings, Billing, members, and global workspace controls. /dashboard/developer should reuse the existing dashboard shell and PR Review/GitHub setup workflow. Do not introduce a new auth bypass, duplicate role policy, or client-controlled role source; the role decision must come from the API context already protected by Clerk token verification.
+Add explicit /dashboard/admin and /dashboard/developer dashboard routes. /dashboard/admin should reuse the existing dashboard shell and Admin-relevant workspace controls such as Settings, Billing, members, and global workspace controls. /dashboard/developer should provide a distinct developer PR Review workspace using existing design tokens, GitHub setup data, repository automation, and review activity rather than an Admin dashboard with disabled controls. Do not introduce a new auth bypass, duplicate role policy, or client-controlled role source; the role decision must come from the API context already protected by Clerk token verification.
 
-Update Clerk SignIn, SignUp, and provider configuration to force successful sign-in/sign-up through /auth/redirect while keeping existing fallback redirect configuration available for resilience. If an already signed-in user visits /sign-in or /sign-up, send them through /auth/redirect.
+Update Clerk SignIn, SignUp, and provider configuration to force successful sign-in/sign-up through /auth/redirect while keeping existing fallback redirect configuration available for resilience. If an already signed-in user visits /sign-in or /sign-up, send them through /auth/redirect. Default signup must not force Clerk organization creation; OrganizationSwitcher should be hidden unless `NEXT_PUBLIC_CLERK_ORGANIZATIONS_ENABLED=true`, and Clerk dashboard configuration must allow personal accounts without a required `choose-organization` task.
 
 Testing requirements:
 - Add tests proving SignIn and SignUp are configured to complete through /auth/redirect.
@@ -17,12 +17,14 @@ Testing requirements:
 - Add tests for missing session, invalid session, unsupported role, and API failure fallback.
 - Add route protection and route-readiness tests for /auth/redirect, /dashboard/admin, and /dashboard/developer.
 - Add component/page tests proving /, /dashboard/admin, and /dashboard/developer render the expected holding page or dashboard shell and reuse existing role-gated surfaces.
+- Add account-control tests proving personal workspace signup is the default and OrganizationSwitcher appears only when organizations are explicitly enabled.
 - Run npm run test --workspace @firmcode/web and npm run lint --workspace @firmcode/web, or document exact failures.
 
 Acceptance criteria:
 - Authenticated users do not remain on /sign-in after sign-in or sign-up.
 - /auth/redirect is protected and resolves role through verified dashboard auth context.
 - / renders a public holding page, and /dashboard/admin and /dashboard/developer exist and route to implemented dashboard pages.
+- New signups can land in a personal workspace without creating a Clerk organization.
 - Role routing does not grant new privileges or trust client-supplied role data.
 - Tests pass through the documented local command, or inability to run them is documented with exact command and failure.
 ```
