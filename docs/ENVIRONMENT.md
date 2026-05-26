@@ -62,6 +62,7 @@ REDIS_URL=redis://redis:6379
 | `NEXT_PUBLIC_CLERK_SIGN_UP_URL` | web | Clerk sign-up route. Use `/sign-up` locally and in production unless Clerk hosted pages require a different URL. |
 | `NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL` | web | Post sign-in fallback destination. Use `/auth/redirect` so role-based routing can send Admins to `/dashboard/admin` and Developers to `/dashboard/developer`. |
 | `NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL` | web | Post sign-up fallback destination. Use `/auth/redirect` so role-based routing can send Admins to `/dashboard/admin` and Developers to `/dashboard/developer`. |
+| `NEXT_PUBLIC_CLERK_ORGANIZATIONS_ENABLED` | web | Optional team-workspace UI flag. Defaults to disabled; set to `true` only when the Clerk instance supports optional organizations without forcing every signup to create one. |
 | `CLERK_JWT_AUDIENCE` | api/web server | Audience/template used for Clerk session tokens sent from Vercel web to the Coolify API. Required for production API token verification. |
 | `CLERK_ISSUER` | api | Optional expected Clerk issuer when not inferred by the Clerk backend SDK. |
 
@@ -86,7 +87,7 @@ Required Clerk dashboard configuration:
 - Sign-up URL: `/sign-up`
 - After sign-in URL: `/auth/redirect`
 - After sign-up URL: `/auth/redirect`
-- Organization settings enabled if team workspaces are supported in the environment.
+- Organization settings optional. For the default SaaS signup, Clerk must allow personal accounts and must not require a `choose-organization` task or force new users to create an organization. Set `NEXT_PUBLIC_CLERK_ORGANIZATIONS_ENABLED=true` only after that Clerk instance supports optional organization switching.
 - Clerk webhook endpoint configured only after the API endpoint exists and `CLERK_WEBHOOK_SECRET` is set.
 - Optional trusted JWT role metadata for organization memberships can be exposed as `firmcode_role`, `org_firmcode_role`, `firmcode.role`, `organization_metadata.firmcode_role`, `public_metadata.firmcode_role`, or `metadata.firmcode_role`. Firmcode maps `admin`/legacy `owner` to Admin and `developer`/`member` to Developer; if absent, Clerk org admin/owner maps to Admin and org member maps to Developer.
 

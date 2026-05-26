@@ -566,7 +566,8 @@ Acceptance criteria:
 - `/auth/redirect` resolves the verified workspace role and sends Admin or owner-equivalent users to `/dashboard/admin`, Developer or member-equivalent users to `/dashboard/developer`, and unsupported/read-only roles to `/dashboard/developer` without granting extra privileges.
 - Explicit `/dashboard/admin` and `/dashboard/developer` dashboard routes exist with distinct role-specific layouts: Admin uses the dashboard shell for settings and account management, while Developer uses a focused PR Review workspace instead of an Admin view with disabled controls.
 - Next.js middleware protects all dashboard pages and dashboard route handlers.
-- Dashboard shell uses Clerk `UserButton` and `OrganizationSwitcher` where organizations are enabled.
+- Dashboard shell uses Clerk `UserButton`; `OrganizationSwitcher` is hidden by default and appears only when `NEXT_PUBLIC_CLERK_ORGANIZATIONS_ENABLED=true`.
+- Default signup resolves to a personal workspace and must not force users through Clerk organization creation. Clerk Organizations are optional team-workspace support, not a mandatory first-run task.
 - The active workspace displayed in the shell comes from Clerk organization/personal workspace state, not static placeholder text.
 - Web server components and route handlers derive the user/session from Clerk `auth()`.
 - Web-to-API requests include `Authorization: Bearer <Clerk session token>`.
@@ -583,6 +584,7 @@ Tests:
 - Web route protection tests for authenticated and unauthenticated users.
 - Sign-in/sign-up route rendering tests.
 - Sign-in/sign-up visual or rendered-markup tests for desktop/mobile layout, Clerk appearance hooks, and no dashboard shell leakage.
+- Dashboard account-control tests proving the OrganizationSwitcher is absent by default and present only when organizations are explicitly enabled.
 - Role-based auth redirect tests for Admin, owner-equivalent, Developer, member-equivalent, missing session, invalid session, and API failure fallback.
 - Route and component tests proving `/auth/redirect`, `/dashboard/admin`, and `/dashboard/developer` are protected and route-ready.
 - Dashboard shell tests for Clerk user menu, organization switcher, and active workspace display.

@@ -7,6 +7,7 @@ import SignInPage from "../app/sign-in/[[...sign-in]]/page";
 import SignUpPage from "../app/sign-up/[[...sign-up]]/page";
 import { clerkAppearance } from "../components/auth/auth-page";
 import { DashboardShell } from "../components/dashboard/dashboard-shell";
+import { isClerkOrganizationsEnabled } from "../lib/clerk-organizations";
 import {
   ROLE_BASED_AUTH_REDIRECT_PATH,
   landingPathForDashboardRole,
@@ -247,7 +248,7 @@ describe("role landing dashboard pages", () => {
 });
 
 describe("Clerk dashboard shell controls", () => {
-  it("renders Clerk account controls and active workspace display", () => {
+  it("defaults to personal workspace account controls without forcing Clerk organization setup", () => {
     const html = renderToString(
       <DashboardShell activeItem="Overview">
         <div>Dashboard content</div>
@@ -255,9 +256,28 @@ describe("Clerk dashboard shell controls", () => {
     );
 
     expect(html).toContain('data-clerk-component="UserButton"');
-    expect(html).toContain('data-clerk-component="OrganizationSwitcher"');
+    expect(html).not.toContain('data-clerk-component="OrganizationSwitcher"');
     expect(html).toContain('data-active-workspace-name="true"');
     expect(html).toContain("Personal workspace");
+    expect(isClerkOrganizationsEnabled({})).toBe(false);
+  });
+
+  it("renders Clerk organization switching only when explicitly enabled", () => {
+    const originalOrganizationsEnabled = process.env.NEXT_PUBLIC_CLERK_ORGANIZATIONS_ENABLED;
+    process.env.NEXT_PUBLIC_CLERK_ORGANIZATIONS_ENABLED = "true";
+
+    try {
+      const html = renderToString(
+        <DashboardShell activeItem="Overview">
+          <div>Dashboard content</div>
+        </DashboardShell>
+      );
+
+      expect(html).toContain('data-clerk-component="OrganizationSwitcher"');
+      expect(isClerkOrganizationsEnabled()).toBe(true);
+    } finally {
+      restoreEnv("NEXT_PUBLIC_CLERK_ORGANIZATIONS_ENABLED", originalOrganizationsEnabled);
+    }
   });
 });
 

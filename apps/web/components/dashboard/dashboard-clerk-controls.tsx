@@ -2,14 +2,19 @@
 
 import React from "react";
 import { OrganizationSwitcher, UserButton, useOrganization, useUser } from "@clerk/nextjs";
+import { isClerkOrganizationsEnabled } from "../../lib/clerk-organizations";
 
 export function DashboardClerkControls() {
+  const organizationsEnabled = isClerkOrganizationsEnabled();
+
   if (process.env.NODE_ENV === "test") {
     return (
       <div className="flex items-center gap-2" data-clerk-dashboard-controls>
-        <span className="rounded-md border border-border bg-surface px-2 py-1 text-xs text-secondary" data-clerk-component="OrganizationSwitcher">
-          OrganizationSwitcher
-        </span>
+        {organizationsEnabled ? (
+          <span className="rounded-md border border-border bg-surface px-2 py-1 text-xs text-secondary" data-clerk-component="OrganizationSwitcher">
+            OrganizationSwitcher
+          </span>
+        ) : null}
         <span className="rounded-md border border-border bg-surface px-2 py-1 text-xs text-secondary" data-clerk-component="UserButton">
           UserButton
         </span>
@@ -19,11 +24,13 @@ export function DashboardClerkControls() {
 
   return (
     <div className="flex items-center gap-2" data-clerk-dashboard-controls>
-      {process.env.NEXT_PUBLIC_CLERK_ORGANIZATIONS_ENABLED !== "false" ? (
+      {organizationsEnabled ? (
         <OrganizationSwitcher
-          afterSelectOrganizationUrl="/"
-          afterLeaveOrganizationUrl="/"
-          afterCreateOrganizationUrl="/"
+          afterSelectOrganizationUrl="/auth/redirect"
+          afterSelectPersonalUrl="/auth/redirect"
+          afterLeaveOrganizationUrl="/auth/redirect"
+          afterCreateOrganizationUrl="/auth/redirect"
+          skipInvitationScreen
           appearance={{
             elements: {
               organizationSwitcherTrigger: "rounded-md border border-border bg-surface px-2 py-1 shadow-sm"

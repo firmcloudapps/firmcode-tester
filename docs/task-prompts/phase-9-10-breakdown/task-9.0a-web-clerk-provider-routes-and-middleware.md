@@ -9,7 +9,7 @@ Implement the web-side Clerk authentication shell. Install @clerk/nextjs in apps
 
 Build the sign-in and sign-up UI from the dedicated auth-page design in docs/DASHBOARD_DESIGN.md. Use an unauthenticated light-mode shell, not the dashboard shell. The desktop layout should pair a compact Firmcode context rail with a constrained Clerk auth panel; mobile should stack the wordmark and auth panel cleanly. Configure Clerk appearance to match dashboard tokens: light surfaces, restrained accent color, 6-8px radius, accessible focus states, and compact typography. Avoid marketing hero treatment, decorative blobs, stock imagery, or oversized sales copy.
 
-Update the dashboard shell to use Clerk account controls: UserButton for user/profile actions and OrganizationSwitcher when Clerk Organizations are enabled. Replace static workspace placeholder text with the active Clerk organization name or personal workspace fallback, while keeping the existing light-mode dashboard layout and route-readiness behavior.
+Update the dashboard shell to use Clerk account controls: UserButton for user/profile actions and OrganizationSwitcher only when Clerk Organizations are explicitly enabled with `NEXT_PUBLIC_CLERK_ORGANIZATIONS_ENABLED=true`. The default signup experience must resolve to a personal workspace and must not force users through Clerk organization creation. Replace static workspace placeholder text with the active Clerk organization name or personal workspace fallback, while keeping the existing light-mode dashboard layout and route-readiness behavior.
 
 Do not implement custom password/session storage. Clerk owns sign-in, sign-up, sessions, user profile, organization switcher, and member-management entry points.
 
