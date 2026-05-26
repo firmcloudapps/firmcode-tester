@@ -69,13 +69,26 @@ describe("SettingsView", () => {
   });
 
   it("enables GitHub setup for Developers while keeping Admin-only settings disabled", () => {
-    const adminHtml = renderToString(<SettingsView state={{ status: "populated", data: adminSettings }} activeTab="github-app" />);
-    const developerHtml = renderToString(<SettingsView state={{ status: "populated", data: developerSettings }} activeTab="github-app" />);
+    const adminHtml = renderToString(
+      <SettingsView
+        state={{ status: "populated", data: adminSettings }}
+        activeTab="github-app"
+        githubAppInstallUrl="https://github.com/apps/firmcode/installations/new"
+      />
+    );
+    const developerHtml = renderToString(
+      <SettingsView
+        state={{ status: "populated", data: developerSettings }}
+        activeTab="github-app"
+        githubAppInstallUrl="https://github.com/apps/firmcode/installations/new"
+      />
+    );
     const developerMembers = renderToString(<SettingsView state={{ status: "populated", data: developerSettings }} activeTab="members" />);
 
-    expect(adminHtml).toContain('href="/github/installations"');
+    expect(adminHtml).toContain('href="https://github.com/apps/firmcode/installations/new"');
+    expect(adminHtml).toContain('data-dashboard-destination="external"');
     expect(adminHtml).toContain("Sensitive settings enabled");
-    expect(developerHtml).toContain('href="/github/installations"');
+    expect(developerHtml).toContain('href="https://github.com/apps/firmcode/installations/new"');
     expect(developerHtml).toContain("Read-only sensitive settings");
     expect(developerMembers).toContain("Open Clerk members");
     expect(developerMembers).toContain("disabled=\"\"");

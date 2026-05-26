@@ -29,9 +29,10 @@ export type SettingsTabKey = (typeof SETTINGS_TABS)[number]["key"];
 interface SettingsViewProps {
   state: ViewState<WorkspaceSettingsResponse>;
   activeTab: SettingsTabKey;
+  githubAppInstallUrl?: string | null;
 }
 
-export function SettingsView({ state, activeTab }: SettingsViewProps) {
+export function SettingsView({ state, activeTab, githubAppInstallUrl = null }: SettingsViewProps) {
   return (
     <div className="space-y-4">
       <div>
@@ -44,8 +45,8 @@ export function SettingsView({ state, activeTab }: SettingsViewProps) {
       <SettingsTabs activeTab={activeTab} />
       {state.status === "loading" ? <SettingsLoadingState /> : null}
       {state.status === "error" ? <SettingsErrorState message={state.message} /> : null}
-      {state.status === "empty" ? <SettingsContent data={state.data} activeTab={activeTab} empty /> : null}
-      {state.status === "populated" ? <SettingsContent data={state.data} activeTab={activeTab} /> : null}
+      {state.status === "empty" ? <SettingsContent data={state.data} activeTab={activeTab} githubAppInstallUrl={githubAppInstallUrl} empty /> : null}
+      {state.status === "populated" ? <SettingsContent data={state.data} activeTab={activeTab} githubAppInstallUrl={githubAppInstallUrl} /> : null}
     </div>
   );
 }
@@ -106,10 +107,12 @@ function SettingsErrorState({ message }: { message: string }) {
 function SettingsContent({
   data,
   activeTab,
+  githubAppInstallUrl,
   empty = false
 }: {
   data?: WorkspaceSettingsResponse;
   activeTab: SettingsTabKey;
+  githubAppInstallUrl: string | null;
   empty?: boolean;
 }) {
   if (data === undefined) {
@@ -130,7 +133,7 @@ function SettingsContent({
       <RoleNotice role={data.workspace.role} canManage={canManage} />
       {empty ? <EmptyInstallNotice /> : null}
       {activeTab === "general" ? <GeneralPanel data={data} /> : null}
-      {activeTab === "github-app" ? <GitHubAppPanel data={data} /> : null}
+      {activeTab === "github-app" ? <GitHubAppPanel data={data} installUrl={githubAppInstallUrl ?? data.githubApp.installUrl} /> : null}
       {activeTab === "members" ? <MembersPanel data={data} /> : null}
       {activeTab === "api-keys" ? <ApiKeysPanel data={data} /> : null}
       {activeTab === "data-retention" ? <DataRetentionPanel data={data} /> : null}
@@ -188,7 +191,7 @@ function GeneralPanel({ data }: { data: WorkspaceSettingsResponse }) {
   );
 }
 
-function GitHubAppPanel({ data }: { data: WorkspaceSettingsResponse }) {
+function GitHubAppPanel({ data, installUrl }: { data: WorkspaceSettingsResponse; installUrl: string }) {
   const canManage = canManageRepositoryConfiguration(data.workspace.role);
 
   return (
@@ -198,7 +201,7 @@ function GitHubAppPanel({ data }: { data: WorkspaceSettingsResponse }) {
     >
       <div className="flex flex-wrap gap-2">
         {canManage ? (
-          <RouteReadyAction href={data.githubApp.installUrl} label="Connect GitHub App" primary provider="github" />
+          <RouteReadyAction href={installUrl} label="Connect GitHub App" primary provider="github" />
         ) : (
           <button
             className="rounded-md bg-mist px-3 py-2 text-sm font-medium text-secondary"
