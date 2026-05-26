@@ -3,7 +3,7 @@ import { createDashboardApiHeaders } from "./dashboard-api-proxy";
 
 export const ROLE_BASED_AUTH_REDIRECT_PATH = "/auth/redirect";
 
-type RoleBasedDashboardPath = "/admin" | "/developer";
+type RoleBasedDashboardPath = "/dashboard/admin" | "/dashboard/developer";
 
 interface RoleBasedDashboardRedirectInput {
   readonly requestUrl: string;
@@ -34,14 +34,14 @@ export async function resolveRoleBasedDashboardRedirect({
     }
 
     if (!response.ok) {
-      return new URL("/developer", requestBaseUrl);
+      return new URL("/dashboard/developer", requestBaseUrl);
     }
 
     const settings = (await response.json()) as Partial<WorkspaceSettingsResponse>;
 
     return new URL(landingPathForDashboardRole(settings.workspace?.role), requestBaseUrl);
   } catch {
-    return new URL("/developer", requestBaseUrl);
+    return new URL("/dashboard/developer", requestBaseUrl);
   }
 }
 
@@ -49,11 +49,11 @@ export function landingPathForDashboardRole(role: string | null | undefined): Ro
   switch (role?.toLowerCase()) {
     case "admin":
     case "owner":
-      return "/admin";
+      return "/dashboard/admin";
     case "developer":
     case "member":
     default:
-      return "/developer";
+      return "/dashboard/developer";
   }
 }
 

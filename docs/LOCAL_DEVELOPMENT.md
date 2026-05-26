@@ -56,14 +56,14 @@ NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/auth/redirect
 The expected local auth flow is:
 
 1. Visit `http://localhost:3000`.
-2. Unauthenticated users are redirected to `/sign-in`.
+2. The root holding page renders with dashboard entry points.
 3. Sign in or sign up through Clerk.
 4. Clerk sends the browser to `/auth/redirect`.
 5. The dashboard creates or resolves the active personal or organization workspace.
-6. `/auth/redirect` sends Admins to `/admin` and Developers to `/developer`.
+6. `/auth/redirect` sends Admins to `/dashboard/admin` and Developers to `/dashboard/developer`.
 7. Web server requests to the API include a Clerk bearer token.
 8. API dashboard endpoints reject requests without a valid Clerk token.
-9. Connect GitHub OAuth from `/developer` or `/github/installations` before using GitHub-backed workflows.
+9. Connect GitHub OAuth from `/dashboard/developer` or `/github/installations` before using GitHub-backed workflows.
 
 Do not use dashboard user or workspace environment shims for normal local development once Task 9.0 is implemented. Web-to-API calls should use Clerk sessions. `FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN` and `FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID` are reserved for isolated web unit tests only.
 

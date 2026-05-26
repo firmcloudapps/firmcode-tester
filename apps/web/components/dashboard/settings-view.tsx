@@ -13,6 +13,7 @@ import {
 } from "../../lib/dashboard-route-readiness";
 import type { ViewState } from "../../lib/view-state";
 import { formatDateTime } from "./format";
+import { WorkspaceMembersManager } from "./workspace-members-manager";
 
 export const SETTINGS_TABS = [
   { key: "general", label: "General" },
@@ -245,7 +246,7 @@ function MembersPanel({ data }: { data: WorkspaceSettingsResponse }) {
   const canManage = data.workspace.canManageSensitiveSettings;
 
   return (
-    <SettingsPanel title="Members" description="Clerk owns member invitations, removals, profile details, and organization roles.">
+    <SettingsPanel title="Members" description="Manage Firmcode workspace authorization while Clerk remains the identity provider.">
       <div className="flex flex-wrap gap-2">
         {canManage ? (
           <RouteReadyAction href={data.clerk.memberManagementUrl} label="Open Clerk members" primary provider="clerk" />
@@ -262,8 +263,12 @@ function MembersPanel({ data }: { data: WorkspaceSettingsResponse }) {
         <RouteReadyAction href={data.clerk.organizationProfileUrl} label="View organization" provider="clerk" />
       </div>
       <p className="mt-4 rounded-md border border-border bg-subtle p-3 text-sm leading-6 text-secondary">
-        Firmcode reads the active workspace membership for authorization and leaves member lifecycle workflows in Clerk.
+        New workspace memberships default to Developer. Promote users to Admin only when they need billing, members, retention,
+        raw artifacts, or sensitive workspace controls.
       </p>
+      <div className="mt-4">
+        <WorkspaceMembersManager members={data.members ?? []} canManage={canManage} />
+      </div>
     </SettingsPanel>
   );
 }

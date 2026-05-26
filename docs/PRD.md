@@ -16,12 +16,13 @@ Firmcode must be designed as a multi-tenant SaaS product, not a single-user loca
 
 - Clerk owns sign-up, sign-in, sessions, user profile, organization/workspace switching, member invitations where enabled, and Billing.
 - Every user must authenticate to Firmcode through Clerk and connect GitHub OAuth before using GitHub-backed workflows.
-- Successful Clerk sign-in/sign-up must route through a protected Firmcode post-auth redirect that resolves the workspace role and sends Admins to `/admin` and Developers to `/developer`; users must never remain stranded on `/sign-in` after authentication.
+- The root route `/` must render a public holding page with clear entry points into Clerk sign-in and the protected dashboards.
+- Successful Clerk sign-in/sign-up must route through a protected Firmcode post-auth redirect that resolves the workspace role and sends Admins to `/dashboard/admin` and Developers to `/dashboard/developer`; users must never remain stranded on `/sign-in` after authentication.
 - Workspaces are the tenant boundary. Every repository, installation, review run, finding, artifact, policy, usage counter, and audit event must be scoped to one workspace.
-- Admins manage billing, plans, member access where Clerk permits, global workspace settings, retention, API keys, and support/safety controls.
+- Admins manage billing, plans, member access where Clerk permits, Firmcode role assignments, workspace account suspension/restoration, global workspace settings, retention, API keys, and support/safety controls.
 - Developers are the primary customer users: they connect GitHub accounts, add/sync repositories, enable PR review automation, run/retry analysis, and track reports, findings, and CI explanations for their workspace.
 - Billing and plan enforcement are SaaS concerns. Clerk Billing owns checkout/subscription management; Firmcode stores only the plan/usage/capability metadata needed for authorization, quotas, and display.
-- Account management surfaces must include profile access, workspace switcher, member management entry point, billing portal, GitHub OAuth connection status, GitHub App installation status, data retention, notifications, and API keys or an explicit disabled state.
+- Account management surfaces must include profile access, workspace switcher, member management entry point, Firmcode role assignment, workspace account suspension/restoration, billing portal, GitHub OAuth connection status, GitHub App installation status, data retention, notifications, and API keys or an explicit disabled state.
 - Auditability is required for sensitive actions: OAuth connect/disconnect, GitHub App install/disconnect/rescope, repository enablement changes, policy changes, billing capability changes, raw artifact access, and retry actions.
 - Secrets, OAuth access tokens, installation tokens, private keys, webhook secrets, client secrets, raw payloads, private diffs, and raw CI logs must never appear in dashboard responses unless a role-gated redacted artifact flow explicitly allows safe access.
 
@@ -106,7 +107,7 @@ Supporting production-planning docs:
 - Inline review comment posting through GitHub Reviews API.
 - PR summary as a normal issue comment or review body.
 - Light-mode TypeScript/Tailwind dashboard with repositories, repository detail/configuration, pull requests, review runs, findings, CI failures, rules/policies, settings, billing, GitHub App setup, and raw/redacted artifacts.
-- Explicit Admin and Developer dashboard entry routes: `/admin` focuses Admins on workspace settings, billing, members, and global controls, while `/developer` focuses Developers on PR Review, GitHub setup, repository automation, and review activity.
+- Explicit Admin and Developer dashboard entry routes: `/dashboard/admin` focuses Admins on workspace settings, billing, members, and global controls, while `/dashboard/developer` focuses Developers on PR Review, GitHub setup, repository automation, and review activity.
 - GitHub App install entry point, installation status, and repository metadata sync controls that are functional or explicitly disabled until backend support exists.
 - Clerk-backed sign-in, user menu, organizations/workspaces where enabled, and billing portal.
 - Clerk session-token verification for every dashboard API; production APIs must never trust client-provided user identity headers or environment-provided dashboard user IDs as authentication.

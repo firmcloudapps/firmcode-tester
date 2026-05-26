@@ -49,6 +49,10 @@ describe("SettingsView", () => {
     expect(retention).toContain("Changed file patches");
     expect(retention).toContain("30 days");
     expect(members).toContain("Open Clerk members");
+    expect(members).toContain("New workspace memberships default to Developer");
+    expect(members).toContain("user_developer");
+    expect(members).toContain("Assign role");
+    expect(members).toContain("Suspend account");
     expect(apiKeys).toContain("Workspace API key creation is not enabled");
     expect(notifications).toContain("Slack notifications");
   });
@@ -75,6 +79,7 @@ describe("SettingsView", () => {
     expect(developerHtml).toContain("Read-only sensitive settings");
     expect(developerMembers).toContain("Open Clerk members");
     expect(developerMembers).toContain("disabled=\"\"");
+    expect(developerMembers).toContain("Admin required to assign roles.");
   });
 });
 
@@ -106,6 +111,32 @@ const adminSettings: WorkspaceSettingsResponse = {
       }
     ]
   },
+  members: [
+    {
+      clerkUserId: "user_admin",
+      role: "admin",
+      active: true,
+      isCurrentUser: true,
+      createdAt: "2026-05-20T10:00:00.000Z",
+      updatedAt: "2026-05-22T10:00:00.000Z"
+    },
+    {
+      clerkUserId: "user_developer",
+      role: "developer",
+      active: true,
+      isCurrentUser: false,
+      createdAt: "2026-05-21T10:00:00.000Z",
+      updatedAt: "2026-05-22T11:00:00.000Z"
+    },
+    {
+      clerkUserId: "user_suspended",
+      role: "developer",
+      active: false,
+      isCurrentUser: false,
+      createdAt: "2026-05-21T10:00:00.000Z",
+      updatedAt: "2026-05-22T12:00:00.000Z"
+    }
+  ],
   retention: {
     artifactRetentionDays: 30,
     changedFilePatchDays: 30,

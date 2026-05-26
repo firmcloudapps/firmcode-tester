@@ -63,13 +63,13 @@ The MVP must ship with real Clerk-backed authentication before any dashboard dat
   - Map Clerk organization memberships to `workspace_memberships`.
   - Prefer explicit Firmcode role metadata when configured in trusted Clerk JWT claims. The API reads `firmcode_role`, `org_firmcode_role`, `firmcode.role`, `organization_metadata.firmcode_role`, `public_metadata.firmcode_role`, or `metadata.firmcode_role`; `admin`/legacy `owner` resolve to Admin and `developer`/`member` resolve to Developer.
   - Fallback role mapping:
-    - Clerk organization admin/owner -> `admin`.
-    - Clerk member -> `developer`.
+    - New Clerk organization memberships default to `developer`; Firmcode Admin is granted only by explicit trusted Firmcode role metadata, an internal seed/support flow, or the Settings member-management UI.
+    - Clerk organization admin/owner status by itself does not grant Firmcode Admin.
 - Clerk Organizations disabled:
   - Create one personal workspace per Clerk user.
-  - The owning user is `developer` by default unless an internal seed or support flow explicitly grants `admin`.
+  - The owning user is `developer` by default unless an internal seed, support flow, trusted metadata, or Admin settings action explicitly grants `admin`.
 - Sync membership from Clerk webhooks and also repair/ensure the active workspace on authenticated requests so first login does not require manual seed data.
-- Persist role changes with `updated_at` and write audit events for admin grants or removals.
+- Persist role changes with `updated_at`, allow Admins to assign Admin/Developer roles or suspend/restore workspace accounts in Settings, and write audit events for Admin grants or removals.
 
 Current sync boundary: until a dedicated Clerk webhook endpoint is added, authenticated API requests are the repair boundary for the active personal or organization workspace. Request-time resolution creates missing personal/org workspace rows, creates missing active memberships, updates role changes derived from trusted Clerk organization claims, refuses memberships already marked inactive, and writes `workspace_audit_events` for Admin grants/removals. Clerk user, organization, and membership deletion/deactivation events must be reflected by an internal support/admin sync or the future Clerk webhook before the next request; the resolver will not reactivate an inactive membership.
 

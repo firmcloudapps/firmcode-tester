@@ -4,6 +4,8 @@ import { GET as listCiFailures } from "../app/api/ci-failures/route";
 import { GET as readCiFailure } from "../app/api/ci-failures/[id]/route";
 import { POST as syncInstallations } from "../app/api/github/installations/sync/route";
 import { GET as readRules, PATCH as saveRules } from "../app/api/rules/route";
+import { PATCH as updateMemberRole } from "../app/api/settings/members/[clerkUserId]/role/route";
+import { PATCH as updateMemberStatus } from "../app/api/settings/members/[clerkUserId]/status/route";
 import { POST as syncRepository } from "../app/api/repositories/[id]/sync/route";
 import { parseGitHubInstallationsNotice } from "../lib/github-installations-notice";
 
@@ -203,6 +205,43 @@ describe("GitHub sync routes", () => {
     expect(init.method).toBe("PATCH");
     expect(init.body).toBe(JSON.stringify({ commentPolicy: { maxInlineComments: 4 } }));
     expect(headers.get("content-type")).toBe("application/json");
+    expect(headers.get("authorization")).toBe("Bearer session-token");
+    expect(headers.get("x-firmcode-workspace-id")).toBe("workspace-1");
+    expect(headers.get("x-firmcode-user-id")).toBeNull();
+  });
+
+  it("routes workspace member role and status updates to the Settings API", async () => {
+    process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
+    process.env.FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN = "session-token";
+    process.env.FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID = "workspace-1";
+    const fetcher = vi.fn(async () => jsonResponse({ clerkUserId: "user_developer", role: "admin", active: true }));
+
+    vi.stubGlobal("fetch", fetcher);
+
+    await updateMemberRole(
+      new Request("http://localhost/api/settings/members/user_developer/role", {
+        method: "PATCH",
+        body: JSON.stringify({ role: "admin" })
+      }),
+      { params: { clerkUserId: "user_developer" } }
+    );
+    await updateMemberStatus(
+      new Request("http://localhost/api/settings/members/user_developer/status", {
+        method: "PATCH",
+        body: JSON.stringify({ active: false })
+      }),
+      { params: { clerkUserId: "user_developer" } }
+    );
+
+    const calls = fetcher.mock.calls as unknown as Array<[RequestInfo | URL, RequestInit | undefined]>;
+    const roleUrl = new URL(String(calls[0]?.[0]));
+    const statusUrl = new URL(String(calls[1]?.[0]));
+    const headers = new Headers(calls[0]?.[1]?.headers);
+
+    expect(roleUrl.pathname).toBe("/api/settings/members/user_developer/role");
+    expect(statusUrl.pathname).toBe("/api/settings/members/user_developer/status");
+    expect(calls[0]?.[1]?.body).toBe(JSON.stringify({ role: "admin" }));
+    expect(calls[1]?.[1]?.body).toBe(JSON.stringify({ active: false }));
     expect(headers.get("authorization")).toBe("Bearer session-token");
     expect(headers.get("x-firmcode-workspace-id")).toBe("workspace-1");
     expect(headers.get("x-firmcode-user-id")).toBeNull();

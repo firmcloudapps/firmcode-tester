@@ -14,6 +14,7 @@ interface PgPoolLike {
 
 const WORKSPACE_ID = "00000000-0000-4000-8000-000000000101";
 const ADMIN_USER_ID = "user_admin";
+const SUPPORT_ADMIN_USER_ID = "user_support_admin";
 const DEVELOPER_USER_ID = "user_developer";
 
 function createTestPool(): PgPoolLike {
@@ -59,6 +60,26 @@ describe("settings dashboard API", () => {
         enabledRepositoryCount: 1
       })
     ]);
+    expect(settings.members).toEqual([
+      expect.objectContaining({
+        clerkUserId: ADMIN_USER_ID,
+        role: "admin",
+        active: true,
+        isCurrentUser: true
+      }),
+      expect.objectContaining({
+        clerkUserId: SUPPORT_ADMIN_USER_ID,
+        role: "admin",
+        active: true,
+        isCurrentUser: false
+      }),
+      expect.objectContaining({
+        clerkUserId: DEVELOPER_USER_ID,
+        role: "developer",
+        active: true,
+        isCurrentUser: false
+      })
+    ]);
     expect(settings.retention).toMatchObject({
       artifactRetentionDays: 21,
       ciLogDays: 14,
@@ -85,6 +106,87 @@ describe("settings dashboard API", () => {
     ).rejects.toThrow(NotImplementedException);
     await expect(
       controller.updateRetentionPolicy({ artifactRetentionDays: 14 }, WORKSPACE_ID, DEVELOPER_USER_ID)
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  it("allows Admins to assign roles and suspend or restore workspace members", async () => {
+    const promoted = await controller.updateWorkspaceMemberRole(
+      DEVELOPER_USER_ID,
+      { role: "admin" },
+      WORKSPACE_ID,
+      ADMIN_USER_ID
+    );
+    const suspended = await controller.updateWorkspaceMemberStatus(
+      DEVELOPER_USER_ID,
+      { active: false },
+      WORKSPACE_ID,
+      ADMIN_USER_ID
+    );
+    const restored = await controller.updateWorkspaceMemberStatus(
+      DEVELOPER_USER_ID,
+      { active: true },
+      WORKSPACE_ID,
+      ADMIN_USER_ID
+    );
+    const audits = await pool.query<{
+      actor_clerk_user_id: string;
+      target_clerk_user_id: string;
+      previous_role: string | null;
+      next_role: string | null;
+      source: string;
+    }>(
+      `
+SELECT actor_clerk_user_id, target_clerk_user_id, previous_role, next_role, source
+FROM workspace_audit_events
+WHERE target_clerk_user_id = $1
+ORDER BY created_at, id
+`,
+      [DEVELOPER_USER_ID]
+    );
+
+    expect(promoted).toMatchObject({ clerkUserId: DEVELOPER_USER_ID, role: "admin", active: true });
+    expect(suspended).toMatchObject({ clerkUserId: DEVELOPER_USER_ID, role: "admin", active: false });
+    expect(restored).toMatchObject({ clerkUserId: DEVELOPER_USER_ID, role: "admin", active: true });
+    expect(audits.rows).toEqual([
+      {
+        actor_clerk_user_id: ADMIN_USER_ID,
+        target_clerk_user_id: DEVELOPER_USER_ID,
+        previous_role: "developer",
+        next_role: "admin",
+        source: "settings_member_role"
+      },
+      {
+        actor_clerk_user_id: ADMIN_USER_ID,
+        target_clerk_user_id: DEVELOPER_USER_ID,
+        previous_role: "admin",
+        next_role: null,
+        source: "settings_member_suspended"
+      },
+      {
+        actor_clerk_user_id: ADMIN_USER_ID,
+        target_clerk_user_id: DEVELOPER_USER_ID,
+        previous_role: null,
+        next_role: "admin",
+        source: "settings_member_restored"
+      }
+    ]);
+  });
+
+  it("prevents non-Admins, self-management, and inactive Admin management", async () => {
+    await expect(
+      controller.updateWorkspaceMemberRole(ADMIN_USER_ID, { role: "developer" }, WORKSPACE_ID, DEVELOPER_USER_ID)
+    ).rejects.toThrow(ForbiddenException);
+    await expect(
+      controller.updateWorkspaceMemberStatus(ADMIN_USER_ID, { active: false }, WORKSPACE_ID, ADMIN_USER_ID)
+    ).rejects.toThrow(ForbiddenException);
+
+    await controller.updateWorkspaceMemberStatus(SUPPORT_ADMIN_USER_ID, { active: false }, WORKSPACE_ID, ADMIN_USER_ID);
+
+    await expect(
+      controller.updateWorkspaceMemberRole(ADMIN_USER_ID, { role: "developer" }, WORKSPACE_ID, SUPPORT_ADMIN_USER_ID)
+    ).rejects.toThrow(UnauthorizedException);
+    await expect(
+      controller.updateWorkspaceMemberRole(ADMIN_USER_ID, { role: "developer" }, WORKSPACE_ID, ADMIN_USER_ID)
     ).rejects.toThrow(ForbiddenException);
   });
 
@@ -145,6 +247,7 @@ INSERT INTO workspaces (id, clerk_org_id, name) VALUES
 
 INSERT INTO workspace_memberships (workspace_id, clerk_user_id, role, active) VALUES
 ('${WORKSPACE_ID}', '${ADMIN_USER_ID}', 'admin', true),
+('${WORKSPACE_ID}', '${SUPPORT_ADMIN_USER_ID}', 'admin', true),
 ('${WORKSPACE_ID}', '${DEVELOPER_USER_ID}', 'developer', true);
 
 INSERT INTO github_installations (

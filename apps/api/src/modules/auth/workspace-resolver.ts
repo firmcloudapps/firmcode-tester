@@ -63,6 +63,7 @@ export class PostgresDashboardWorkspaceResolver implements DashboardWorkspaceRes
         clerkUserId: input.token.clerkUserId,
         role: resolveOrganizationRole(input.token),
         source: resolveOrganizationRoleSource(input.token),
+        syncExistingRole: hasExplicitFirmcodeRole(input.token),
         metadata: {
           clerkOrgId: input.token.clerkOrgId,
           clerkOrgRole: input.token.orgRole,
@@ -131,6 +132,7 @@ VALUES ($1, NULL, $2)
       clerkUserId,
       role: "developer",
       source: "personal_first_login",
+      syncExistingRole: false,
       metadata: {
         clerkOrgId: null,
         clerkOrgRole: null,
@@ -144,6 +146,7 @@ VALUES ($1, NULL, $2)
     readonly clerkUserId: string;
     readonly role: DashboardRole;
     readonly source: string;
+    readonly syncExistingRole: boolean;
     readonly metadata: Record<string, unknown>;
   }): Promise<MembershipRow> {
     const existing = await this.findMembership(input.workspaceId, input.clerkUserId);
@@ -152,7 +155,7 @@ VALUES ($1, NULL, $2)
       throw new ForbiddenException("Workspace membership is inactive");
     }
 
-    if (existing !== null && existing.role === input.role) {
+    if (existing !== null && (!input.syncExistingRole || existing.role === input.role)) {
       return existing;
     }
 
@@ -284,13 +287,15 @@ export class EmptyDashboardWorkspaceResolver implements DashboardWorkspaceResolv
 }
 
 function resolveOrganizationRole(token: VerifiedClerkToken): DashboardRole {
-  return normalizeFirmcodeRole(token.firmcodeRole) ?? mapClerkOrganizationRole(token.orgRole);
+  return normalizeFirmcodeRole(token.firmcodeRole) ?? "developer";
 }
 
 function resolveOrganizationRoleSource(token: VerifiedClerkToken): string {
-  return normalizeFirmcodeRole(token.firmcodeRole) === null
-    ? "clerk_org_role"
-    : "clerk_firmcode_role_metadata";
+  return hasExplicitFirmcodeRole(token) ? "clerk_firmcode_role_metadata" : "default_developer";
+}
+
+function hasExplicitFirmcodeRole(token: VerifiedClerkToken): boolean {
+  return normalizeFirmcodeRole(token.firmcodeRole) !== null;
 }
 
 function normalizeFirmcodeRole(role: string | null): DashboardRole | null {
@@ -304,14 +309,6 @@ function normalizeFirmcodeRole(role: string | null): DashboardRole | null {
     default:
       return null;
   }
-}
-
-function mapClerkOrganizationRole(role: string | null): DashboardRole {
-  if (role === "org:admin" || role === "admin" || role === "owner" || role === "org:owner") {
-    return "admin";
-  }
-
-  return "developer";
 }
 
 function isElevatedRole(role: DashboardRole | null): boolean {

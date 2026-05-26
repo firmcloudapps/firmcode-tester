@@ -1,18 +1,7 @@
-import React from "react";
-import { DashboardShell } from "../../components/dashboard/dashboard-shell";
-import { GitHubInstallationsView } from "../../components/dashboard/github-installations-view";
-import { loadGitHubAppInstallConfig } from "../../config/github-app-installation";
-import { loadGitHubInstallationsState } from "../../lib/dashboard-data";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
 export default async function DeveloperDashboardPage() {
-  const state = await loadGitHubInstallationsState();
-  const installConfig = loadGitHubAppInstallConfig();
-
-  return (
-    <DashboardShell activeItem="PR Review">
-      <GitHubInstallationsView state={state} installConfig={installConfig} />
-    </DashboardShell>
-  );
+  redirect("/dashboard/developer");
 }

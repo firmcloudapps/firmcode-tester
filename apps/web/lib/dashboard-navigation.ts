@@ -19,7 +19,7 @@ export interface DashboardNavItem {
 }
 
 export const DASHBOARD_NAV_ITEMS: readonly DashboardNavItem[] = [
-  { label: "Overview", href: "/", enabled: true, activeItem: "Overview" },
+  { label: "Overview", href: "/dashboard", enabled: true, activeItem: "Overview" },
   { label: "PR Review", href: "/github/installations", enabled: true, activeItem: "PR Review" },
   { label: "Repositories", href: "/repositories", enabled: true, activeItem: "Repositories" },
   { label: "Pull Requests", href: "/pull-requests", enabled: true, activeItem: "Pull Requests" },

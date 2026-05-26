@@ -1,5 +1,5 @@
-import { Body, Controller, Get, Patch, Post, UseGuards } from "@nestjs/common";
-import type { WorkspaceSettingsResponse } from "@firmcode/shared";
+import { Body, Controller, Get, Param, Patch, Post, UseGuards } from "@nestjs/common";
+import type { WorkspaceSettingsMember, WorkspaceSettingsResponse } from "@firmcode/shared";
 import {
   DashboardAuth,
   toDashboardServiceAuth,
@@ -43,6 +43,34 @@ export class SettingsController {
   ): Promise<never> {
     return this.settingsService.createApiKey({
       ...readServiceAuth(auth, userIdHeader),
+      body
+    });
+  }
+
+  @Patch("members/:clerkUserId/role")
+  async updateWorkspaceMemberRole(
+    @Param("clerkUserId") clerkUserId: string,
+    @Body() body: unknown,
+    @DashboardAuth() auth: DashboardAuthParam,
+    userIdHeader?: string | string[]
+  ): Promise<WorkspaceSettingsMember> {
+    return this.settingsService.updateWorkspaceMemberRole({
+      ...readServiceAuth(auth, userIdHeader),
+      targetClerkUserId: clerkUserId,
+      body
+    });
+  }
+
+  @Patch("members/:clerkUserId/status")
+  async updateWorkspaceMemberStatus(
+    @Param("clerkUserId") clerkUserId: string,
+    @Body() body: unknown,
+    @DashboardAuth() auth: DashboardAuthParam,
+    userIdHeader?: string | string[]
+  ): Promise<WorkspaceSettingsMember> {
+    return this.settingsService.updateWorkspaceMemberStatus({
+      ...readServiceAuth(auth, userIdHeader),
+      targetClerkUserId: clerkUserId,
       body
     });
   }
