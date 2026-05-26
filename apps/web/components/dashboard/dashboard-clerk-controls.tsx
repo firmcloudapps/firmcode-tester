@@ -44,17 +44,28 @@ export function DashboardClerkControls() {
 }
 
 export function DashboardWorkspaceLabel() {
+  const organizationsEnabled = isClerkOrganizationsEnabled();
+
   if (process.env.NODE_ENV === "test") {
     return <span data-active-workspace-name>Personal workspace</span>;
   }
 
-  return <ResolvedWorkspaceLabel />;
+  return organizationsEnabled ? <OrganizationWorkspaceLabel /> : <PersonalWorkspaceLabel />;
 }
 
-function ResolvedWorkspaceLabel() {
+function PersonalWorkspaceLabel() {
+  const { user } = useUser();
+
+  return <span data-active-workspace-name>{resolvePersonalWorkspaceName(user)}</span>;
+}
+
+function OrganizationWorkspaceLabel() {
   const { organization } = useOrganization();
   const { user } = useUser();
-  const personalName = user?.fullName ?? user?.primaryEmailAddress?.emailAddress ?? "Personal workspace";
 
-  return <span data-active-workspace-name>{organization?.name ?? personalName}</span>;
+  return <span data-active-workspace-name>{organization?.name ?? resolvePersonalWorkspaceName(user)}</span>;
+}
+
+function resolvePersonalWorkspaceName(user: ReturnType<typeof useUser>["user"]) {
+  return user?.fullName ?? user?.primaryEmailAddress?.emailAddress ?? "Personal workspace";
 }
