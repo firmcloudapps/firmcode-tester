@@ -562,8 +562,9 @@ Acceptance criteria:
 - Clerk sign-in and sign-up pages exist at `/sign-in/[[...sign-in]]` and `/sign-up/[[...sign-up]]`.
 - Sign-in and sign-up use the dedicated auth-page design from `docs/DASHBOARD_DESIGN.md`: light-mode unauthenticated shell, constrained Clerk panel, compact Firmcode context, responsive mobile layout, and no marketing hero treatment.
 - Successful sign-in and sign-up route through a protected `/auth/redirect` handler so authenticated users do not remain on `/sign-in`.
-- `/auth/redirect` resolves the verified workspace role and sends Admin or owner-equivalent users to `/admin`, Developer or member-equivalent users to `/developer`, and unsupported/read-only roles to `/developer` without granting extra privileges.
-- Explicit `/admin` and `/developer` dashboard routes exist, use the dashboard shell, and reuse existing role-gated workspace controls instead of creating a parallel authorization path.
+- `/` renders a public holding page with sign-in and protected dashboard entry points.
+- `/auth/redirect` resolves the verified workspace role and sends Admin or owner-equivalent users to `/dashboard/admin`, Developer or member-equivalent users to `/dashboard/developer`, and unsupported/read-only roles to `/dashboard/developer` without granting extra privileges.
+- Explicit `/dashboard/admin` and `/dashboard/developer` dashboard routes exist, use the dashboard shell, and reuse existing role-gated workspace controls instead of creating a parallel authorization path.
 - Next.js middleware protects all dashboard pages and dashboard route handlers.
 - Dashboard shell uses Clerk `UserButton` and `OrganizationSwitcher` where organizations are enabled.
 - The active workspace displayed in the shell comes from Clerk organization/personal workspace state, not static placeholder text.
@@ -574,6 +575,7 @@ Acceptance criteria:
 - API dashboard routes use a shared Nest guard that verifies Clerk session/JWT tokens before controller logic runs.
 - API request context includes Clerk user ID, active Clerk organization ID when available, resolved workspace ID, role, and capabilities.
 - Workspace rows and memberships are resolved or created from Clerk organization/user state for first-login flows.
+- New personal or organization workspace memberships default to Developer unless trusted Firmcode role metadata, an internal seed/support flow, or an Admin settings action explicitly grants Admin.
 - Spoofed `x-firmcode-user-id` headers are ignored or rejected in production.
 
 Tests:
@@ -582,7 +584,7 @@ Tests:
 - Sign-in/sign-up route rendering tests.
 - Sign-in/sign-up visual or rendered-markup tests for desktop/mobile layout, Clerk appearance hooks, and no dashboard shell leakage.
 - Role-based auth redirect tests for Admin, owner-equivalent, Developer, member-equivalent, missing session, invalid session, and API failure fallback.
-- Route and component tests proving `/auth/redirect`, `/admin`, and `/developer` are protected and route-ready.
+- Route and component tests proving `/auth/redirect`, `/dashboard/admin`, and `/dashboard/developer` are protected and route-ready.
 - Dashboard shell tests for Clerk user menu, organization switcher, and active workspace display.
 - API guard tests for missing token, invalid token, expired token, valid personal workspace token, and valid organization token.
 - Tests proving client-provided user headers cannot impersonate another Clerk user.
@@ -632,6 +634,7 @@ Acceptance criteria:
 - Findings page supports severity, source, category, repository, status, posted inline, and date filters.
 - Settings page includes General, GitHub Account/OAuth, GitHub App, Members, API Keys, Data Retention, and Notifications tabs or equivalent sections.
 - Settings exposes SaaS account-management entry points: Clerk profile, workspace/organization profile, member management where allowed, required GitHub OAuth connection, GitHub App installation status, and explicit disabled states for unavailable account features.
+- Settings exposes Firmcode member-management controls for Admins to assign Admin/Developer roles and suspend or restore workspace accounts without trusting client-supplied role data.
 - Billing page displays plan/usage placeholders or counters, role-gated plan capability messaging, and links to Clerk Billing subscription management.
 - All screens use the approved light-mode Tailwind design.
 

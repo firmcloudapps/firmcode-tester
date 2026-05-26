@@ -1,5 +1,5 @@
 import { ForbiddenException, Inject, Injectable, NotFoundException, NotImplementedException, UnauthorizedException } from "@nestjs/common";
-import type { WorkspaceSettingsResponse } from "@firmcode/shared";
+import type { WorkspaceSettingsMember, WorkspaceSettingsResponse } from "@firmcode/shared";
 import {
   DASHBOARD_AUTH_STORE,
   roleHasDashboardCapability,
@@ -13,6 +13,11 @@ export interface WorkspaceSettingsRequestContext {
 }
 
 export interface SensitiveWorkspaceSettingsRequestContext extends WorkspaceSettingsRequestContext {
+  readonly body: unknown;
+}
+
+export interface WorkspaceMemberMutationRequestContext extends WorkspaceSettingsRequestContext {
+  readonly targetClerkUserId: string;
   readonly body: unknown;
 }
 
@@ -58,7 +63,59 @@ export class SettingsService {
     throw new NotImplementedException("Workspace API key creation is not enabled in the MVP");
   }
 
-  private async authorizeSensitiveSettings(input: WorkspaceSettingsRequestContext): Promise<void> {
+  async updateWorkspaceMemberRole(input: WorkspaceMemberMutationRequestContext): Promise<WorkspaceSettingsMember> {
+    const membership = await this.authorizeSensitiveSettings(input);
+    const role = readAssignableRole(input.body);
+
+    await this.assertMemberMutationAllowed({
+      workspaceId: membership.workspaceId,
+      actorClerkUserId: membership.clerkUserId,
+      targetClerkUserId: input.targetClerkUserId,
+      nextRole: role,
+      nextActive: null
+    });
+
+    const updated = await this.settingsStore.updateWorkspaceMemberRole({
+      workspaceId: membership.workspaceId,
+      currentClerkUserId: membership.clerkUserId,
+      targetClerkUserId: input.targetClerkUserId,
+      role
+    });
+
+    if (updated === null) {
+      throw new NotFoundException("Workspace member was not found");
+    }
+
+    return updated;
+  }
+
+  async updateWorkspaceMemberStatus(input: WorkspaceMemberMutationRequestContext): Promise<WorkspaceSettingsMember> {
+    const membership = await this.authorizeSensitiveSettings(input);
+    const active = readActiveStatus(input.body);
+
+    await this.assertMemberMutationAllowed({
+      workspaceId: membership.workspaceId,
+      actorClerkUserId: membership.clerkUserId,
+      targetClerkUserId: input.targetClerkUserId,
+      nextRole: null,
+      nextActive: active
+    });
+
+    const updated = await this.settingsStore.updateWorkspaceMemberStatus({
+      workspaceId: membership.workspaceId,
+      currentClerkUserId: membership.clerkUserId,
+      targetClerkUserId: input.targetClerkUserId,
+      active
+    });
+
+    if (updated === null) {
+      throw new NotFoundException("Workspace member was not found");
+    }
+
+    return updated;
+  }
+
+  private async authorizeSensitiveSettings(input: WorkspaceSettingsRequestContext) {
     assertAuthenticated(input);
 
     const membership = await this.dashboardAuthStore.findActiveMembership({
@@ -73,6 +130,49 @@ export class SettingsService {
     if (!roleHasDashboardCapability(membership.role, "manage_sensitive_settings")) {
       throw new ForbiddenException("Workspace role cannot manage sensitive settings");
     }
+
+    return membership;
+  }
+
+  private async assertMemberMutationAllowed(input: {
+    readonly workspaceId: string;
+    readonly actorClerkUserId: string;
+    readonly targetClerkUserId: string;
+    readonly nextRole: "admin" | "developer" | null;
+    readonly nextActive: boolean | null;
+  }): Promise<void> {
+    if (input.actorClerkUserId === input.targetClerkUserId) {
+      throw new ForbiddenException("Admins cannot change or suspend their own workspace membership");
+    }
+
+    const target = await this.settingsStore.getWorkspaceMember({
+      workspaceId: input.workspaceId,
+      currentClerkUserId: input.actorClerkUserId,
+      targetClerkUserId: input.targetClerkUserId
+    });
+
+    if (target === null) {
+      throw new NotFoundException("Workspace member was not found");
+    }
+
+    const removesActiveAdmin =
+      target.active &&
+      target.role === "admin" &&
+      ((input.nextRole !== null && input.nextRole !== "admin") || input.nextActive === false);
+
+    if (!removesActiveAdmin) {
+      return;
+    }
+
+    const otherAdmins = await this.settingsStore.countOtherActiveAdmins({
+      workspaceId: input.workspaceId,
+      currentClerkUserId: input.actorClerkUserId,
+      targetClerkUserId: input.targetClerkUserId
+    });
+
+    if (otherAdmins === 0) {
+      throw new ForbiddenException("At least one active Admin must remain in the workspace");
+    }
   }
 }
 
@@ -83,4 +183,32 @@ function assertAuthenticated(input: WorkspaceSettingsRequestContext): asserts in
   if (input.workspaceId === null || input.clerkUserId === null) {
     throw new UnauthorizedException("Dashboard authentication is required");
   }
+}
+
+function readAssignableRole(body: unknown): "admin" | "developer" {
+  const role = readRecordValue(body, "role");
+
+  if (role === "admin" || role === "developer") {
+    return role;
+  }
+
+  throw new ForbiddenException("Workspace member role must be admin or developer");
+}
+
+function readActiveStatus(body: unknown): boolean {
+  const active = readRecordValue(body, "active");
+
+  if (typeof active === "boolean") {
+    return active;
+  }
+
+  throw new ForbiddenException("Workspace member active status must be a boolean");
+}
+
+function readRecordValue(body: unknown, key: string): unknown {
+  if (body === null || typeof body !== "object") {
+    return undefined;
+  }
+
+  return (body as Record<string, unknown>)[key];
 }

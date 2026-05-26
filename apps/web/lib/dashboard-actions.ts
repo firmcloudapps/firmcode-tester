@@ -8,7 +8,8 @@ import type {
   ReviewRunRetryResponse,
   ReviewRunStatus,
   UpdateRepositoryReviewConfigurationRequest,
-  UpdateReviewPolicyRequest
+  UpdateReviewPolicyRequest,
+  WorkspaceSettingsMember
 } from "@firmcode/shared";
 
 export type DashboardMutationFetcher = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
@@ -177,6 +178,40 @@ export async function updateReviewPolicy(
   });
 
   return readMutationResponse<RulesPolicyResponse>(response, "Rules policy could not be updated.");
+}
+
+export async function updateWorkspaceMemberRole(
+  clerkUserId: string,
+  role: "admin" | "developer",
+  fetcher: DashboardMutationFetcher = fetch
+): Promise<WorkspaceSettingsMember> {
+  const response = await fetcher(`/api/settings/members/${encodeURIComponent(clerkUserId)}/role`, {
+    method: "PATCH",
+    headers: {
+      accept: "application/json",
+      "content-type": "application/json"
+    },
+    body: JSON.stringify({ role })
+  });
+
+  return readMutationResponse<WorkspaceSettingsMember>(response, "Workspace member role could not be updated.");
+}
+
+export async function updateWorkspaceMemberStatus(
+  clerkUserId: string,
+  active: boolean,
+  fetcher: DashboardMutationFetcher = fetch
+): Promise<WorkspaceSettingsMember> {
+  const response = await fetcher(`/api/settings/members/${encodeURIComponent(clerkUserId)}/status`, {
+    method: "PATCH",
+    headers: {
+      accept: "application/json",
+      "content-type": "application/json"
+    },
+    body: JSON.stringify({ active })
+  });
+
+  return readMutationResponse<WorkspaceSettingsMember>(response, "Workspace member status could not be updated.");
 }
 
 export function toRetryFeedbackMessage(response: ReviewRunRetryResponse): string {

@@ -18,16 +18,20 @@ export type GitHubAppInstallConfig =
 
 const INSTALL_URL_VARIABLES = ["GITHUB_APP_INSTALL_URL", "NEXT_PUBLIC_GITHUB_APP_INSTALL_URL"] as const;
 const SLUG_VARIABLES = ["GITHUB_APP_SLUG", "NEXT_PUBLIC_GITHUB_APP_SLUG"] as const;
-const GITHUB_APP_INSTALL_PATH = /^\/apps\/[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\/installations\/new\/?$/i;
+const GITHUB_APP_PATH = /^\/apps\/([a-z0-9](?:[a-z0-9-]*[a-z0-9])?)(?:\/installations\/new\/?)?$/i;
+const GITHUB_APP_SLUG = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/i;
 
 export function loadGitHubAppInstallConfig(env: EnvironmentVariables = process.env): GitHubAppInstallConfig {
   const configuredUrl = readFirst(env, INSTALL_URL_VARIABLES);
+  const configuredSlug = readFirst(env, SLUG_VARIABLES);
 
   if (configuredUrl !== null) {
-    return toInstallUrlConfig(configuredUrl.variable, configuredUrl.value);
-  }
+    const installUrlConfig = toInstallUrlConfig(configuredUrl.variable, configuredUrl.value);
 
-  const configuredSlug = readFirst(env, SLUG_VARIABLES);
+    if (installUrlConfig.status === "configured" || configuredSlug === null) {
+      return installUrlConfig;
+    }
+  }
 
   if (configuredSlug !== null) {
     return toSlugConfig(configuredSlug.variable, configuredSlug.value);
@@ -40,6 +44,14 @@ export function loadGitHubAppInstallConfig(env: EnvironmentVariables = process.e
 }
 
 function toInstallUrlConfig(variable: string, value: string): GitHubAppInstallConfig {
+  if (GITHUB_APP_SLUG.test(value)) {
+    return {
+      status: "configured",
+      installUrl: buildInstallUrl(value),
+      source: "GITHUB_APP_SLUG"
+    };
+  }
+
   try {
     const url = new URL(value);
 
@@ -51,7 +63,9 @@ function toInstallUrlConfig(variable: string, value: string): GitHubAppInstallCo
       };
     }
 
-    if (url.hostname.toLowerCase() !== "github.com" || !GITHUB_APP_INSTALL_PATH.test(url.pathname)) {
+    const match = url.hostname.toLowerCase() === "github.com" ? GITHUB_APP_PATH.exec(url.pathname) : null;
+
+    if (match === null) {
       return {
         status: "invalid",
         variable,
@@ -61,7 +75,7 @@ function toInstallUrlConfig(variable: string, value: string): GitHubAppInstallCo
 
     return {
       status: "configured",
-      installUrl: url.toString(),
+      installUrl: buildInstallUrl(match[1]),
       source: "GITHUB_APP_INSTALL_URL"
     };
   } catch {
@@ -74,7 +88,7 @@ function toInstallUrlConfig(variable: string, value: string): GitHubAppInstallCo
 }
 
 function toSlugConfig(variable: string, value: string): GitHubAppInstallConfig {
-  if (!/^[a-z0-9][a-z0-9-]*[a-z0-9]$/i.test(value) && !/^[a-z0-9]$/i.test(value)) {
+  if (!GITHUB_APP_SLUG.test(value)) {
     return {
       status: "invalid",
       variable,
@@ -84,9 +98,13 @@ function toSlugConfig(variable: string, value: string): GitHubAppInstallConfig {
 
   return {
     status: "configured",
-    installUrl: `https://github.com/apps/${value}/installations/new`,
+    installUrl: buildInstallUrl(value),
     source: "GITHUB_APP_SLUG"
   };
+}
+
+function buildInstallUrl(slug: string): string {
+  return `https://github.com/apps/${slug}/installations/new`;
 }
 
 function readFirst(

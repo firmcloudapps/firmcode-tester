@@ -13,6 +13,30 @@ describe("GitHub App installation config", () => {
     });
   });
 
+  it("normalizes a bare GitHub App URL to the installation URL", () => {
+    expect(
+      loadGitHubAppInstallConfig({
+        GITHUB_APP_INSTALL_URL: "https://github.com/apps/firmcode"
+      })
+    ).toEqual({
+      status: "configured",
+      installUrl: "https://github.com/apps/firmcode/installations/new",
+      source: "GITHUB_APP_INSTALL_URL"
+    });
+  });
+
+  it("accepts a slug accidentally provided in the install URL variable", () => {
+    expect(
+      loadGitHubAppInstallConfig({
+        GITHUB_APP_INSTALL_URL: "firmcodeai"
+      })
+    ).toEqual({
+      status: "configured",
+      installUrl: "https://github.com/apps/firmcodeai/installations/new",
+      source: "GITHUB_APP_SLUG"
+    });
+  });
+
   it("derives the install URL from a GitHub App slug", () => {
     expect(
       loadGitHubAppInstallConfig({
@@ -41,6 +65,19 @@ describe("GitHub App installation config", () => {
       status: "invalid",
       variable: "GITHUB_APP_INSTALL_URL",
       message: "must be an absolute GitHub App installation URL"
+    });
+  });
+
+  it("falls back to the GitHub App slug when the install URL is malformed", () => {
+    expect(
+      loadGitHubAppInstallConfig({
+        GITHUB_APP_INSTALL_URL: "https://example.com/apps/firmcode/installations/new",
+        GITHUB_APP_SLUG: "firmcodeai"
+      })
+    ).toEqual({
+      status: "configured",
+      installUrl: "https://github.com/apps/firmcodeai/installations/new",
+      source: "GITHUB_APP_SLUG"
     });
   });
 

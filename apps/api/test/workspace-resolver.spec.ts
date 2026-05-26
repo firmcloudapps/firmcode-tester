@@ -104,7 +104,7 @@ describe("PostgresDashboardWorkspaceResolver", () => {
     expect(second).toMatchObject({
       workspaceId: first.workspaceId,
       clerkOrgId: "org_firmcode",
-      role: "admin"
+      role: "developer"
     });
     expect(workspaces.rows).toEqual([{ id: first.workspaceId, clerk_org_id: "org_firmcode" }]);
   });
@@ -123,7 +123,7 @@ describe("PostgresDashboardWorkspaceResolver", () => {
     expect(resolved.role).toBe("admin");
   });
 
-  it("maps Clerk organization admin/owner to Admin and member to Developer", async () => {
+  it("defaults new Clerk organization users to Developer unless Firmcode metadata grants Admin", async () => {
     const admin = await resolver.resolve({
       token: createToken({
         clerkUserId: "user_admin",
@@ -136,7 +136,8 @@ describe("PostgresDashboardWorkspaceResolver", () => {
       token: createToken({
         clerkUserId: "user_owner",
         clerkOrgId: "org_roles",
-        orgRole: "org:owner"
+        orgRole: "org:owner",
+        firmcodeRole: "admin"
       }),
       selectedWorkspaceId: null
     });
@@ -149,7 +150,7 @@ describe("PostgresDashboardWorkspaceResolver", () => {
       selectedWorkspaceId: null
     });
 
-    expect(admin.role).toBe("admin");
+    expect(admin.role).toBe("developer");
     expect(owner.role).toBe("admin");
     expect(member.role).toBe("developer");
   });
@@ -222,7 +223,8 @@ describe("PostgresDashboardWorkspaceResolver", () => {
       token: createToken({
         clerkUserId: "user_audit",
         clerkOrgId: "org_audit",
-        orgRole: "org:admin"
+        orgRole: "org:member",
+        firmcodeRole: "admin"
       }),
       selectedWorkspaceId: null
     });
@@ -230,7 +232,8 @@ describe("PostgresDashboardWorkspaceResolver", () => {
       token: createToken({
         clerkUserId: "user_audit",
         clerkOrgId: "org_audit",
-        orgRole: "org:member"
+        orgRole: "org:member",
+        firmcodeRole: "developer"
       }),
       selectedWorkspaceId: null
     });
@@ -257,14 +260,14 @@ ORDER BY created_at, id
         target_clerk_user_id: "user_audit",
         previous_role: "developer",
         next_role: "admin",
-        source: "clerk_org_role"
+        source: "clerk_firmcode_role_metadata"
       },
       {
         actor_clerk_user_id: "user_audit",
         target_clerk_user_id: "user_audit",
         previous_role: "admin",
         next_role: "developer",
-        source: "clerk_org_role"
+        source: "clerk_firmcode_role_metadata"
       }
     ]);
   });

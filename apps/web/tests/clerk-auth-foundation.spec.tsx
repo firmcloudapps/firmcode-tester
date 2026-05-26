@@ -1,7 +1,8 @@
 import React from "react";
 import { renderToString } from "react-dom/server";
-import AdminDashboardPage from "../app/admin/page";
-import DeveloperDashboardPage from "../app/developer/page";
+import HoldingPage from "../app/page";
+import AdminDashboardPage from "../app/dashboard/admin/page";
+import DeveloperDashboardPage from "../app/dashboard/developer/page";
 import SignInPage from "../app/sign-in/[[...sign-in]]/page";
 import SignUpPage from "../app/sign-up/[[...sign-up]]/page";
 import { clerkAppearance } from "../components/auth/auth-page";
@@ -19,7 +20,8 @@ import { config as nextMiddlewareConfig } from "../middleware";
 describe("Clerk route protection", () => {
   it("marks dashboard pages and route handlers as protected", () => {
     expect(PROTECTED_DASHBOARD_ROUTES).toContain("/api/(.*)");
-    expect(isProtectedDashboardPath("/")).toBe(true);
+    expect(PROTECTED_DASHBOARD_ROUTES).toContain("/dashboard(.*)");
+    expect(isProtectedDashboardPath("/")).toBe(false);
     expect(isProtectedDashboardPath("/repositories")).toBe(true);
     expect(isProtectedDashboardPath("/repositories/repo-1")).toBe(true);
     expect(isProtectedDashboardPath("/api/rules")).toBe(true);
@@ -27,6 +29,8 @@ describe("Clerk route protection", () => {
     expect(isProtectedDashboardPath("/auth/redirect")).toBe(true);
     expect(isProtectedDashboardPath("/admin")).toBe(true);
     expect(isProtectedDashboardPath("/developer")).toBe(true);
+    expect(isProtectedDashboardPath("/dashboard/admin")).toBe(true);
+    expect(isProtectedDashboardPath("/dashboard/developer")).toBe(true);
   });
 
   it("keeps sign-in and sign-up public for unauthenticated users", () => {
@@ -67,7 +71,7 @@ describe("Clerk route protection", () => {
     try {
       expect(hasClerkMiddlewareConfig()).toBe(false);
 
-      const pageResponse = await middlewareConfig(new Request("https://firmcode.test/") as never, {} as never);
+      const pageResponse = await middlewareConfig(new Request("https://firmcode.test/repositories") as never, {} as never);
       const apiResponse = await middlewareConfig(new Request("https://firmcode.test/api/rules") as never, {} as never);
 
       expect(pageResponse?.headers.get("location")).toBe("https://firmcode.test/sign-in");
@@ -113,18 +117,18 @@ describe("Clerk auth pages", () => {
 
 describe("role-based auth redirect", () => {
   it("maps Admin and owner-equivalent roles to the Admin dashboard", () => {
-    expect(landingPathForDashboardRole("admin")).toBe("/admin");
-    expect(landingPathForDashboardRole("owner")).toBe("/admin");
+    expect(landingPathForDashboardRole("admin")).toBe("/dashboard/admin");
+    expect(landingPathForDashboardRole("owner")).toBe("/dashboard/admin");
   });
 
   it("maps Developer, member-equivalent, and unsupported roles to the Developer dashboard", () => {
-    expect(landingPathForDashboardRole("developer")).toBe("/developer");
-    expect(landingPathForDashboardRole("member")).toBe("/developer");
-    expect(landingPathForDashboardRole("viewer")).toBe("/developer");
-    expect(landingPathForDashboardRole(undefined)).toBe("/developer");
+    expect(landingPathForDashboardRole("developer")).toBe("/dashboard/developer");
+    expect(landingPathForDashboardRole("member")).toBe("/dashboard/developer");
+    expect(landingPathForDashboardRole("viewer")).toBe("/dashboard/developer");
+    expect(landingPathForDashboardRole(undefined)).toBe("/dashboard/developer");
   });
 
-  it("redirects authenticated Admin users to /admin", async () => {
+  it("redirects authenticated Admin users to /dashboard/admin", async () => {
     const fetcher = vi.fn(async (_input: Parameters<typeof fetch>[0]) => jsonResponse({ workspace: { role: "admin" } }));
 
     const redirectUrl = await resolveRoleBasedDashboardRedirect({
@@ -133,11 +137,11 @@ describe("role-based auth redirect", () => {
       fetcher
     });
 
-    expect(redirectUrl.toString()).toBe("https://firmcode.test/admin");
+    expect(redirectUrl.toString()).toBe("https://firmcode.test/dashboard/admin");
     expect(new URL(String(fetcher.mock.calls[0]![0])).pathname).toBe("/api/settings");
   });
 
-  it("redirects authenticated Developer users to /developer", async () => {
+  it("redirects authenticated Developer users to /dashboard/developer", async () => {
     const fetcher = vi.fn(async () => jsonResponse({ workspace: { role: "developer" } }));
 
     const redirectUrl = await resolveRoleBasedDashboardRedirect({
@@ -146,7 +150,7 @@ describe("role-based auth redirect", () => {
       fetcher
     });
 
-    expect(redirectUrl.toString()).toBe("https://firmcode.test/developer");
+    expect(redirectUrl.toString()).toBe("https://firmcode.test/dashboard/developer");
   });
 
   it("redirects missing or invalid sessions to sign-in", async () => {
@@ -174,11 +178,21 @@ describe("role-based auth redirect", () => {
       fetcher: vi.fn(async () => new Response(JSON.stringify({ message: "API unavailable" }), { status: 503 }))
     });
 
-    expect(redirectUrl.toString()).toBe("https://firmcode.test/developer");
+    expect(redirectUrl.toString()).toBe("https://firmcode.test/dashboard/developer");
   });
 });
 
 describe("role landing dashboard pages", () => {
+  it("renders a public holding page at the root route", () => {
+    const html = renderToString(<HoldingPage />);
+
+    expect(html).toContain("Firmcode is getting the workspace ready.");
+    expect(html).toContain('href="/sign-in"');
+    expect(html).toContain('href="/dashboard/admin"');
+    expect(html).toContain('href="/dashboard/developer"');
+    expect(html).not.toContain('data-clerk-authenticated="required"');
+  });
+
   it("renders the Admin dashboard route with the existing settings controls", async () => {
     const restore = withDashboardEnv();
     const fetcher = vi.fn(async (_input: Parameters<typeof fetch>[0]) => jsonResponse(settingsResponse("admin")));

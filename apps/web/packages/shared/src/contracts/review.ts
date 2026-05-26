@@ -740,6 +740,23 @@ export interface WorkspaceSettingsInstallation {
   updatedAt: string;
 }
 
+export interface WorkspaceSettingsMember {
+  clerkUserId: string;
+  role: DashboardWorkspaceRole;
+  active: boolean;
+  isCurrentUser: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UpdateWorkspaceMemberRoleRequest {
+  role: "admin" | "developer";
+}
+
+export interface UpdateWorkspaceMemberStatusRequest {
+  active: boolean;
+}
+
 export interface WorkspaceRetentionPolicy {
   artifactRetentionDays: number;
   changedFilePatchDays: number;
@@ -770,6 +787,7 @@ export interface WorkspaceSettingsResponse {
     installations: WorkspaceSettingsInstallation[];
     repositoryConfigurationUrl: string;
   };
+  members?: WorkspaceSettingsMember[];
   retention: WorkspaceRetentionPolicy;
   apiKeys: {
     enabled: boolean;
