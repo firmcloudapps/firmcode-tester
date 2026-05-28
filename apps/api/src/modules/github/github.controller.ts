@@ -34,12 +34,14 @@ export class GitHubDashboardController {
     @Query("code") code: string | string[] | undefined,
     @Query("state") state: string | string[] | undefined,
     @DashboardAuth() auth: DashboardAuthParam,
-    userIdHeader?: string | string[]
+    userIdHeader?: string | string[],
+    @Query("flow") flow?: string | string[]
   ): Promise<GitHubOAuthStatusResponse> {
     return this.githubService.completeOAuth({
       ...readServiceAuth(auth, userIdHeader),
       code: readSingleValue(code) ?? null,
-      state: readSingleValue(state) ?? null
+      state: readSingleValue(state) ?? null,
+      flow: readOAuthFlow(readSingleValue(flow))
     });
   }
 
@@ -119,4 +121,8 @@ function readSingleValue(value: string | string[] | undefined): string | undefin
   }
 
   return value === "" ? undefined : value;
+}
+
+function readOAuthFlow(value: string | undefined): "dashboard" | "installation" {
+  return value === "installation" ? "installation" : "dashboard";
 }

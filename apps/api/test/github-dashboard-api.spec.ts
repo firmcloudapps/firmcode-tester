@@ -181,6 +181,42 @@ ORDER BY full_name
     expect(installationClient.installationRepositoryFetches).toBe(1);
   });
 
+  it("maps accessible GitHub App installations from the OAuth-during-install callback", async () => {
+    await pool.query("DELETE FROM repositories WHERE installation_id = $1", ["00000000-0000-4000-8000-000000000301"]);
+    await pool.query("DELETE FROM github_installations WHERE installation_id = $1", [301]);
+
+    accountClient.accessibleInstallations = [
+      {
+        installationId: 301,
+        accountLogin: "openclaw",
+        accountType: "Organization",
+        permissionsJson: { metadata: "read", contents: "read", pull_requests: "write" }
+      }
+    ];
+
+    const callback = await controller.completeOAuth("oauth-code", undefined, WORKSPACE_ID, UNCONNECTED_USER_ID, "installation");
+    const installations = await controller.listInstallations(WORKSPACE_ID, UNCONNECTED_USER_ID);
+
+    expect(callback).toMatchObject({
+      connected: true,
+      user: {
+        login: "octo-user"
+      }
+    });
+    expect(accountClient.lastExchange).toMatchObject({
+      code: "oauth-code",
+      redirectUri: "https://firmcode.firmoncloud.com/api/auth/github/callback"
+    });
+    expect(installations.installations).toEqual([
+      expect.objectContaining({
+        installationId: 301,
+        accountLogin: "openclaw",
+        repositoryCount: 2
+      })
+    ]);
+    expect(installationClient.installationRepositoryFetches).toBe(1);
+  });
+
   it("does not auto-map installations during OAuth for users without installation management access", async () => {
     accountClient.accessibleInstallations = [
       {
