@@ -49,6 +49,7 @@ export interface GitHubDashboardContext {
 export interface GitHubOAuthCallbackContext extends GitHubDashboardContext {
   readonly code: string | null;
   readonly state: string | null;
+  readonly flow: "dashboard" | "installation";
 }
 
 export interface GitHubInstallationCallbackContext extends GitHubDashboardContext {
@@ -119,6 +120,10 @@ export class GitHubDashboardService {
     }
 
     if (input.state === null || input.state.trim() === "") {
+      if (input.flow === "installation") {
+        return this.completeInstallationOAuth({ membership, code: input.code });
+      }
+
       throw new BadRequestException("GitHub OAuth state is required");
     }
 
@@ -275,6 +280,26 @@ export class GitHubDashboardService {
 
       await this.syncInstallationRepositories(mappedInstallation.id, mappedInstallation.installationId);
     }
+  }
+
+  private async completeInstallationOAuth(input: { membership: DashboardMembership; code: string }): Promise<GitHubOAuthStatusResponse> {
+    const token = await this.accountClient.exchangeOAuthCode({
+      code: input.code,
+      redirectUri: buildOAuthRedirectUri(this.config)
+    });
+    const user = await this.accountClient.fetchOAuthUser(token.accessToken);
+    const status = await this.store.upsertOAuthConnection({
+      clerkUserId: input.membership.clerkUserId,
+      user,
+      scopes: token.scopes,
+      accessToken: token.accessToken
+    });
+
+    if (roleHasDashboardCapability(input.membership.role, "manage_github_installations")) {
+      await this.connectAccessibleInstallations(input.membership, token.accessToken);
+    }
+
+    return status;
   }
 
   private async requireWorkspaceInstallation(workspaceId: string, installationId: number): Promise<{

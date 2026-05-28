@@ -107,19 +107,23 @@ Clerk webhook sync boundary: the API currently repairs the active workspace and 
 | `GITHUB_APP_INSTALL_URL` | web | Public GitHub App installation URL shown by `/github/installations`, for example `https://github.com/apps/<slug>/installations/new`. |
 | `GITHUB_APP_SLUG` | web | GitHub App slug used to derive the install URL when `GITHUB_APP_INSTALL_URL` is not set. |
 
-Configure the GitHub App OAuth callback URL to the dashboard callback route:
+Firmcode supports two GitHub App install return flows.
+
+If **Request user authorization (OAuth) during installation** is enabled, configure the first GitHub App callback URL to the dashboard OAuth callback route:
 
 ```text
 https://firmcode.firmoncloud.com/api/auth/github/callback
 ```
 
-Configure the GitHub App setup URL to the dashboard installation callback route so GitHub can return `installation_id` to Firmcode after install/update:
+GitHub redirects there with a `code` after installation. Firmcode completes OAuth for the signed-in Clerk user and discovers accessible app installations through the user access token.
+
+If OAuth during installation is disabled, configure the GitHub App setup URL to the dashboard installation callback route so GitHub can return `installation_id` to Firmcode after install/update:
 
 ```text
 https://firmcode.firmoncloud.com/github/installations/callback
 ```
 
-In the GitHub App settings, also enable **Redirect on update** so repository-access changes return to Firmcode instead of leaving the user on GitHub's installation configuration page. Leave **Request user authorization (OAuth) during installation** disabled when using the setup URL; GitHub disables the setup URL field when that OAuth install flow is enabled. Users can return to Firmcode and use **Detect installed app** to run the OAuth discovery step.
+In the setup URL flow, enable **Redirect on update** so repository-access changes return to Firmcode instead of leaving the user on GitHub's installation configuration page. GitHub disables the setup URL field when OAuth during installation is enabled.
 
 Keep `APP_URL=https://firmcode.firmoncloud.com` on the API service and `NEXT_PUBLIC_API_URL=https://firmcodeapi.firmoncloud.com` on the web service so the dashboard callback can forward securely to the API token exchange endpoint.
 

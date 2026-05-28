@@ -13,6 +13,10 @@ export async function GET(request: Request): Promise<Response> {
   copySearchParam(incomingUrl, callbackUrl, "code");
   copySearchParam(incomingUrl, callbackUrl, "state");
 
+  if (!incomingUrl.searchParams.has("state")) {
+    callbackUrl.searchParams.set("flow", "installation");
+  }
+
   const response = await fetch(callbackUrl, {
     cache: "no-store",
     headers

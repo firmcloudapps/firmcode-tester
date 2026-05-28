@@ -92,6 +92,28 @@ describe("GitHub sync routes", () => {
     expect(response.headers.get("location")).toBe("https://firmcode.firmoncloud.com/github/installations?github_oauth=connected");
   });
 
+  it("marks GitHub OAuth callbacks without state as installation-started OAuth", async () => {
+    process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
+    process.env.APP_URL = "https://firmcode.firmoncloud.com";
+    process.env.FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN = "session-token";
+    process.env.FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID = "workspace-1";
+    const fetcher = vi.fn(async () => jsonResponse({ connected: true, user: { login: "octo-user" } }));
+
+    vi.stubGlobal("fetch", fetcher);
+
+    const response = await completeGitHubOAuth(
+      new Request("https://firmcode.firmoncloud.com/api/auth/github/callback?code=oauth-code")
+    );
+    const calls = fetcher.mock.calls as unknown as Array<[RequestInfo | URL, RequestInit | undefined]>;
+    const callbackUrl = new URL(String(calls[0]?.[0]));
+
+    expect(callbackUrl.pathname).toBe("/auth/github/callback");
+    expect(callbackUrl.searchParams.get("code")).toBe("oauth-code");
+    expect(callbackUrl.searchParams.get("flow")).toBe("installation");
+    expect(callbackUrl.searchParams.has("state")).toBe(false);
+    expect(response.headers.get("location")).toBe("https://firmcode.firmoncloud.com/github/installations?github_oauth=connected");
+  });
+
   it("parses safe GitHub setup callback notices from query params", () => {
     expect(parseGitHubInstallationsNotice({ github_oauth: "connected" })).toBe("oauth-connected");
     expect(parseGitHubInstallationsNotice({ github_oauth: "error" })).toBe("oauth-error");
