@@ -141,6 +141,70 @@ describe("GitHub OAuth, installation, and repository sync API", () => {
     expect(JSON.stringify(callback)).not.toContain("gho_plaintext_secret");
   });
 
+  it("maps accessible GitHub App installations when OAuth completes", async () => {
+    await pool.query("DELETE FROM repositories WHERE installation_id = $1", ["00000000-0000-4000-8000-000000000301"]);
+    await pool.query("DELETE FROM github_installations WHERE installation_id = $1", [301]);
+
+    accountClient.accessibleInstallations = [
+      {
+        installationId: 301,
+        accountLogin: "openclaw",
+        accountType: "Organization",
+        permissionsJson: { metadata: "read", contents: "read", pull_requests: "write" }
+      }
+    ];
+
+    const start = await controller.startOAuth(WORKSPACE_ID, UNCONNECTED_USER_ID);
+    const state = new URL(start.authorizationUrl).searchParams.get("state") ?? "";
+    await controller.completeOAuth("oauth-code", state, WORKSPACE_ID, UNCONNECTED_USER_ID);
+
+    const installations = await controller.listInstallations(WORKSPACE_ID, UNCONNECTED_USER_ID);
+    const repositoryRows = await pool.query<{ full_name: string }>(
+      `
+SELECT full_name
+FROM repositories r
+JOIN github_installations gi ON gi.id = r.installation_id
+WHERE gi.installation_id = $1
+ORDER BY full_name
+`,
+      [301]
+    );
+
+    expect(installations.installations).toEqual([
+      expect.objectContaining({
+        installationId: 301,
+        accountLogin: "openclaw",
+        repositoryCount: 2
+      })
+    ]);
+    expect(repositoryRows.rows).toEqual([{ full_name: "openclaw/firmcode" }, { full_name: "openclaw/new-service" }]);
+    expect(installationClient.installationRepositoryFetches).toBe(1);
+  });
+
+  it("does not auto-map installations during OAuth for users without installation management access", async () => {
+    accountClient.accessibleInstallations = [
+      {
+        installationId: 303,
+        accountLogin: "new-openclaw",
+        accountType: "Organization",
+        permissionsJson: { metadata: "read", contents: "read" }
+      }
+    ];
+
+    const start = await controller.startOAuth(WORKSPACE_ID, UNCONNECTED_USER_ID);
+    const state = new URL(start.authorizationUrl).searchParams.get("state") ?? "";
+    await pool.query("UPDATE workspace_memberships SET role = 'viewer' WHERE clerk_user_id = $1", [UNCONNECTED_USER_ID]);
+    await controller.completeOAuth("oauth-code", state, WORKSPACE_ID, UNCONNECTED_USER_ID);
+
+    const installationRows = await pool.query<{ installation_id: string | number }>(
+      "SELECT installation_id FROM github_installations WHERE installation_id = $1",
+      [303]
+    );
+
+    expect(installationRows.rows).toEqual([]);
+    expect(installationClient.installationRepositoryFetches).toBe(0);
+  });
+
   it("requires workspace membership for OAuth and GitHub-backed APIs", async () => {
     await expect(controller.getOAuthStatus(undefined, OWNER_USER_ID)).rejects.toThrow(UnauthorizedException);
     await expect(controller.getOAuthStatus(WORKSPACE_ID, undefined)).rejects.toThrow(UnauthorizedException);
@@ -306,6 +370,7 @@ ORDER BY full_name
 
 class FakeGitHubAccountClient implements GitHubAccountClient {
   lastExchange: { code: string; redirectUri: string } | null = null;
+  accessibleInstallations: GitHubInstallationMetadata[] = [];
 
   async exchangeOAuthCode(input: { code: string; redirectUri: string }): Promise<GitHubOAuthTokenExchange> {
     this.lastExchange = input;
@@ -322,6 +387,10 @@ class FakeGitHubAccountClient implements GitHubAccountClient {
       name: "Octo User",
       avatarUrl: "https://avatars.example/octo-user.png"
     };
+  }
+
+  async fetchAccessibleInstallations(_accessToken: string): Promise<GitHubInstallationMetadata[]> {
+    return this.accessibleInstallations;
   }
 }
 
