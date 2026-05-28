@@ -119,6 +119,8 @@ Configure the GitHub App setup URL to the dashboard installation callback route 
 https://firmcode.firmoncloud.com/github/installations/callback
 ```
 
+In the GitHub App settings, also enable **Redirect on update** so repository-access changes return to Firmcode instead of leaving the user on GitHub's installation configuration page. Leave **Request user authorization (OAuth) during installation** disabled when using the setup URL; GitHub disables the setup URL field when that OAuth install flow is enabled. Users can return to Firmcode and use **Detect installed app** to run the OAuth discovery step.
+
 Keep `APP_URL=https://firmcode.firmoncloud.com` on the API service and `NEXT_PUBLIC_API_URL=https://firmcodeapi.firmoncloud.com` on the web service so the dashboard callback can forward securely to the API token exchange endpoint.
 
 ## LLM

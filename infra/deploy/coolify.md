@@ -62,6 +62,12 @@ The GitHub App OAuth callback URL should point at the web dashboard route, not t
 https://firmcode.firmoncloud.com/api/auth/github/callback
 ```
 
+The GitHub App setup URL should also point at the web dashboard route, and **Redirect on update** should be enabled in the GitHub App settings:
+
+```text
+https://firmcode.firmoncloud.com/github/installations/callback
+```
+
 Dashboard API requests must authenticate with `Authorization: Bearer <Clerk session token>`. Production API services must not trust `x-firmcode-user-id`, `FIRMCODE_DASHBOARD_CLERK_USER_ID`, or any other caller-provided user identity header. Optional workspace selectors are valid only after Clerk token verification and membership checks.
 
 Coolify Compose compatibility note: `docker-compose.prod.yml` uses `env_file: .env` for API and worker application settings. Coolify should generate this `.env` file from runtime-enabled environment variables for the Compose app.
