@@ -32,6 +32,7 @@ export interface GitHubRepositoryMetadata {
 export interface GitHubAccountClient {
   exchangeOAuthCode(input: { code: string; redirectUri: string }): Promise<GitHubOAuthTokenExchange>;
   fetchOAuthUser(accessToken: string): Promise<GitHubOAuthUser>;
+  fetchAccessibleInstallations(accessToken: string): Promise<GitHubInstallationMetadata[]>;
 }
 
 export interface GitHubInstallationSyncClient {
@@ -45,6 +46,10 @@ export class NoopGitHubAccountClient implements GitHubAccountClient {
   }
 
   async fetchOAuthUser(): Promise<GitHubOAuthUser> {
+    throw new GitHubSyncClientError("GitHub OAuth is not configured.");
+  }
+
+  async fetchAccessibleInstallations(): Promise<GitHubInstallationMetadata[]> {
     throw new GitHubSyncClientError("GitHub OAuth is not configured.");
   }
 }
@@ -77,6 +82,10 @@ interface GitHubOAuthTokenResponse {
 
 interface GitHubInstallationTokenResponse {
   readonly token?: unknown;
+}
+
+interface GitHubUserInstallationsResponse {
+  readonly installations?: unknown;
 }
 
 export class GitHubApiAccountClient implements GitHubAccountClient {
@@ -127,6 +136,30 @@ export class GitHubApiAccountClient implements GitHubAccountClient {
     }
 
     return normalized;
+  }
+
+  async fetchAccessibleInstallations(accessToken: string): Promise<GitHubInstallationMetadata[]> {
+    const installations: GitHubInstallationMetadata[] = [];
+    let page = 1;
+
+    while (true) {
+      const response = await requestGitHubJson<GitHubUserInstallationsResponse>({
+        method: "GET",
+        token: accessToken,
+        path: `/user/installations?per_page=100&page=${page}`
+      });
+      const pageItems = Array.isArray(response.installations) ? response.installations : [];
+
+      installations.push(...pageItems.map(normalizeInstallation).filter((item): item is GitHubInstallationMetadata => item !== null));
+
+      if (pageItems.length < 100) {
+        break;
+      }
+
+      page += 1;
+    }
+
+    return installations;
   }
 }
 

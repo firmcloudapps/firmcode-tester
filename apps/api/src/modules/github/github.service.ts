@@ -137,13 +137,18 @@ export class GitHubDashboardService {
       redirectUri: stateRecord.redirectUri
     });
     const user = await this.accountClient.fetchOAuthUser(token.accessToken);
-
-    return this.store.upsertOAuthConnection({
+    const status = await this.store.upsertOAuthConnection({
       clerkUserId: membership.clerkUserId,
       user,
       scopes: token.scopes,
       accessToken: token.accessToken
     });
+
+    if (roleHasDashboardCapability(membership.role, "manage_github_installations")) {
+      await this.connectAccessibleInstallations(membership, token.accessToken);
+    }
+
+    return status;
   }
 
   async listInstallations(input: GitHubDashboardContext): Promise<GitHubInstallationListResponse> {
@@ -251,6 +256,25 @@ export class GitHubDashboardService {
     }
 
     return repositories.length;
+  }
+
+  private async connectAccessibleInstallations(membership: DashboardMembership, accessToken: string): Promise<void> {
+    const installations = await this.accountClient.fetchAccessibleInstallations(accessToken);
+
+    for (const installation of installations) {
+      const existingOwner = await this.store.findInstallationOwner(installation.installationId);
+
+      if (existingOwner !== null && existingOwner.workspaceId !== null && existingOwner.workspaceId !== membership.workspaceId) {
+        continue;
+      }
+
+      const mappedInstallation = await this.store.upsertWorkspaceInstallation({
+        workspaceId: membership.workspaceId,
+        installation
+      });
+
+      await this.syncInstallationRepositories(mappedInstallation.id, mappedInstallation.installationId);
+    }
   }
 
   private async requireWorkspaceInstallation(workspaceId: string, installationId: number): Promise<{
