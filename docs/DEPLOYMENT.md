@@ -132,6 +132,7 @@ Neither Compose file runs PostgreSQL or the Next.js dashboard. PostgreSQL is Neo
 | Clerk after-auth URL | `https://firmcode.example.com/auth/redirect` | Clerk |
 | Clerk callback URLs | Vercel production and preview URLs | Clerk |
 | GitHub OAuth callback URL | `https://firmcode.example.com/api/auth/github/callback` | GitHub App OAuth |
+| GitHub App setup URL | `https://firmcode.example.com/github/installations/callback` | GitHub App install/update redirect; enable Redirect on update |
 
 ## Authentication Deployment Plan
 

@@ -325,6 +325,11 @@ function GitHubAppCard({
           disabled={!hasOAuth || !canManage || !hasInstallations}
           disabledReason={installationSyncDisabledReason({ hasOAuth, canManage, hasInstallations })}
         />
+        {hasOAuth && canManage && !hasInstallations ? (
+          <a className="rounded-md border border-border px-3 py-2 text-sm font-medium text-primary" href="/auth/github">
+            Detect installed app
+          </a>
+        ) : null}
       </div>
       <div className="mt-4 grid gap-3">
         {hasInstallations ? (
@@ -613,7 +618,7 @@ function installationSyncDisabledReason(input: { hasOAuth: boolean; canManage: b
   }
 
   if (!input.hasInstallations) {
-    return "Install the GitHub App before syncing repositories.";
+    return "Detect the installed GitHub App before syncing repositories.";
   }
 
   return undefined;

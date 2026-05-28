@@ -57,6 +57,8 @@ describe("GitHubInstallationsView", () => {
     expect(html).toContain("kelly");
     expect(html).toContain("Missing");
     expect(html).toContain("No installation is mapped to this workspace yet");
+    expect(html).toContain("Detect installed app");
+    expect(html).toContain('href="/auth/github"');
     expect(html).toContain("Configured install URL");
     expect(html).toContain("https://github.com/apps/firmcode/installations/new");
     expect(html).toContain('href="https://github.com/apps/firmcode/installations/new"');

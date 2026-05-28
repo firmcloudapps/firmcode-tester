@@ -72,6 +72,7 @@ Configure Clerk with:
 - Sign-up URL: `https://firmcode.firmoncloud.com/sign-up`.
 - After sign-in and after sign-up URL: `https://firmcode.firmoncloud.com/auth/redirect`.
 - GitHub App OAuth callback URL: `https://firmcode.firmoncloud.com/api/auth/github/callback`.
+- GitHub App setup URL: `https://firmcode.firmoncloud.com/github/installations/callback`; enable Redirect on update in the GitHub App settings.
 - Vercel preview URL pattern if preview deployments need authenticated dashboard access.
 - API token audience/template matching `CLERK_JWT_AUDIENCE`.
 - Billing portal URL exposed through `CLERK_BILLING_PORTAL_URL`.
