@@ -17,7 +17,7 @@ export interface ClerkWebhookReceipt {
   readonly eventName: string;
   readonly userId: string | null;
   readonly organizationId: string | null;
-  readonly membershipStatus: "already_member" | "created" | "skipped";
+  readonly membershipStatus: "already_member" | "created" | "skipped" | "failed";
   readonly ignored: boolean;
   readonly reason: string | null;
 }
@@ -120,7 +120,7 @@ export class ClerkWebhookService {
     @Inject(API_RUNTIME_CONFIG) private readonly config: ApiRuntimeConfig,
     @Inject(CLERK_WEBHOOK_VERIFIER) private readonly verifier: ClerkWebhookVerifier,
     @Inject(CLERK_ORGANIZATION_MEMBERSHIP_CLIENT) private readonly membershipClient: ClerkOrganizationMembershipClient
-  ) {}
+  ) { }
 
   async acceptDelivery(input: ClerkWebhookDeliveryInput): Promise<ClerkWebhookReceipt> {
     if (input.rawBody === null) {
@@ -149,19 +149,43 @@ export class ClerkWebhookService {
       };
     }
 
-    const membershipStatus = await this.membershipClient.ensureMembership({
-      organization: this.config.clerk.defaultOrganization,
-      userId: event.data.id
-    });
+    try {
+      const membershipStatus = await this.membershipClient.ensureMembership({
+        organization: this.config.clerk.defaultOrganization,
+        userId: event.data.id
+      });
 
-    return {
-      status: "accepted",
-      eventName: event.type,
-      userId: event.data.id,
-      organizationId: this.config.clerk.defaultOrganization.id,
-      membershipStatus,
-      ignored: false,
-      reason: null
-    };
+      return {
+        status: "accepted",
+        eventName: event.type,
+        userId: event.data.id,
+        organizationId: this.config.clerk.defaultOrganization.id,
+        membershipStatus,
+        ignored: false,
+        reason: null
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "unknown error";
+
+      console.error(
+        JSON.stringify({
+          event: "clerk.default_organization.membership_failed",
+          organizationId: this.config.clerk.defaultOrganization.id,
+          role: this.config.clerk.defaultOrganization.role,
+          userId: event.data.id,
+          message
+        })
+      );
+
+      return {
+        status: "accepted",
+        eventName: event.type,
+        userId: event.data.id,
+        organizationId: this.config.clerk.defaultOrganization.id,
+        membershipStatus: "failed",
+        ignored: false,
+        reason: "membership_error"
+      };
+    }
   }
 }

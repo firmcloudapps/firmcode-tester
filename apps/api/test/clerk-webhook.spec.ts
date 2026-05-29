@@ -1,4 +1,5 @@
 import { BadRequestException } from "@nestjs/common";
+import { describe, expect, it, vi } from "vitest";
 import type { ApiRuntimeConfig } from "@firmcode/shared";
 import type { WebhookEvent } from "@clerk/backend";
 import {
@@ -62,6 +63,33 @@ describe("ClerkWebhookService", () => {
     });
   });
 
+  it("accepts the webhook without retrying forever when membership provisioning fails", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const membershipClient = new FailingMembershipClient(new Error("role org:developer does not exist"));
+    const service = new ClerkWebhookService(testConfig(), new FakeClerkWebhookVerifier(userCreatedEvent("user_new")), membershipClient);
+
+    try {
+      const receipt = await service.acceptDelivery({
+        rawBody: Buffer.from("{}"),
+        headers: {}
+      });
+
+      expect(receipt).toMatchObject({
+        status: "accepted",
+        eventName: "user.created",
+        userId: "user_new",
+        organizationId: "org_3EGsxXDTl8pWEfV6da6oENrYhRr",
+        membershipStatus: "failed",
+        ignored: false,
+        reason: "membership_error"
+      });
+      expect(errorSpy).toHaveBeenCalledTimes(1);
+      expect(String(errorSpy.mock.calls[0]![0])).toContain("clerk.default_organization.membership_failed");
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
   it("ignores unsupported Clerk webhook events", async () => {
     const membershipClient = new FakeMembershipClient("created");
     const service = new ClerkWebhookService(testConfig(), new FakeClerkWebhookVerifier(userUpdatedEvent("user_1")), membershipClient);
@@ -94,7 +122,7 @@ describe("ClerkWebhookService", () => {
 class FakeClerkWebhookVerifier implements ClerkWebhookVerifier {
   readonly signingSecrets: string[] = [];
 
-  constructor(private readonly event: WebhookEvent) {}
+  constructor(private readonly event: WebhookEvent) { }
 
   async verify(input: { readonly signingSecret: string }): Promise<WebhookEvent> {
     this.signingSecrets.push(input.signingSecret);
@@ -105,11 +133,19 @@ class FakeClerkWebhookVerifier implements ClerkWebhookVerifier {
 class FakeMembershipClient implements ClerkOrganizationMembershipClient {
   readonly calls: Array<Parameters<ClerkOrganizationMembershipClient["ensureMembership"]>[0]> = [];
 
-  constructor(private readonly result: "already_member" | "created") {}
+  constructor(private readonly result: "already_member" | "created") { }
 
   async ensureMembership(input: Parameters<ClerkOrganizationMembershipClient["ensureMembership"]>[0]): Promise<"already_member" | "created"> {
     this.calls.push(input);
     return this.result;
+  }
+}
+
+class FailingMembershipClient implements ClerkOrganizationMembershipClient {
+  constructor(private readonly error: Error) { }
+
+  async ensureMembership(): Promise<"already_member" | "created"> {
+    throw this.error;
   }
 }
 

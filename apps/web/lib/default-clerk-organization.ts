@@ -11,11 +11,11 @@ export interface DefaultClerkOrganizationMembershipConfig {
 }
 
 export interface DefaultClerkOrganizationMembershipResult {
-  readonly status: "already_member" | "created" | "skipped";
+  readonly status: "already_member" | "created" | "skipped" | "failed";
   readonly organizationId: string | null;
   readonly userId: string | null;
   readonly role: string | null;
-  readonly reason: "unauthenticated" | null;
+  readonly reason: "unauthenticated" | "membership_error" | null;
 }
 
 interface ClerkOrganizationMembership {
@@ -97,7 +97,7 @@ export async function ensureDefaultClerkOrganizationMembership(input: {
       reason: null
     };
   } catch (error) {
-    const recovered = await findDefaultClerkOrganizationMembership(input);
+    const recovered = await findDefaultClerkOrganizationMembership(input).catch(() => null);
 
     if (recovered !== null) {
       return {
@@ -109,8 +109,40 @@ export async function ensureDefaultClerkOrganizationMembership(input: {
       };
     }
 
-    throw error;
+    logDefaultClerkOrganizationMembershipFailure({
+      organizationId: input.config.organizationId,
+      userId: input.userId,
+      role: input.config.role,
+      error
+    });
+
+    return {
+      status: "failed",
+      organizationId: input.config.organizationId,
+      userId: input.userId,
+      role: input.config.role,
+      reason: "membership_error"
+    };
   }
+}
+
+function logDefaultClerkOrganizationMembershipFailure(input: {
+  readonly organizationId: string;
+  readonly userId: string;
+  readonly role: string;
+  readonly error: unknown;
+}): void {
+  const message = input.error instanceof Error ? input.error.message : "unknown error";
+
+  console.error(
+    JSON.stringify({
+      event: "clerk.default_organization.membership_failed",
+      organizationId: input.organizationId,
+      userId: input.userId,
+      role: input.role,
+      message
+    })
+  );
 }
 
 export function readDefaultClerkOrganizationMembershipConfig(
