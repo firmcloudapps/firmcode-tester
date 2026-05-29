@@ -610,7 +610,11 @@ const testConfig: ApiRuntimeConfig = {
     secretKey: "sk_test_example",
     jwtAudience: "firmcode-api",
     webhookSecret: null,
-    defaultOrganization: null
+    defaultOrganization: {
+      id: "org_3EGsxXDTl8pWEfV6da6oENrYhRr",
+      name: "Firmcode AI",
+      role: "org:developer"
+    }
   },
   github: {
     appId: 123,

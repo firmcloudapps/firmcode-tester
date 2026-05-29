@@ -15,7 +15,7 @@ export interface DefaultClerkOrganizationMembershipResult {
   readonly organizationId: string | null;
   readonly userId: string | null;
   readonly role: string | null;
-  readonly reason: "disabled" | "unauthenticated" | null;
+  readonly reason: "unauthenticated" | null;
 }
 
 interface ClerkOrganizationMembership {
@@ -43,16 +43,6 @@ export async function ensureAuthenticatedUserDefaultClerkOrganizationMembership(
   env: Record<string, string | undefined> = process.env
 ): Promise<DefaultClerkOrganizationMembershipResult> {
   const config = readDefaultClerkOrganizationMembershipConfig(env);
-
-  if (config === null) {
-    return {
-      status: "skipped",
-      organizationId: null,
-      userId: null,
-      role: null,
-      reason: "disabled"
-    };
-  }
 
   const session = await auth();
 
@@ -125,15 +115,9 @@ export async function ensureDefaultClerkOrganizationMembership(input: {
 
 export function readDefaultClerkOrganizationMembershipConfig(
   env: Record<string, string | undefined>
-): DefaultClerkOrganizationMembershipConfig | null {
-  const explicitOrganizationId = readEnvironmentValue(env.FIRMCODE_DEFAULT_CLERK_ORGANIZATION_ID);
-
-  if (explicitOrganizationId === null && env.NODE_ENV !== "production") {
-    return null;
-  }
-
+): DefaultClerkOrganizationMembershipConfig {
   return {
-    organizationId: explicitOrganizationId ?? DEFAULT_CLERK_ORGANIZATION_ID,
+    organizationId: readEnvironmentValue(env.FIRMCODE_DEFAULT_CLERK_ORGANIZATION_ID) ?? DEFAULT_CLERK_ORGANIZATION_ID,
     organizationName: readEnvironmentValue(env.FIRMCODE_DEFAULT_CLERK_ORGANIZATION_NAME) ?? DEFAULT_CLERK_ORGANIZATION_NAME,
     role: readEnvironmentValue(env.FIRMCODE_DEFAULT_CLERK_ORGANIZATION_ROLE) ?? DEFAULT_CLERK_ORGANIZATION_ROLE
   };

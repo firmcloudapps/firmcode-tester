@@ -10,12 +10,14 @@ import { RepositoriesModule } from "./repositories/repositories.module";
 import { ReviewRunsModule } from "./review-runs/review-runs.module";
 import { RulesModule } from "./rules/rules.module";
 import { SettingsModule } from "./settings/settings.module";
+import { ClerkWebhookModule } from "./webhooks/clerk/clerk-webhook.module";
 import { GitHubWebhookModule } from "./webhooks/github/github-webhook.module";
 
 @Module({
   imports: [
     DashboardAuthModule,
     HealthModule,
+    ClerkWebhookModule,
     GitHubWebhookModule,
     CodebaseScansModule,
     GitHubDashboardModule,

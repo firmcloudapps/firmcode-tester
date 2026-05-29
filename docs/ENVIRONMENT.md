@@ -88,15 +88,16 @@ Required Clerk dashboard configuration:
 - After sign-in URL: `/auth/redirect`
 - After sign-up URL: `/auth/redirect`
 - Organization settings optional. For the default SaaS signup, Clerk must allow personal accounts and must not require a `choose-organization` task or force new users to create an organization. Firmcode server-side signup repair adds users to the configured default organization instead. Set `NEXT_PUBLIC_CLERK_ORGANIZATIONS_ENABLED=true` only after that Clerk instance supports optional organization switching.
+- Clerk webhook endpoint: configure `https://<api-host>/webhooks/clerk` with the `user.created` event so all newly created Clerk users are added to the default organization even if they do not complete the browser redirect.
 - Default Clerk organization:
   - `FIRMCODE_DEFAULT_CLERK_ORGANIZATION_ID=org_3EGsxXDTl8pWEfV6da6oENrYhRr`
   - `FIRMCODE_DEFAULT_CLERK_ORGANIZATION_NAME=Firmcode AI`
   - `FIRMCODE_DEFAULT_CLERK_ORGANIZATION_ROLE=org:developer`
 - Clerk webhook endpoint configured only after the API endpoint exists and `CLERK_WEBHOOK_SECRET` is set.
 - Clerk organization roles are the source of truth for organization workspace authorization. Firmcode maps Clerk `org:admin`/`admin` and legacy `org:owner`/`owner` to Admin, and maps `org:member`/`member` plus `org:developer`/`developer` to Developer. Optional JWT role metadata (`firmcode_role`, `org_firmcode_role`, `firmcode.role`, `organization_metadata.firmcode_role`, `public_metadata.firmcode_role`, or `metadata.firmcode_role`) is only a fallback when no recognized Clerk organization role is present.
-- Without a configured default Clerk organization, frontend signups fall back to personal workspaces as Developer in non-production development. Promote users from the Clerk dashboard by setting trusted user metadata, for example `public_metadata.firmcode_role = "admin"` or `firmcode.role = "admin"`, and expose it in the session token as one of the supported claims above.
+- Personal workspace fallback is reserved for explicitly constructed tests and legacy paths; normal signups are assigned to the configured default Clerk organization. Promote users from the Clerk dashboard by setting trusted user metadata, for example `public_metadata.firmcode_role = "admin"` or `firmcode.role = "admin"`, and expose it in the session token as one of the supported claims above.
 
-Clerk webhook sync boundary: the API currently repairs the active workspace and membership at request time. A future Clerk webhook endpoint should consume user, organization, and organization-membership lifecycle events, set removed memberships inactive, and record elevated role changes in `workspace_audit_events`. Until that endpoint is deployed, support/admin sync must mark deleted or removed memberships inactive; request-time repair will not reactivate inactive memberships.
+Clerk webhook sync boundary: the API accepts signed `user.created` deliveries at `/webhooks/clerk` and adds the new user to the configured default organization. The active workspace is also repaired at request time for signed-in users. Organization deletion, membership removal, and elevated role audit sync are still support/admin operations; request-time repair will not reactivate inactive memberships.
 
 ## GitHub App
 

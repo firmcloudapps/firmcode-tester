@@ -67,7 +67,7 @@ The MVP must ship with real Clerk-backed authentication before any dashboard dat
   - `/auth/redirect` adds authenticated signups to Clerk organization `org_3EGsxXDTl8pWEfV6da6oENrYhRr` (`Firmcode AI`) with role `org:developer`.
   - If a fresh Clerk session token does not yet carry an active organization claim, the API resolves the user into the configured default organization workspace and creates the Firmcode membership as Developer.
   - Existing Admin memberships are preserved during default signup repair; only active Clerk organization claims or trusted support/admin flows should grant or remove Admin.
-- Clerk Organizations disabled or default organization omitted in local development:
+- Legacy/test personal workspace fallback:
   - Create one personal workspace per Clerk user.
   - All frontend signups default to Developer.
   - Admin is granted by setting trusted Clerk user metadata such as `firmcode_role=admin` and exposing it in the Clerk session token. The API syncs that claim into `workspace_memberships` on the next authenticated request.
@@ -113,7 +113,7 @@ Firmcode should map Clerk identities to internal workspace records:
 - `created_at`
 - `updated_at`
 
-The configured default Clerk organization maps to one Firmcode workspace. If the default organization is omitted for local development or Clerk Organizations are not used, a user can own a personal workspace.
+The configured default Clerk organization maps to one Firmcode workspace. Personal workspaces remain available only for tests and legacy fallback paths.
 
 The workspace is the tenant boundary. Every application row that contains customer data or customer configuration should either belong directly to a workspace or be reachable only through a workspace-owned parent.
 
