@@ -77,7 +77,7 @@ export class GitHubDashboardService {
     @Inject(GITHUB_INSTALLATION_SYNC_CLIENT) private readonly installationClient: GitHubInstallationSyncClient,
     @Inject(API_RUNTIME_CONFIG) private readonly config: ApiRuntimeConfig,
     @Optional() private readonly codebaseScanEnqueueService?: CodebaseScanEnqueueService
-  ) {}
+  ) { }
 
   async getOAuthStatus(input: GitHubDashboardContext): Promise<GitHubOAuthStatusResponse> {
     const membership = await this.requireMembership(input);
@@ -150,7 +150,7 @@ export class GitHubDashboardService {
     });
 
     if (roleHasDashboardCapability(membership.role, "manage_github_installations")) {
-      await this.connectAccessibleInstallations(membership, token.accessToken);
+      await this.connectAccessibleInstallationsSafely(membership, token.accessToken);
     }
 
     return status;
@@ -296,10 +296,25 @@ export class GitHubDashboardService {
     });
 
     if (roleHasDashboardCapability(input.membership.role, "manage_github_installations")) {
-      await this.connectAccessibleInstallations(input.membership, token.accessToken);
+      await this.connectAccessibleInstallationsSafely(input.membership, token.accessToken);
     }
 
     return status;
+  }
+
+  private async connectAccessibleInstallationsSafely(membership: DashboardMembership, accessToken: string): Promise<void> {
+    try {
+      await this.connectAccessibleInstallations(membership, accessToken);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "unknown error";
+      console.error(
+        `[github-oauth] GitHub App installation sync failed after OAuth connection: ${JSON.stringify({
+          workspaceId: membership.workspaceId,
+          clerkUserId: membership.clerkUserId,
+          message
+        })}`
+      );
+    }
   }
 
   private async requireWorkspaceInstallation(workspaceId: string, installationId: number): Promise<{

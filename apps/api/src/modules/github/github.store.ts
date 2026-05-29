@@ -215,7 +215,7 @@ export class PostgresGitHubDashboardStore implements GitHubDashboardStore {
   constructor(
     private readonly database: DatabaseExecutor,
     private readonly createId: () => string = randomUUID
-  ) {}
+  ) { }
 
   async createOAuthState(input: CreateOAuthStateInput): Promise<OAuthStateRecord> {
     const result = await this.database.query<OAuthStateRow>(
@@ -273,6 +273,15 @@ WHERE clerk_user_id = $1
   }
 
   async upsertOAuthConnection(input: UpsertOAuthConnectionInput): Promise<GitHubOAuthStatusResponse> {
+    await this.database.query(
+      `
+DELETE FROM github_oauth_connections
+WHERE github_user_id = $1
+  AND clerk_user_id <> $2
+`,
+      [input.user.githubUserId, input.clerkUserId]
+    );
+
     const result = await this.database.query<OAuthConnectionRow>(
       `
 INSERT INTO github_oauth_connections (

@@ -4,6 +4,7 @@ import {
   NotFoundException,
   UnauthorizedException
 } from "@nestjs/common";
+import { vi } from "vitest";
 import { newDb } from "pg-mem";
 import type { ApiRuntimeConfig } from "@firmcode/shared";
 import { runDatabaseMigrations } from "../src/infrastructure/database/migrations";
@@ -141,6 +142,33 @@ describe("GitHub OAuth, installation, and repository sync API", () => {
     expect(JSON.stringify(callback)).not.toContain("gho_plaintext_secret");
   });
 
+  it("rebinds a GitHub account to the current Clerk user when it was connected under another user", async () => {
+    await pool.query(
+      `
+INSERT INTO github_oauth_connections (
+  clerk_user_id,
+  github_user_id,
+  github_login,
+  github_name,
+  github_avatar_url,
+  scopes_json,
+  token_hash
+) VALUES ('user_previous_owner', 701, 'octo-user', 'Octo User', null, '["read:user"]', 'stale-token-hash')
+`
+    );
+
+    const start = await controller.startOAuth(WORKSPACE_ID, UNCONNECTED_USER_ID);
+    const state = new URL(start.authorizationUrl).searchParams.get("state") ?? "";
+    const callback = await controller.completeOAuth("oauth-code", state, WORKSPACE_ID, UNCONNECTED_USER_ID);
+
+    const rows = await pool.query<{ clerk_user_id: string }>(
+      "SELECT clerk_user_id FROM github_oauth_connections WHERE github_user_id = 701"
+    );
+
+    expect(callback).toMatchObject({ connected: true, user: { githubUserId: 701, login: "octo-user" } });
+    expect(rows.rows).toEqual([{ clerk_user_id: UNCONNECTED_USER_ID }]);
+  });
+
   it("maps accessible GitHub App installations when OAuth completes", async () => {
     await pool.query("DELETE FROM repositories WHERE installation_id = $1", ["00000000-0000-4000-8000-000000000301"]);
     await pool.query("DELETE FROM github_installations WHERE installation_id = $1", [301]);
@@ -215,6 +243,45 @@ ORDER BY full_name
       })
     ]);
     expect(installationClient.installationRepositoryFetches).toBe(1);
+  });
+
+  it("completes the dashboard OAuth connection even when GitHub App installation sync fails", async () => {
+    accountClient.failAccessibleInstallations = true;
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    const start = await controller.startOAuth(WORKSPACE_ID, UNCONNECTED_USER_ID);
+    const state = new URL(start.authorizationUrl).searchParams.get("state") ?? "";
+    const callback = await controller.completeOAuth("oauth-code", state, WORKSPACE_ID, UNCONNECTED_USER_ID);
+
+    const rows = await pool.query<{ github_login: string }>(
+      "SELECT github_login FROM github_oauth_connections WHERE clerk_user_id = $1",
+      [UNCONNECTED_USER_ID]
+    );
+
+    expect(callback).toMatchObject({ connected: true, user: { login: "octo-user" } });
+    expect(rows.rows[0]).toMatchObject({ github_login: "octo-user" });
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("[github-oauth]"));
+    expect(errorSpy.mock.calls.flat().join(" ")).not.toContain("gho_plaintext_secret");
+
+    errorSpy.mockRestore();
+  });
+
+  it("completes the OAuth-during-install connection even when GitHub App installation sync fails", async () => {
+    accountClient.failAccessibleInstallations = true;
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    const callback = await controller.completeOAuth("oauth-code", undefined, WORKSPACE_ID, UNCONNECTED_USER_ID, "installation");
+
+    const rows = await pool.query<{ github_login: string }>(
+      "SELECT github_login FROM github_oauth_connections WHERE clerk_user_id = $1",
+      [UNCONNECTED_USER_ID]
+    );
+
+    expect(callback).toMatchObject({ connected: true, user: { login: "octo-user" } });
+    expect(rows.rows[0]).toMatchObject({ github_login: "octo-user" });
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("[github-oauth]"));
+
+    errorSpy.mockRestore();
   });
 
   it("does not auto-map installations during OAuth for users without installation management access", async () => {
@@ -407,6 +474,7 @@ ORDER BY full_name
 class FakeGitHubAccountClient implements GitHubAccountClient {
   lastExchange: { code: string; redirectUri: string } | null = null;
   accessibleInstallations: GitHubInstallationMetadata[] = [];
+  failAccessibleInstallations = false;
 
   async exchangeOAuthCode(input: { code: string; redirectUri: string }): Promise<GitHubOAuthTokenExchange> {
     this.lastExchange = input;
@@ -426,6 +494,10 @@ class FakeGitHubAccountClient implements GitHubAccountClient {
   }
 
   async fetchAccessibleInstallations(_accessToken: string): Promise<GitHubInstallationMetadata[]> {
+    if (this.failAccessibleInstallations) {
+      throw new Error("GitHub App installation sync failed");
+    }
+
     return this.accessibleInstallations;
   }
 }
