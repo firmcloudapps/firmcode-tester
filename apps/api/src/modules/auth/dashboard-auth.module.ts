@@ -29,7 +29,9 @@ import {
           new Pool({
             connectionString: config.database.url,
             ssl: config.database.ssl ? { rejectUnauthorized: false } : false
-          })
+          }),
+          undefined,
+          config.clerk.defaultOrganization
         );
       },
       inject: [API_RUNTIME_CONFIG]

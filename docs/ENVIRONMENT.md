@@ -74,7 +74,7 @@ The production dashboard authentication flow is:
 2. Web server code reads Clerk auth state with `auth()` and obtains a Clerk session token for `CLERK_JWT_AUDIENCE`.
 3. Web-to-API calls send `Authorization: Bearer <Clerk session token>`.
 4. The NestJS API verifies the token with Clerk, derives the Clerk user and organization claims, resolves the Firmcode workspace/membership, and then applies role/capability checks.
-5. After successful sign-in or sign-up, Clerk sends the browser to `/auth/redirect`, which resolves the verified workspace role through the dashboard API and routes Admins to `/dashboard/admin` and Developers to `/dashboard/developer`.
+5. After successful sign-in or sign-up, Clerk sends the browser to `/auth/redirect`, which adds the user to the configured default Clerk organization as `org:developer`, resolves the verified workspace role through the dashboard API, and routes Admins to `/dashboard/admin` and Developers to `/dashboard/developer`.
 6. The API must ignore client-provided user identity headers. Web tests may use `FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN` as an isolated bearer-token fixture, but production and normal local development must use Clerk sessions. Any legacy workspace/user shortcut is gated to `NODE_ENV=test` for direct controller tests only; setting `FIRMCODE_DASHBOARD_*` or sending `x-firmcode-user-id` is not a supported runtime authentication path.
 
 Required Clerk dashboard configuration:
@@ -87,10 +87,14 @@ Required Clerk dashboard configuration:
 - Sign-up URL: `/sign-up`
 - After sign-in URL: `/auth/redirect`
 - After sign-up URL: `/auth/redirect`
-- Organization settings optional. For the default SaaS signup, Clerk must allow personal accounts and must not require a `choose-organization` task or force new users to create an organization. Set `NEXT_PUBLIC_CLERK_ORGANIZATIONS_ENABLED=true` only after that Clerk instance supports optional organization switching.
+- Organization settings optional. For the default SaaS signup, Clerk must allow personal accounts and must not require a `choose-organization` task or force new users to create an organization. Firmcode server-side signup repair adds users to the configured default organization instead. Set `NEXT_PUBLIC_CLERK_ORGANIZATIONS_ENABLED=true` only after that Clerk instance supports optional organization switching.
+- Default Clerk organization:
+  - `FIRMCODE_DEFAULT_CLERK_ORGANIZATION_ID=org_3EGsxXDTl8pWEfV6da6oENrYhRr`
+  - `FIRMCODE_DEFAULT_CLERK_ORGANIZATION_NAME=Firmcode AI`
+  - `FIRMCODE_DEFAULT_CLERK_ORGANIZATION_ROLE=org:developer`
 - Clerk webhook endpoint configured only after the API endpoint exists and `CLERK_WEBHOOK_SECRET` is set.
 - Clerk organization roles are the source of truth for organization workspace authorization. Firmcode maps Clerk `org:admin`/`admin` and legacy `org:owner`/`owner` to Admin, and maps `org:member`/`member` plus `org:developer`/`developer` to Developer. Optional JWT role metadata (`firmcode_role`, `org_firmcode_role`, `firmcode.role`, `organization_metadata.firmcode_role`, `public_metadata.firmcode_role`, or `metadata.firmcode_role`) is only a fallback when no recognized Clerk organization role is present.
-- Without Clerk Organizations, frontend signups default to Developer. Promote users from the Clerk dashboard by setting trusted user metadata, for example `public_metadata.firmcode_role = "admin"` or `firmcode.role = "admin"`, and expose it in the session token as one of the supported claims above.
+- Without a configured default Clerk organization, frontend signups fall back to personal workspaces as Developer in non-production development. Promote users from the Clerk dashboard by setting trusted user metadata, for example `public_metadata.firmcode_role = "admin"` or `firmcode.role = "admin"`, and expose it in the session token as one of the supported claims above.
 
 Clerk webhook sync boundary: the API currently repairs the active workspace and membership at request time. A future Clerk webhook endpoint should consume user, organization, and organization-membership lifecycle events, set removed memberships inactive, and record elevated role changes in `workspace_audit_events`. Until that endpoint is deployed, support/admin sync must mark deleted or removed memberships inactive; request-time repair will not reactivate inactive memberships.
 

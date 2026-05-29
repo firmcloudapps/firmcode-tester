@@ -54,6 +54,13 @@ export interface ClerkApiConfig {
   secretKey: string;
   jwtAudience: string | null;
   webhookSecret: string | null;
+  defaultOrganization: DefaultClerkOrganizationConfig | null;
+}
+
+export interface DefaultClerkOrganizationConfig {
+  id: string;
+  name: string;
+  role: string;
 }
 
 export interface RedactedGitHubAppConfig {
@@ -102,6 +109,9 @@ export interface CodebaseScanConfig {
 
 export const DEFAULT_CI_LOG_MAX_BYTES = 20_000;
 export const DEFAULT_CODEBASE_SCAN_CADENCE_HOURS = 24;
+export const DEFAULT_CLERK_ORGANIZATION_ID = "org_3EGsxXDTl8pWEfV6da6oENrYhRr";
+export const DEFAULT_CLERK_ORGANIZATION_NAME = "Firmcode AI";
+export const DEFAULT_CLERK_ORGANIZATION_ROLE = "org:developer";
 
 const BOOLEAN_VALUES = new Map<string, boolean>([
   ["true", true],
@@ -115,7 +125,7 @@ export function createApiRuntimeConfig(env: EnvironmentVariables): ApiRuntimeCon
   const nodeEnv = readRuntimeEnvironment(env, issues);
   const database = readDatabaseConfig(env, nodeEnv, issues);
   const queue = readQueueConfig(env, issues);
-  const clerk = readClerkApiConfig(env, issues);
+  const clerk = readClerkApiConfig(env, nodeEnv, issues);
   const github = readGitHubAppConfig(env, nodeEnv, issues);
   const review = readReviewConfig(env, issues);
   const codebaseScan = readCodebaseScanConfig(env, issues);
@@ -272,7 +282,11 @@ function readDatabaseConfig(
   };
 }
 
-function readClerkApiConfig(env: EnvironmentVariables, issues: ConfigValidationIssue[]): ClerkApiConfig | null {
+function readClerkApiConfig(
+  env: EnvironmentVariables,
+  nodeEnv: RuntimeEnvironment,
+  issues: ConfigValidationIssue[]
+): ClerkApiConfig | null {
   const secretKey = readRequired(env, "CLERK_SECRET_KEY", issues);
   const jwtAudience =
     readOptional(env, "CLERK_JWT_AUDIENCE") ??
@@ -285,7 +299,25 @@ function readClerkApiConfig(env: EnvironmentVariables, issues: ConfigValidationI
   return {
     secretKey,
     jwtAudience,
-    webhookSecret: readOptional(env, "CLERK_WEBHOOK_SECRET")
+    webhookSecret: readOptional(env, "CLERK_WEBHOOK_SECRET"),
+    defaultOrganization: readDefaultClerkOrganizationConfig(env, nodeEnv)
+  };
+}
+
+function readDefaultClerkOrganizationConfig(
+  env: EnvironmentVariables,
+  nodeEnv: RuntimeEnvironment
+): DefaultClerkOrganizationConfig | null {
+  const explicitOrganizationId = readOptional(env, "FIRMCODE_DEFAULT_CLERK_ORGANIZATION_ID");
+
+  if (explicitOrganizationId === null && nodeEnv !== "production") {
+    return null;
+  }
+
+  return {
+    id: explicitOrganizationId ?? DEFAULT_CLERK_ORGANIZATION_ID,
+    name: readOptional(env, "FIRMCODE_DEFAULT_CLERK_ORGANIZATION_NAME") ?? DEFAULT_CLERK_ORGANIZATION_NAME,
+    role: readOptional(env, "FIRMCODE_DEFAULT_CLERK_ORGANIZATION_ROLE") ?? DEFAULT_CLERK_ORGANIZATION_ROLE
   };
 }
 

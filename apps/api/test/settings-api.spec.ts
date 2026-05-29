@@ -213,7 +213,8 @@ const testConfig: ApiRuntimeConfig = {
   clerk: {
     secretKey: "sk_test_example",
     jwtAudience: "firmcode-api",
-    webhookSecret: null
+    webhookSecret: null,
+    defaultOrganization: null
   },
   github: null,
   review: {

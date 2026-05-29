@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { ForbiddenException, Injectable } from "@nestjs/common";
+import type { DefaultClerkOrganizationConfig } from "@firmcode/shared";
 import type { DatabaseExecutor } from "../../infrastructure/database/migrations";
 import type { DashboardRole } from "../review-runs/dashboard-auth.store";
 import type { VerifiedClerkToken } from "./clerk-token-verifier";
@@ -39,7 +40,8 @@ interface MembershipRow {
 export class PostgresDashboardWorkspaceResolver implements DashboardWorkspaceResolver {
   constructor(
     private readonly database: DatabaseExecutor,
-    private readonly uuidFactory: () => string = randomUUID
+    private readonly uuidFactory: () => string = randomUUID,
+    private readonly defaultOrganization: DefaultClerkOrganizationConfig | null = null
   ) {}
 
   async resolve(input: {
@@ -57,7 +59,10 @@ export class PostgresDashboardWorkspaceResolver implements DashboardWorkspaceRes
     }
 
     if (input.token.clerkOrgId !== null) {
-      const workspaceId = await this.ensureOrganizationWorkspace(input.token);
+      const workspaceId = await this.ensureOrganizationWorkspace({
+        clerkOrgId: input.token.clerkOrgId,
+        name: `Clerk organization ${input.token.clerkOrgId}`
+      });
       const membership = await this.ensureMembership({
         workspaceId,
         clerkUserId: input.token.clerkUserId,
@@ -74,12 +79,41 @@ export class PostgresDashboardWorkspaceResolver implements DashboardWorkspaceRes
       return toResolvedWorkspace(input.token, membership);
     }
 
+    if (this.defaultOrganization !== null) {
+      const workspaceId = await this.ensureOrganizationWorkspace({
+        clerkOrgId: this.defaultOrganization.id,
+        name: this.defaultOrganization.name
+      });
+      const defaultRole = resolveConfiguredOrganizationRole(this.defaultOrganization.role);
+      const membership = await this.ensureMembership({
+        workspaceId,
+        clerkUserId: input.token.clerkUserId,
+        role: defaultRole,
+        source: "default_clerk_organization_signup",
+        syncExistingRole: false,
+        metadata: {
+          clerkOrgId: this.defaultOrganization.id,
+          clerkOrgRole: this.defaultOrganization.role,
+          firmcodeRole: input.token.firmcodeRole
+        }
+      });
+
+      return toResolvedWorkspace(
+        {
+          ...input.token,
+          clerkOrgId: this.defaultOrganization.id,
+          orgRole: this.defaultOrganization.role
+        },
+        membership
+      );
+    }
+
     const membership = await this.ensurePersonalWorkspace(input.token);
     return toResolvedWorkspace(input.token, membership);
   }
 
-  private async ensureOrganizationWorkspace(token: VerifiedClerkToken): Promise<string> {
-    const existing = await this.database.query<WorkspaceRow>("SELECT id FROM workspaces WHERE clerk_org_id = $1", [token.clerkOrgId]);
+  private async ensureOrganizationWorkspace(input: { readonly clerkOrgId: string; readonly name: string }): Promise<string> {
+    const existing = await this.database.query<WorkspaceRow>("SELECT id FROM workspaces WHERE clerk_org_id = $1", [input.clerkOrgId]);
 
     if (existing.rows[0] !== undefined) {
       return existing.rows[0].id;
@@ -93,7 +127,7 @@ VALUES ($1, $2, $3)
 ON CONFLICT (clerk_org_id) DO UPDATE SET updated_at = now()
 RETURNING id
 `,
-      [workspaceId, token.clerkOrgId, `Clerk organization ${token.clerkOrgId}`]
+      [workspaceId, input.clerkOrgId, input.name]
     );
 
     return result.rows[0]?.id ?? workspaceId;
@@ -307,6 +341,10 @@ function resolvePersonalRoleSource(token: VerifiedClerkToken): string {
 
 function resolveOrganizationRole(token: VerifiedClerkToken): DashboardRole {
   return normalizeClerkOrganizationRole(token.orgRole) ?? normalizeFirmcodeRole(token.firmcodeRole) ?? "developer";
+}
+
+function resolveConfiguredOrganizationRole(role: string): DashboardRole {
+  return normalizeClerkOrganizationRole(role) ?? normalizeFirmcodeRole(role) ?? "developer";
 }
 
 function resolveOrganizationRoleSource(token: VerifiedClerkToken): string {

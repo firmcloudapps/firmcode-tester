@@ -31,6 +31,7 @@ describe("API runtime config", () => {
     expect(config.queue.redactedRedisUrl).toBe("redis://:REDACTED@localhost:6379");
     expect(config.clerk.secretKey).toBe("sk_test_example");
     expect(config.clerk.jwtAudience).toBeNull();
+    expect(config.clerk.defaultOrganization).toBeNull();
     expect(config.publicAppUrl).toBe("https://firmcode.firmoncloud.com");
     expect(config.publicApiUrl).toBe("https://firmcodeapi.firmoncloud.com");
     expect(config.github?.appId).toBe(12345);
@@ -50,6 +51,21 @@ describe("API runtime config", () => {
 
     expect(config.clerk.secretKey).toBe("sk_test_example");
     expect(config.clerk.jwtAudience).toBe("firmcode-api");
+  });
+
+  it("loads the default Clerk organization used for signup membership", () => {
+    const config = createApiRuntimeConfig({
+      ...VALID_ENV,
+      FIRMCODE_DEFAULT_CLERK_ORGANIZATION_ID: "org_3EGsxXDTl8pWEfV6da6oENrYhRr",
+      FIRMCODE_DEFAULT_CLERK_ORGANIZATION_NAME: "Firmcode AI",
+      FIRMCODE_DEFAULT_CLERK_ORGANIZATION_ROLE: "org:developer"
+    });
+
+    expect(config.clerk.defaultOrganization).toEqual({
+      id: "org_3EGsxXDTl8pWEfV6da6oENrYhRr",
+      name: "Firmcode AI",
+      role: "org:developer"
+    });
   });
 
   it("accepts values copied with surrounding quotes from deployment UIs", () => {

@@ -63,7 +63,11 @@ The MVP must ship with real Clerk-backed authentication before any dashboard dat
   - Map Clerk organization memberships to `workspace_memberships`.
   - Treat Clerk organization roles as authoritative when Organizations are optional and active: `org:admin`/`admin` and legacy `org:owner`/`owner` resolve to Admin; `org:member`/`member` and `org:developer`/`developer` resolve to Developer.
   - Optional trusted Firmcode role metadata is only a fallback when no recognized Clerk organization role is present. The API reads `firmcode_role`, `org_firmcode_role`, `firmcode.role`, `organization_metadata.firmcode_role`, `public_metadata.firmcode_role`, or `metadata.firmcode_role`.
-- Clerk Organizations disabled:
+- Default Firmcode AI organization:
+  - `/auth/redirect` adds authenticated signups to Clerk organization `org_3EGsxXDTl8pWEfV6da6oENrYhRr` (`Firmcode AI`) with role `org:developer`.
+  - If a fresh Clerk session token does not yet carry an active organization claim, the API resolves the user into the configured default organization workspace and creates the Firmcode membership as Developer.
+  - Existing Admin memberships are preserved during default signup repair; only active Clerk organization claims or trusted support/admin flows should grant or remove Admin.
+- Clerk Organizations disabled or default organization omitted in local development:
   - Create one personal workspace per Clerk user.
   - All frontend signups default to Developer.
   - Admin is granted by setting trusted Clerk user metadata such as `firmcode_role=admin` and exposing it in the Clerk session token. The API syncs that claim into `workspace_memberships` on the next authenticated request.
@@ -109,7 +113,7 @@ Firmcode should map Clerk identities to internal workspace records:
 - `created_at`
 - `updated_at`
 
-If Clerk Organizations are enabled, a Clerk organization maps to one Firmcode workspace. If not enabled for MVP, a user can own a personal workspace.
+The configured default Clerk organization maps to one Firmcode workspace. If the default organization is omitted for local development or Clerk Organizations are not used, a user can own a personal workspace.
 
 The workspace is the tenant boundary. Every application row that contains customer data or customer configuration should either belong directly to a workspace or be reachable only through a workspace-owned parent.
 

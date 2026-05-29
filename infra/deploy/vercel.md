@@ -47,6 +47,9 @@ Set these variables in Vercel for Production, Preview, and Development as approp
 | `NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL` | web | Post sign-in fallback destination, normally `/auth/redirect` for role-based dashboard routing. |
 | `NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL` | web | Post sign-up fallback destination, normally `/auth/redirect` for role-based dashboard routing. |
 | `CLERK_BILLING_PORTAL_URL` | web | Clerk-managed billing portal or account billing URL. |
+| `FIRMCODE_DEFAULT_CLERK_ORGANIZATION_ID` | web server | Clerk organization to add signups to, currently `org_3EGsxXDTl8pWEfV6da6oENrYhRr`. |
+| `FIRMCODE_DEFAULT_CLERK_ORGANIZATION_NAME` | web server | Display name used by backend workspace repair, currently `Firmcode AI`. |
+| `FIRMCODE_DEFAULT_CLERK_ORGANIZATION_ROLE` | web server | Clerk membership role for first-time signup assignment, normally `org:developer`. |
 | `VERCEL_URL` | Vercel | Auto-provided by Vercel and useful for preview callback handling. |
 
 Do not set GitHub App private keys, LLM API keys, Redis URLs, or worker-only settings in Vercel unless a future dashboard server route explicitly needs them.

@@ -1,0 +1,171 @@
+import { auth, clerkClient } from "@clerk/nextjs/server";
+
+export const DEFAULT_CLERK_ORGANIZATION_ID = "org_3EGsxXDTl8pWEfV6da6oENrYhRr";
+export const DEFAULT_CLERK_ORGANIZATION_NAME = "Firmcode AI";
+export const DEFAULT_CLERK_ORGANIZATION_ROLE = "org:developer";
+
+export interface DefaultClerkOrganizationMembershipConfig {
+  readonly organizationId: string;
+  readonly organizationName: string;
+  readonly role: string;
+}
+
+export interface DefaultClerkOrganizationMembershipResult {
+  readonly status: "already_member" | "created" | "skipped";
+  readonly organizationId: string | null;
+  readonly userId: string | null;
+  readonly role: string | null;
+  readonly reason: "disabled" | "unauthenticated" | null;
+}
+
+interface ClerkOrganizationMembership {
+  readonly role: string;
+}
+
+interface ClerkOrganizationMembershipList {
+  readonly data: readonly ClerkOrganizationMembership[];
+}
+
+interface ClerkOrganizationsApi {
+  getOrganizationMembershipList(params: {
+    readonly organizationId: string;
+    readonly userId: string[];
+    readonly limit: number;
+  }): Promise<ClerkOrganizationMembershipList>;
+  createOrganizationMembership(params: {
+    readonly organizationId: string;
+    readonly userId: string;
+    readonly role: string;
+  }): Promise<unknown>;
+}
+
+export async function ensureAuthenticatedUserDefaultClerkOrganizationMembership(
+  env: Record<string, string | undefined> = process.env
+): Promise<DefaultClerkOrganizationMembershipResult> {
+  const config = readDefaultClerkOrganizationMembershipConfig(env);
+
+  if (config === null) {
+    return {
+      status: "skipped",
+      organizationId: null,
+      userId: null,
+      role: null,
+      reason: "disabled"
+    };
+  }
+
+  const session = await auth();
+
+  if (session.userId === null) {
+    return {
+      status: "skipped",
+      organizationId: config.organizationId,
+      userId: null,
+      role: config.role,
+      reason: "unauthenticated"
+    };
+  }
+
+  const client = await clerkClient();
+
+  return ensureDefaultClerkOrganizationMembership({
+    userId: session.userId,
+    config,
+    organizations: client.organizations
+  });
+}
+
+export async function ensureDefaultClerkOrganizationMembership(input: {
+  readonly userId: string;
+  readonly config: DefaultClerkOrganizationMembershipConfig;
+  readonly organizations: ClerkOrganizationsApi;
+}): Promise<DefaultClerkOrganizationMembershipResult> {
+  const existing = await findDefaultClerkOrganizationMembership(input);
+
+  if (existing !== null) {
+    return {
+      status: "already_member",
+      organizationId: input.config.organizationId,
+      userId: input.userId,
+      role: existing.role,
+      reason: null
+    };
+  }
+
+  try {
+    await input.organizations.createOrganizationMembership({
+      organizationId: input.config.organizationId,
+      userId: input.userId,
+      role: input.config.role
+    });
+
+    return {
+      status: "created",
+      organizationId: input.config.organizationId,
+      userId: input.userId,
+      role: input.config.role,
+      reason: null
+    };
+  } catch (error) {
+    const recovered = await findDefaultClerkOrganizationMembership(input);
+
+    if (recovered !== null) {
+      return {
+        status: "already_member",
+        organizationId: input.config.organizationId,
+        userId: input.userId,
+        role: recovered.role,
+        reason: null
+      };
+    }
+
+    throw error;
+  }
+}
+
+export function readDefaultClerkOrganizationMembershipConfig(
+  env: Record<string, string | undefined>
+): DefaultClerkOrganizationMembershipConfig | null {
+  const explicitOrganizationId = readEnvironmentValue(env.FIRMCODE_DEFAULT_CLERK_ORGANIZATION_ID);
+
+  if (explicitOrganizationId === null && env.NODE_ENV !== "production") {
+    return null;
+  }
+
+  return {
+    organizationId: explicitOrganizationId ?? DEFAULT_CLERK_ORGANIZATION_ID,
+    organizationName: readEnvironmentValue(env.FIRMCODE_DEFAULT_CLERK_ORGANIZATION_NAME) ?? DEFAULT_CLERK_ORGANIZATION_NAME,
+    role: readEnvironmentValue(env.FIRMCODE_DEFAULT_CLERK_ORGANIZATION_ROLE) ?? DEFAULT_CLERK_ORGANIZATION_ROLE
+  };
+}
+
+async function findDefaultClerkOrganizationMembership(input: {
+  readonly userId: string;
+  readonly config: DefaultClerkOrganizationMembershipConfig;
+  readonly organizations: ClerkOrganizationsApi;
+}): Promise<ClerkOrganizationMembership | null> {
+  const memberships = await input.organizations.getOrganizationMembershipList({
+    organizationId: input.config.organizationId,
+    userId: [input.userId],
+    limit: 1
+  });
+
+  return memberships.data[0] ?? null;
+}
+
+function readEnvironmentValue(value: string | undefined): string | null {
+  const trimmed = value?.trim();
+
+  if (!trimmed) {
+    return null;
+  }
+
+  if (
+    (trimmed.startsWith("\"") && trimmed.endsWith("\"")) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+  ) {
+    return trimmed.slice(1, -1).trim() || null;
+  }
+
+  return trimmed;
+}
