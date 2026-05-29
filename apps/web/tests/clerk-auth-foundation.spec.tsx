@@ -257,6 +257,35 @@ describe("default Clerk organization signup membership", () => {
     });
     expect(organizations.createCalls).toEqual([]);
   });
+
+  it("never blocks login when default organization membership provisioning fails", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const organizations = createFailingOrganizations(new Error("role org:developer does not exist"));
+
+    try {
+      const result = await ensureDefaultClerkOrganizationMembership({
+        userId: "user_new",
+        config: {
+          organizationId: DEFAULT_CLERK_ORGANIZATION_ID,
+          organizationName: "Firmcode AI",
+          role: "org:developer"
+        },
+        organizations
+      });
+
+      expect(result).toMatchObject({
+        status: "failed",
+        organizationId: DEFAULT_CLERK_ORGANIZATION_ID,
+        userId: "user_new",
+        role: "org:developer",
+        reason: "membership_error"
+      });
+      expect(errorSpy).toHaveBeenCalledTimes(1);
+      expect(String(errorSpy.mock.calls[0]![0])).toContain("clerk.default_organization.membership_failed");
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
 });
 
 describe("role landing dashboard pages", () => {
@@ -447,6 +476,17 @@ function createFakeOrganizations(initialRoles: Record<string, string> = {}) {
     async createOrganizationMembership(params: { readonly organizationId: string; readonly userId: string; readonly role: string }) {
       createCalls.push(params);
       roles.set(params.userId, params.role);
+    }
+  };
+}
+
+function createFailingOrganizations(error: Error) {
+  return {
+    async getOrganizationMembershipList() {
+      return { data: [] };
+    },
+    async createOrganizationMembership() {
+      throw error;
     }
   };
 }
