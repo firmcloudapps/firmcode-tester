@@ -38,7 +38,7 @@ Create a Clerk development application and configure:
 - After sign-in URL: `http://localhost:3000/auth/redirect`
 - After sign-up URL: `http://localhost:3000/auth/redirect`
 - Allowed redirect origin: `http://localhost:3000`
-- Organizations disabled for the default signup flow. Enable Clerk Organizations only when specifically testing team workspaces, and do not require organization creation for new users.
+- Organizations can stay disabled for ordinary local development. Set the default organization env vars below only when using a Clerk instance that contains the Firmcode AI organization, or another test organization you want new signups to join.
 - A JWT template or audience matching `CLERK_JWT_AUDIENCE` for API calls.
 
 Local `.env` values should include:
@@ -52,6 +52,9 @@ NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
 NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/auth/redirect
 NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/auth/redirect
 NEXT_PUBLIC_CLERK_ORGANIZATIONS_ENABLED=false
+FIRMCODE_DEFAULT_CLERK_ORGANIZATION_ID=org_3EGsxXDTl8pWEfV6da6oENrYhRr
+FIRMCODE_DEFAULT_CLERK_ORGANIZATION_NAME=Firmcode AI
+FIRMCODE_DEFAULT_CLERK_ORGANIZATION_ROLE=org:developer
 ```
 
 The expected local auth flow is:
@@ -60,12 +63,12 @@ The expected local auth flow is:
 2. The root holding page renders with dashboard entry points.
 3. Sign in or sign up through Clerk.
 4. Clerk sends the browser to `/auth/redirect`.
-5. The dashboard creates or resolves the active personal workspace by default, or an organization workspace only when Clerk Organizations are explicitly enabled.
+5. `/auth/redirect` adds the signed-in Clerk user to the configured default organization as `org:developer`, then the API creates or resolves the matching Firmcode workspace. If the default organization env var is omitted in local development, the personal workspace fallback is used.
 6. `/auth/redirect` sends Admins to `/dashboard/admin` and Developers to `/dashboard/developer`.
 7. Web server requests to the API include a Clerk bearer token.
 8. API dashboard endpoints reject requests without a valid Clerk token.
 
-Frontend signups resolve to Developer by default. For local Admin testing without requiring Clerk organization membership, set trusted Clerk user metadata such as `public_metadata.firmcode_role = "admin"` in the Clerk dashboard and expose it in the session token as `firmcode_role`, `public_metadata.firmcode_role`, or `firmcode.role`.
+Configured default-organization signups resolve to Developer by default. For local Admin testing without requiring Clerk organization membership, set trusted Clerk user metadata such as `public_metadata.firmcode_role = "admin"` in the Clerk dashboard and expose it in the session token as `firmcode_role`, `public_metadata.firmcode_role`, or `firmcode.role`.
 9. Connect GitHub OAuth from `/dashboard/developer` or `/github/installations` before using GitHub-backed workflows.
 
 Do not use dashboard user or workspace environment shims for normal local development once Task 9.0 is implemented. Web-to-API calls should use Clerk sessions. `FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN` and `FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID` are reserved for isolated web unit tests only.

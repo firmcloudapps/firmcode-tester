@@ -44,6 +44,9 @@ Required API environment variables:
 | `CLERK_SECRET_KEY` | Used to validate dashboard API requests. |
 | `CLERK_JWT_AUDIENCE` | Clerk token audience/template expected for dashboard API bearer tokens. |
 | `CLERK_WEBHOOK_SECRET` | Required if Clerk webhooks are enabled. |
+| `FIRMCODE_DEFAULT_CLERK_ORGANIZATION_ID` | Clerk organization used for default signup workspace repair, currently `org_3EGsxXDTl8pWEfV6da6oENrYhRr`. |
+| `FIRMCODE_DEFAULT_CLERK_ORGANIZATION_NAME` | Workspace display name for the default Clerk organization, currently `Firmcode AI`. |
+| `FIRMCODE_DEFAULT_CLERK_ORGANIZATION_ROLE` | Default Clerk organization role for signups, normally `org:developer`. |
 | `GITHUB_APP_ID` | GitHub App ID. |
 | `GITHUB_APP_PRIVATE_KEY` | PEM, escaped-newline, or base64 private key. In Coolify, prefer a single-line escaped-newline value such as `-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----` or a base64-encoded PEM. Do not log it. |
 | `GITHUB_WEBHOOK_SECRET` | Used to verify GitHub webhook signatures. |

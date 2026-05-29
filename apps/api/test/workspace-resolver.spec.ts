@@ -145,6 +145,54 @@ describe("PostgresDashboardWorkspaceResolver", () => {
     expect(workspaces.rows).toEqual([{ id: first.workspaceId, clerk_org_id: "org_firmcode" }]);
   });
 
+  it("resolves organization-less signup sessions into the configured default Clerk organization", async () => {
+    const defaultOrgResolver = new PostgresDashboardWorkspaceResolver(pool, createDeterministicUuidFactory(), {
+      id: "org_3EGsxXDTl8pWEfV6da6oENrYhRr",
+      name: "Firmcode AI",
+      role: "org:developer"
+    });
+
+    const resolved = await defaultOrgResolver.resolve({
+      token: createToken({ clerkUserId: "user_signup" }),
+      selectedWorkspaceId: null
+    });
+    const workspace = await pool.query<{ clerk_org_id: string | null; name: string }>(
+      "SELECT clerk_org_id, name FROM workspaces WHERE id = $1",
+      [resolved.workspaceId]
+    );
+
+    expect(resolved).toMatchObject({
+      clerkUserId: "user_signup",
+      clerkOrgId: "org_3EGsxXDTl8pWEfV6da6oENrYhRr",
+      role: "developer"
+    });
+    expect(workspace.rows[0]).toEqual({
+      clerk_org_id: "org_3EGsxXDTl8pWEfV6da6oENrYhRr",
+      name: "Firmcode AI"
+    });
+  });
+
+  it("preserves an existing default organization Admin membership during signup repair", async () => {
+    await insertWorkspace("00000000-0000-4000-8000-000000000151", "org_default", "Firmcode AI");
+    await insertMembership("00000000-0000-4000-8000-000000000151", "user_admin", "admin", true);
+    const defaultOrgResolver = new PostgresDashboardWorkspaceResolver(pool, createDeterministicUuidFactory(), {
+      id: "org_default",
+      name: "Firmcode AI",
+      role: "org:developer"
+    });
+
+    const resolved = await defaultOrgResolver.resolve({
+      token: createToken({ clerkUserId: "user_admin" }),
+      selectedWorkspaceId: null
+    });
+
+    expect(resolved).toMatchObject({
+      workspaceId: "00000000-0000-4000-8000-000000000151",
+      clerkOrgId: "org_default",
+      role: "admin"
+    });
+  });
+
   it("treats Clerk organization roles as the authoritative Firmcode role source", async () => {
     const member = await resolver.resolve({
       token: createToken({

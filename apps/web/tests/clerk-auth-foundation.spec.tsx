@@ -9,6 +9,11 @@ import { clerkAppearance } from "../components/auth/auth-page";
 import { DashboardShell } from "../components/dashboard/dashboard-shell";
 import { isClerkOrganizationsEnabled } from "../lib/clerk-organizations";
 import {
+  DEFAULT_CLERK_ORGANIZATION_ID,
+  ensureDefaultClerkOrganizationMembership,
+  readDefaultClerkOrganizationMembershipConfig
+} from "../lib/default-clerk-organization";
+import {
   ROLE_BASED_AUTH_REDIRECT_PATH,
   landingPathForDashboardRole,
   resolveRoleBasedDashboardRedirect
@@ -183,6 +188,73 @@ describe("role-based auth redirect", () => {
   });
 });
 
+describe("default Clerk organization signup membership", () => {
+  it("uses the Firmcode AI organization in production and stays opt-in during local development", () => {
+    expect(readDefaultClerkOrganizationMembershipConfig({ NODE_ENV: "development" })).toBeNull();
+    expect(readDefaultClerkOrganizationMembershipConfig({ NODE_ENV: "production" })).toMatchObject({
+      organizationId: DEFAULT_CLERK_ORGANIZATION_ID,
+      organizationName: "Firmcode AI",
+      role: "org:developer"
+    });
+    expect(
+      readDefaultClerkOrganizationMembershipConfig({
+        NODE_ENV: "development",
+        FIRMCODE_DEFAULT_CLERK_ORGANIZATION_ID: "org_local",
+        FIRMCODE_DEFAULT_CLERK_ORGANIZATION_ROLE: "org:developer"
+      })
+    ).toMatchObject({
+      organizationId: "org_local",
+      role: "org:developer"
+    });
+  });
+
+  it("creates missing default organization memberships with the Developer role", async () => {
+    const organizations = createFakeOrganizations();
+    const result = await ensureDefaultClerkOrganizationMembership({
+      userId: "user_new",
+      config: {
+        organizationId: DEFAULT_CLERK_ORGANIZATION_ID,
+        organizationName: "Firmcode AI",
+        role: "org:developer"
+      },
+      organizations
+    });
+
+    expect(result).toMatchObject({
+      status: "created",
+      organizationId: DEFAULT_CLERK_ORGANIZATION_ID,
+      userId: "user_new",
+      role: "org:developer"
+    });
+    expect(organizations.createCalls).toEqual([
+      {
+        organizationId: DEFAULT_CLERK_ORGANIZATION_ID,
+        userId: "user_new",
+        role: "org:developer"
+      }
+    ]);
+  });
+
+  it("preserves existing organization membership roles", async () => {
+    const organizations = createFakeOrganizations({ user_admin: "org:admin" });
+    const result = await ensureDefaultClerkOrganizationMembership({
+      userId: "user_admin",
+      config: {
+        organizationId: DEFAULT_CLERK_ORGANIZATION_ID,
+        organizationName: "Firmcode AI",
+        role: "org:developer"
+      },
+      organizations
+    });
+
+    expect(result).toMatchObject({
+      status: "already_member",
+      role: "org:admin"
+    });
+    expect(organizations.createCalls).toEqual([]);
+  });
+});
+
 describe("role landing dashboard pages", () => {
   it("renders a public holding page at the root route", () => {
     const html = renderToString(<HoldingPage />);
@@ -348,6 +420,31 @@ function jsonResponse(value: unknown, status = 200): Response {
       "content-type": "application/json"
     }
   });
+}
+
+function createFakeOrganizations(initialRoles: Record<string, string> = {}) {
+  const roles = new Map(Object.entries(initialRoles));
+  const createCalls: Array<{ organizationId: string; userId: string; role: string }> = [];
+
+  return {
+    createCalls,
+    async getOrganizationMembershipList(params: {
+      readonly organizationId: string;
+      readonly userId: string[];
+      readonly limit: number;
+    }) {
+      const userId = params.userId[0] ?? "";
+      const role = roles.get(userId);
+
+      return {
+        data: role === undefined ? [] : [{ role }]
+      };
+    },
+    async createOrganizationMembership(params: { readonly organizationId: string; readonly userId: string; readonly role: string }) {
+      createCalls.push(params);
+      roles.set(params.userId, params.role);
+    }
+  };
 }
 
 function settingsResponse(role: "admin" | "developer") {
