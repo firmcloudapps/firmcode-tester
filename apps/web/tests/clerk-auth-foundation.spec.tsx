@@ -189,8 +189,12 @@ describe("role-based auth redirect", () => {
 });
 
 describe("default Clerk organization signup membership", () => {
-  it("uses the Firmcode AI organization in production and stays opt-in during local development", () => {
-    expect(readDefaultClerkOrganizationMembershipConfig({ NODE_ENV: "development" })).toBeNull();
+  it("uses the Firmcode AI organization by default in every runtime", () => {
+    expect(readDefaultClerkOrganizationMembershipConfig({ NODE_ENV: "development" })).toMatchObject({
+      organizationId: DEFAULT_CLERK_ORGANIZATION_ID,
+      organizationName: "Firmcode AI",
+      role: "org:developer"
+    });
     expect(readDefaultClerkOrganizationMembershipConfig({ NODE_ENV: "production" })).toMatchObject({
       organizationId: DEFAULT_CLERK_ORGANIZATION_ID,
       organizationName: "Firmcode AI",

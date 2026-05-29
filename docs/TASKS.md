@@ -567,7 +567,7 @@ Acceptance criteria:
 - Explicit `/dashboard/admin` and `/dashboard/developer` dashboard routes exist with distinct role-specific layouts: Admin uses the dashboard shell for settings and account management, while Developer uses a focused PR Review workspace instead of an Admin view with disabled controls.
 - Next.js middleware protects all dashboard pages and dashboard route handlers.
 - Dashboard shell uses Clerk `UserButton`; `OrganizationSwitcher` is hidden by default and appears only when `NEXT_PUBLIC_CLERK_ORGANIZATIONS_ENABLED=true`.
-- Default signup is repaired into the configured Firmcode AI Clerk organization as `org:developer` and must not force users through Clerk organization creation. Personal workspace fallback remains available for local development when no default organization is configured.
+- Default signup is repaired into the configured Firmcode AI Clerk organization as `org:developer` and must not force users through Clerk organization creation.
 - The active workspace displayed in the shell comes from Clerk organization/personal workspace state, not static placeholder text.
 - Web server components and route handlers derive the user/session from Clerk `auth()`.
 - Web-to-API requests include `Authorization: Bearer <Clerk session token>`.

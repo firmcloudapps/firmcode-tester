@@ -54,7 +54,7 @@ export interface ClerkApiConfig {
   secretKey: string;
   jwtAudience: string | null;
   webhookSecret: string | null;
-  defaultOrganization: DefaultClerkOrganizationConfig | null;
+  defaultOrganization: DefaultClerkOrganizationConfig;
 }
 
 export interface DefaultClerkOrganizationConfig {
@@ -300,22 +300,13 @@ function readClerkApiConfig(
     secretKey,
     jwtAudience,
     webhookSecret: readOptional(env, "CLERK_WEBHOOK_SECRET"),
-    defaultOrganization: readDefaultClerkOrganizationConfig(env, nodeEnv)
+    defaultOrganization: readDefaultClerkOrganizationConfig(env)
   };
 }
 
-function readDefaultClerkOrganizationConfig(
-  env: EnvironmentVariables,
-  nodeEnv: RuntimeEnvironment
-): DefaultClerkOrganizationConfig | null {
-  const explicitOrganizationId = readOptional(env, "FIRMCODE_DEFAULT_CLERK_ORGANIZATION_ID");
-
-  if (explicitOrganizationId === null && nodeEnv !== "production") {
-    return null;
-  }
-
+function readDefaultClerkOrganizationConfig(env: EnvironmentVariables): DefaultClerkOrganizationConfig {
   return {
-    id: explicitOrganizationId ?? DEFAULT_CLERK_ORGANIZATION_ID,
+    id: readOptional(env, "FIRMCODE_DEFAULT_CLERK_ORGANIZATION_ID") ?? DEFAULT_CLERK_ORGANIZATION_ID,
     name: readOptional(env, "FIRMCODE_DEFAULT_CLERK_ORGANIZATION_NAME") ?? DEFAULT_CLERK_ORGANIZATION_NAME,
     role: readOptional(env, "FIRMCODE_DEFAULT_CLERK_ORGANIZATION_ROLE") ?? DEFAULT_CLERK_ORGANIZATION_ROLE
   };

@@ -59,6 +59,8 @@ API CORS must use explicit origins:
 CORS_ALLOWED_ORIGINS=https://firmcode.firmoncloud.com,https://firmcode-git-main-owner.vercel.app,http://localhost:3000
 ```
 
+Configure Clerk webhooks to send `user.created` events to `https://<api-host>/webhooks/clerk`. The API verifies the Clerk webhook signature with `CLERK_WEBHOOK_SECRET` and adds the user to the configured Firmcode AI organization as `org:developer`.
+
 The GitHub App OAuth callback URL should point at the web dashboard route, not the API host:
 
 ```text

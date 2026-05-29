@@ -27,6 +27,7 @@ export async function createApiApplication(config: ApiRuntimeConfig = loadApiCon
 
 export function configureApiApplication(app: INestApplication, config: ApiRuntimeConfig): void {
   app.use("/webhooks/github", expressBodyParser.raw({ type: "*/*", limit: "1mb" }));
+  app.use("/webhooks/clerk", expressBodyParser.raw({ type: "*/*", limit: "1mb" }));
   app.use(expressBodyParser.json({ limit: "1mb" }));
   app.use(expressBodyParser.urlencoded({ extended: true, limit: "1mb" }));
 

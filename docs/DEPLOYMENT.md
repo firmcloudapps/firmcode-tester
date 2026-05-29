@@ -158,7 +158,7 @@ Neither Compose file runs PostgreSQL or the Next.js dashboard. PostgreSQL is Neo
 7. Confirm a signed-in web request to the API includes an `Authorization` bearer token and the API resolves the correct workspace.
 8. Confirm unauthenticated dashboard page access redirects to Clerk.
 9. Confirm direct API requests without a valid Clerk token return `401`.
-10. Configure Clerk webhooks for organization/user/membership sync after the API endpoint is deployed.
+10. Configure Clerk webhooks for `user.created` delivery to the API after `/webhooks/clerk` is deployed.
 
 Production must not rely on `FIRMCODE_DASHBOARD_WORKSPACE_ID`, `FIRMCODE_DASHBOARD_CLERK_USER_ID`, or other user-identity headers as authentication.
 
@@ -203,7 +203,7 @@ infra/deploy/coolify.md
 7. Deploy worker to Coolify.
 8. Deploy web to Vercel.
 9. Verify Clerk route protection and API token verification.
-10. Configure Clerk webhooks if membership sync endpoint is deployed.
+10. Configure Clerk webhooks for `user.created` delivery to `/webhooks/clerk`.
 11. Configure GitHub App webhook URL and GitHub OAuth callback URL.
 12. Run dry-run fixture.
 13. Enable publishing for one test repository.
