@@ -240,6 +240,31 @@ export async function loadBillingState(): Promise<ViewState<WorkspaceBillingResp
   }
 }
 
+export type DashboardRoleResult =
+  | { status: "ok"; role: string }
+  | { status: "signed-out" }
+  | { status: "error" };
+
+export async function loadDashboardRole(): Promise<DashboardRoleResult> {
+  try {
+    const data = await requestAuthenticatedJson<WorkspaceSettingsResponse>("/api/settings");
+
+    return { status: "ok", role: data.workspace.role };
+  } catch (error) {
+    if (error instanceof DashboardApiError && error.status === 401) {
+      return { status: "signed-out" };
+    }
+
+    return { status: "error" };
+  }
+}
+
+export async function resolveDashboardNavRole(): Promise<string> {
+  const result = await loadDashboardRole();
+
+  return result.status === "ok" ? result.role : "developer";
+}
+
 export async function loadReviewRunDetailState(reviewRunId: string): Promise<ViewState<ReviewRunDetail>> {
   try {
     const data = await requestAuthenticatedJson<ReviewRunDetail>(`/api/review-runs/${encodeURIComponent(reviewRunId)}`);

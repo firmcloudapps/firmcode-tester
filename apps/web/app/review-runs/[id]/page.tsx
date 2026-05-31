@@ -1,6 +1,6 @@
 import { DashboardShell } from "../../../components/dashboard/dashboard-shell";
 import { ReviewRunDetailView } from "../../../components/dashboard/review-run-detail-view";
-import { loadReviewRunDetailState } from "../../../lib/dashboard-data";
+import { loadReviewRunDetailState, resolveDashboardNavRole } from "../../../lib/dashboard-data";
 
 export const dynamic = "force-dynamic";
 
@@ -11,10 +11,10 @@ interface ReviewRunDetailPageProps {
 }
 
 export default async function ReviewRunDetailPage({ params }: ReviewRunDetailPageProps) {
-  const state = await loadReviewRunDetailState(params.id);
+  const [state, role] = await Promise.all([loadReviewRunDetailState(params.id), resolveDashboardNavRole()]);
 
   return (
-    <DashboardShell activeItem="Review Runs">
+    <DashboardShell activeItem="Review Runs" role={role}>
       <ReviewRunDetailView state={state} />
     </DashboardShell>
   );

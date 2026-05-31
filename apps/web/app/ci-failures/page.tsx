@@ -1,6 +1,6 @@
 import { DashboardShell } from "../../components/dashboard/dashboard-shell";
 import { CiFailuresView } from "../../components/dashboard/ci-failures-view";
-import { loadCiFailuresState } from "../../lib/dashboard-data";
+import { loadCiFailuresState, resolveDashboardNavRole } from "../../lib/dashboard-data";
 
 export const dynamic = "force-dynamic";
 
@@ -9,10 +9,10 @@ interface CiFailuresPageProps {
 }
 
 export default async function CiFailuresPage({ searchParams = {} }: CiFailuresPageProps) {
-  const state = await loadCiFailuresState(searchParams);
+  const [state, role] = await Promise.all([loadCiFailuresState(searchParams), resolveDashboardNavRole()]);
 
   return (
-    <DashboardShell activeItem="CI Failures">
+    <DashboardShell activeItem="CI Failures" role={role}>
       <CiFailuresView state={state} />
     </DashboardShell>
   );

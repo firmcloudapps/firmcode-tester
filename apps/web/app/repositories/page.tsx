@@ -13,9 +13,10 @@ export default async function RepositoriesPage({ searchParams = {} }: Repositori
     loadRepositoriesState(searchParams),
     loadGitHubRepositoryControlsState()
   ]);
+  const role = controlsState.status === "ready" ? controlsState.data.settings.workspace.role : "developer";
 
   return (
-    <DashboardShell activeItem="Repositories">
+    <DashboardShell activeItem="Repositories" role={role}>
       <RepositoriesView state={state} controlsState={controlsState} />
     </DashboardShell>
   );
