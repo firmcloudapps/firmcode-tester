@@ -23,7 +23,9 @@ import type {
 import type { DatabaseExecutor } from "../../infrastructure/database/migrations";
 import { randomUUID } from "crypto";
 import {
+  appendOwnPullRequestActivityCondition,
   buildRepositoryAccessClause,
+  buildOwnPullRequestActivityClause,
   FULL_REPOSITORY_ACCESS_SCOPE,
   type RepositoryAccessScope
 } from "../auth/repository-access-scope";
@@ -271,9 +273,15 @@ LIMIT 100
         ? { sql: "", values: [] as unknown[] }
         : buildRepositoryAccessClause(options.accessScope ?? FULL_REPOSITORY_ACCESS_SCOPE, "r", runValues.length + 1);
     runValues.push(...accessClause.values);
+    const ownActivityClause =
+      options.workspaceId === undefined
+        ? { sql: "", values: [] as unknown[] }
+        : buildOwnPullRequestActivityClause(options.accessScope ?? FULL_REPOSITORY_ACCESS_SCOPE, "pr", runValues.length + 1);
+    runValues.push(...ownActivityClause.values);
     const runWhere =
       (options.workspaceId === undefined ? "WHERE rr.id = $1" : "WHERE rr.id = $1 AND gi.workspace_id = $2") +
-      (accessClause.sql === "" ? "" : ` AND ${accessClause.sql}`);
+      (accessClause.sql === "" ? "" : ` AND ${accessClause.sql}`) +
+      (ownActivityClause.sql === "" ? "" : ` AND ${ownActivityClause.sql}`);
     const runResult = await this.database.query<ReviewRunRow>(
       `
 SELECT
@@ -449,7 +457,21 @@ ORDER BY created_at ASC,
   }
 
   async getRawArtifactAccess(input: RawArtifactAccessLookup): Promise<RawReviewRunArtifactAccess | null> {
-    const accessClause = buildRepositoryAccessClause(input.accessScope ?? FULL_REPOSITORY_ACCESS_SCOPE, "r", 4);
+    const artifactValues: unknown[] = [input.artifactId, input.reviewRunId, input.workspaceId];
+    const artifactConditions = ["aa.id = $1", "aa.review_run_id = $2", "gi.workspace_id = $3"];
+    const artifactScope = input.accessScope ?? FULL_REPOSITORY_ACCESS_SCOPE;
+
+    const accessClause = buildRepositoryAccessClause(artifactScope, "r", artifactValues.length + 1);
+    if (accessClause.sql !== "") {
+      artifactValues.push(...accessClause.values);
+      artifactConditions.push(accessClause.sql);
+    }
+    const ownActivityClause = buildOwnPullRequestActivityClause(artifactScope, "pr", artifactValues.length + 1);
+    if (ownActivityClause.sql !== "") {
+      artifactValues.push(...ownActivityClause.values);
+      artifactConditions.push(ownActivityClause.sql);
+    }
+
     const result = await this.database.query<ArtifactRow & { review_run_id: string }>(
       `
 SELECT
@@ -463,12 +485,10 @@ FROM analysis_artifacts aa
 JOIN review_runs rr ON rr.id = aa.review_run_id
 JOIN repositories r ON r.id = rr.repository_id
 JOIN github_installations gi ON gi.id = r.installation_id
-WHERE aa.id = $1
-  AND aa.review_run_id = $2
-  AND gi.workspace_id = $3
-${accessClause.sql === "" ? "" : `  AND ${accessClause.sql}\n`}
+JOIN pull_requests pr ON pr.id = rr.pull_request_id
+WHERE ${artifactConditions.join(" AND ")}
 `,
-      [input.artifactId, input.reviewRunId, input.workspaceId, ...accessClause.values]
+      artifactValues
     );
     const row = result.rows[0];
 
@@ -631,7 +651,20 @@ WHERE original_review_run_id = $1
     workspaceId: string,
     accessScope: RepositoryAccessScope
   ): Promise<RetryableReviewRunRow | null> {
-    const accessClause = buildRepositoryAccessClause(accessScope, "r", 3);
+    const values: unknown[] = [reviewRunId, workspaceId];
+    const conditions = ["rr.id = $1", "gi.workspace_id = $2"];
+
+    const accessClause = buildRepositoryAccessClause(accessScope, "r", values.length + 1);
+    if (accessClause.sql !== "") {
+      values.push(...accessClause.values);
+      conditions.push(accessClause.sql);
+    }
+    const ownActivityClause = buildOwnPullRequestActivityClause(accessScope, "pr", values.length + 1);
+    if (ownActivityClause.sql !== "") {
+      values.push(...ownActivityClause.values);
+      conditions.push(ownActivityClause.sql);
+    }
+
     const result = await this.database.query<RetryableReviewRunRow>(
       `
 SELECT
@@ -650,11 +683,9 @@ FROM review_runs rr
 JOIN repositories r ON r.id = rr.repository_id
 JOIN github_installations gi ON gi.id = r.installation_id
 JOIN pull_requests pr ON pr.id = rr.pull_request_id
-WHERE rr.id = $1
-  AND gi.workspace_id = $2
-${accessClause.sql === "" ? "" : `  AND ${accessClause.sql}\n`}
+WHERE ${conditions.join(" AND ")}
 `,
-      [reviewRunId, workspaceId, ...accessClause.values]
+      values
     );
 
     return result.rows[0] ?? null;
@@ -763,6 +794,7 @@ function buildReviewRunListWhereClause(filters: ReviewRunListLookup): { whereSql
     values.push(...accessClause.values);
     conditions.push(accessClause.sql);
   }
+  appendOwnPullRequestActivityCondition(conditions, values, filters.accessScope ?? FULL_REPOSITORY_ACCESS_SCOPE);
 
   if (filters.status !== undefined) {
     values.push(filters.status);

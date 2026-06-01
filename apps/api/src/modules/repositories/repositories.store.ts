@@ -27,6 +27,7 @@ import type {
 } from "@firmcode/shared";
 import type { DatabaseExecutor } from "../../infrastructure/database/migrations";
 import {
+  appendOwnPullRequestActivityCondition,
   buildRepositoryAccessClause,
   FULL_REPOSITORY_ACCESS_SCOPE,
   type RepositoryAccessScope
@@ -290,6 +291,11 @@ LIMIT 100
 `,
       values
     );
+    const repositoryIds = result.rows.map((row) => row.id);
+    const activityScope = filters.accessScope ?? FULL_REPOSITORY_ACCESS_SCOPE;
+    const reviewRunValues: unknown[] = [repositoryIds];
+    const reviewRunConditions = ["rr.repository_id = ANY($1)"];
+    appendOwnPullRequestActivityCondition(reviewRunConditions, reviewRunValues, activityScope);
     const reviewRuns = await this.database.query<RepositoryReviewRunRow>(
       `
 SELECT
@@ -301,11 +307,16 @@ SELECT
   rr.finished_at,
   pr.number AS pull_request_number,
   pr.title AS pull_request_title
-FROM review_runs rr
-JOIN pull_requests pr ON pr.id = rr.pull_request_id
+FROM pull_requests pr
+JOIN review_runs rr ON rr.pull_request_id = pr.id
+WHERE ${reviewRunConditions.join(" AND ")}
 ORDER BY rr.created_at DESC
-`
+`,
+      reviewRunValues
     );
+    const changedFileValues: unknown[] = [repositoryIds];
+    const changedFileConditions = ["rr.repository_id = ANY($1)", "cf.language IS NOT NULL"];
+    appendOwnPullRequestActivityCondition(changedFileConditions, changedFileValues, activityScope);
     const changedFiles = await this.database.query<RepositoryChangedFileRow>(
       `
 SELECT
@@ -313,10 +324,15 @@ SELECT
   cf.language
 FROM changed_files cf
 JOIN review_runs rr ON rr.id = cf.review_run_id
-WHERE cf.language IS NOT NULL
+JOIN pull_requests pr ON pr.id = rr.pull_request_id
+WHERE ${changedFileConditions.join(" AND ")}
 ORDER BY cf.created_at DESC
-`
+`,
+      changedFileValues
     );
+    const findingValues: unknown[] = [repositoryIds];
+    const findingConditions = ["rr.repository_id = ANY($1)"];
+    appendOwnPullRequestActivityCondition(findingConditions, findingValues, activityScope);
     const findings = await this.database.query<RepositoryFindingRow>(
       `
 SELECT
@@ -324,9 +340,12 @@ SELECT
   f.id AS finding_id
 FROM findings f
 JOIN review_runs rr ON rr.id = f.review_run_id
-`
+JOIN pull_requests pr ON pr.id = rr.pull_request_id
+WHERE ${findingConditions.join(" AND ")}
+`,
+      findingValues
     );
-    const scanAggregates = await this.loadCodebaseScanAggregates(result.rows.map((row) => row.id));
+    const scanAggregates = await this.loadCodebaseScanAggregates(repositoryIds);
     const aggregates = buildRepositoryAggregates(reviewRuns.rows, changedFiles.rows, findings.rows, scanAggregates);
     const repositories = result.rows
       .map((row) => toRepositoryListItem(row, aggregates.get(row.id)))
@@ -349,9 +368,9 @@ JOIN review_runs rr ON rr.id = f.review_run_id
 
     const [configuration, pullRequests, reviewRuns, findings, codebaseScans, codebaseFindings, activity] = await Promise.all([
       this.getRepositoryConfiguration(input),
-      this.listRepositoryPullRequests(input.repositoryId),
-      this.listRepositoryReviewRuns(input.repositoryId),
-      this.listRepositoryFindings(input.repositoryId),
+      this.listRepositoryPullRequests(input.repositoryId, input.accessScope ?? FULL_REPOSITORY_ACCESS_SCOPE),
+      this.listRepositoryReviewRuns(input.repositoryId, input.accessScope ?? FULL_REPOSITORY_ACCESS_SCOPE),
+      this.listRepositoryFindings(input.repositoryId, input.accessScope ?? FULL_REPOSITORY_ACCESS_SCOPE),
       this.listRepositoryCodebaseScans(input.repositoryId),
       this.listRepositoryCodebaseFindings(input.repositoryId),
       this.listRepositoryActivityItems(input.repositoryId)
@@ -474,7 +493,17 @@ WHERE rr.repository_id = $1
     return toRepositoryListItem(row, aggregates.get(row.id));
   }
 
-  private async listRepositoryPullRequests(repositoryId: string): Promise<RepositoryPullRequestSummary[]> {
+  private async listRepositoryPullRequests(
+    repositoryId: string,
+    accessScope: RepositoryAccessScope
+  ): Promise<RepositoryPullRequestSummary[]> {
+    const pullRequestValues: unknown[] = [repositoryId];
+    const pullRequestConditions = ["repository_id = $1"];
+    appendOwnPullRequestActivityCondition(pullRequestConditions, pullRequestValues, accessScope, "pull_requests");
+    const reviewRunValues: unknown[] = [repositoryId];
+    const reviewRunConditions = ["rr.repository_id = $1"];
+    appendOwnPullRequestActivityCondition(reviewRunConditions, reviewRunValues, accessScope);
+
     const [pullRequests, reviewRuns] = await Promise.all([
       this.database.query<RepositoryPullRequestRow>(
         `
@@ -489,11 +518,11 @@ SELECT
   draft,
   updated_at
 FROM pull_requests
-WHERE repository_id = $1
+WHERE ${pullRequestConditions.join(" AND ")}
 ORDER BY updated_at DESC, number DESC
 LIMIT 50
 `,
-        [repositoryId]
+        pullRequestValues
       ),
       this.database.query<RepositoryReviewRunRow & { pull_request_id: string }>(
         `
@@ -509,10 +538,10 @@ SELECT
   pr.title AS pull_request_title
 FROM review_runs rr
 JOIN pull_requests pr ON pr.id = rr.pull_request_id
-WHERE rr.repository_id = $1
+WHERE ${reviewRunConditions.join(" AND ")}
 ORDER BY rr.created_at DESC
 `,
-        [repositoryId]
+        reviewRunValues
       )
     ]);
     const latestRunsByPullRequestId = new Map<string, RepositoryLastReview>();
@@ -547,7 +576,14 @@ ORDER BY rr.created_at DESC
     }));
   }
 
-  private async listRepositoryReviewRuns(repositoryId: string): Promise<ReviewRunListItem[]> {
+  private async listRepositoryReviewRuns(
+    repositoryId: string,
+    accessScope: RepositoryAccessScope
+  ): Promise<ReviewRunListItem[]> {
+    const values: unknown[] = [repositoryId];
+    const conditions = ["rr.repository_id = $1"];
+    appendOwnPullRequestActivityCondition(conditions, values, accessScope);
+
     const result = await this.database.query<RepositoryDetailReviewRunRow>(
       `
 SELECT
@@ -569,18 +605,25 @@ SELECT
 FROM review_runs rr
 JOIN repositories r ON r.id = rr.repository_id
 JOIN pull_requests pr ON pr.id = rr.pull_request_id
-WHERE rr.repository_id = $1
+WHERE ${conditions.join(" AND ")}
 ORDER BY rr.created_at DESC
 LIMIT 25
 `,
-      [repositoryId]
+      values
     );
     const counts = await this.loadReviewRunCounts(repositoryId);
 
     return result.rows.map((row) => toRepositoryReviewRunListItem(row, counts));
   }
 
-  private async listRepositoryFindings(repositoryId: string): Promise<FindingInboxItem[]> {
+  private async listRepositoryFindings(
+    repositoryId: string,
+    accessScope: RepositoryAccessScope
+  ): Promise<FindingInboxItem[]> {
+    const values: unknown[] = [repositoryId];
+    const conditions = ["rr.repository_id = $1"];
+    appendOwnPullRequestActivityCondition(conditions, values, accessScope);
+
     const result = await this.database.query<RepositoryFindingInboxRow>(
       `
 SELECT
@@ -612,7 +655,7 @@ JOIN review_runs rr ON rr.id = f.review_run_id
 JOIN repositories r ON r.id = rr.repository_id
 JOIN pull_requests pr ON pr.id = rr.pull_request_id
 LEFT JOIN published_comments pc ON pc.finding_id = f.id AND pc.comment_type = 'inline'
-WHERE rr.repository_id = $1
+WHERE ${conditions.join(" AND ")}
 ORDER BY
   CASE f.severity
     WHEN 'critical' THEN 0
@@ -625,7 +668,7 @@ ORDER BY
   f.file_path ASC
 LIMIT 50
 `,
-      [repositoryId]
+      values
     );
 
     return result.rows.map(toRepositoryFindingInboxItem);

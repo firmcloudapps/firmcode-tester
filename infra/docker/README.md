@@ -6,7 +6,7 @@ Firmcode uses Docker-first local development for the NestJS API and Python worke
 
 - `../../docker-compose.yml` defines the local `api`, `worker`, and `redis` stack.
 - `../../docker-compose.prod.yml` defines the production/Coolify `api`, `worker`, and internal `redis` stack that pulls prebuilt API and worker images from Docker Hub.
-- `api.Dockerfile` builds the local NestJS API image and runs `npm run start --workspace @firmcode/api`.
+- `api.Dockerfile` builds the local NestJS API image, applies pending database migrations, and runs `npm run start:migrated --workspace @firmcode/api`.
 - `worker.Dockerfile` builds the local Python worker image with Semgrep CLI and Tree-sitter runtime dependency.
 - `api.prod.Dockerfile` builds the production NestJS API image without copying `apps/web`; GitHub Actions publishes it.
 - `worker.prod.Dockerfile` builds the production Python worker image; GitHub Actions publishes it.

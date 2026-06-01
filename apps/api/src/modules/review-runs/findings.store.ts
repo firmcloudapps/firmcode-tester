@@ -12,6 +12,7 @@ import type {
 } from "@firmcode/shared";
 import type { DatabaseExecutor } from "../../infrastructure/database/migrations";
 import {
+  appendOwnPullRequestActivityCondition,
   appendRepositoryAccessCondition,
   FULL_REPOSITORY_ACCESS_SCOPE,
   type RepositoryAccessScope
@@ -225,6 +226,7 @@ function buildPullRequestFindingsWhereClause(
   const values: unknown[] = [workspaceId];
 
   appendRepositoryAccessCondition(conditions, values, accessScope);
+  appendOwnPullRequestActivityCondition(conditions, values, accessScope);
   appendSharedFindingFilters("f", "rr", "r", conditions, values, filters);
 
   if (filters.status !== undefined) {

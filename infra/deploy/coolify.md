@@ -27,7 +27,7 @@ Coolify settings:
 | Public domain | `https://firmcodeapi.firmoncloud.com` |
 | Health check path | `/health` |
 | Readiness check | `/health/ready` when enabled |
-| Start command | Dockerfile default: `npm run start --workspace @firmcode/api` |
+| Start command | Dockerfile default: `npm run start:migrated --workspace @firmcode/api` |
 
 Required API environment variables:
 
@@ -154,13 +154,13 @@ Use a production NeonDB branch for production and a separate branch or project f
 
 ## Migration Command
 
-Run migrations from the API service after the API image deploys and before scaling workers:
+The API container applies pending migrations before it starts serving traffic. To run the same migration step manually from the API service, use:
 
 ```bash
 npm run db:migrate:runtime --workspace @firmcode/api
 ```
 
-The production API image already contains compiled JavaScript and omits TypeScript dev dependencies, so use the runtime migration command inside Coolify. From a source checkout during local development, `npm run db:migrate --workspace @firmcode/api` still builds the API package before applying migrations against `DATABASE_URL`.
+The production API image already contains compiled JavaScript and omits TypeScript dev dependencies, so use the runtime migration command inside Coolify when you need a manual migration check. From a source checkout during local development, `npm run db:migrate --workspace @firmcode/api` still builds the API package before applying migrations against `DATABASE_URL`.
 
 ## Deployment Order
 
