@@ -35,17 +35,15 @@ describe("dashboard navigation", () => {
     expect(html).not.toContain("Repository detail configuration is planned");
   });
 
-  it("routes Rules / Policies to the implemented dashboard page", () => {
+  it("omits Rules / Policies from dashboard navigation", () => {
     const html = renderToString(
-      <DashboardShell activeItem="Rules">
-        <main>Rules body</main>
+      <DashboardShell activeItem="Overview">
+        <main>Dashboard body</main>
       </DashboardShell>
     );
 
-    expect(html).toContain('href="/rules"');
-    expect(html).toContain(">Rules / Policies</a>");
-    expect(html).toContain('aria-current="page"');
-    expect(html).not.toContain("Rules / Policies</span>");
+    expect(html).not.toContain('href="/rules"');
+    expect(html).not.toContain("Rules / Policies");
   });
 
   it("enables Pull Requests sidebar navigation once the route exists", () => {

@@ -11,7 +11,6 @@ import { OverviewView } from "../components/dashboard/overview-view";
 import { PullRequestsView } from "../components/dashboard/pull-requests-view";
 import { RepositoriesView } from "../components/dashboard/repositories-view";
 import { ReviewRunsView } from "../components/dashboard/review-runs-view";
-import { RulesPoliciesView } from "../components/dashboard/rules-policies-view";
 import { SettingsView } from "../components/dashboard/settings-view";
 import { DASHBOARD_NAV_ITEMS } from "../lib/dashboard-navigation";
 
@@ -49,7 +48,6 @@ describe("dashboard visual navigation smoke", () => {
       { active: "Review Runs" as const, expected: "Pipeline executions", view: <ReviewRunsView state={{ status: "loading" }} /> },
       { active: "Findings" as const, expected: "Findings inbox", view: <FindingsView state={{ status: "loading" }} /> },
       { active: "CI Failures" as const, expected: "Broken checks queue", view: <CiFailuresView state={{ status: "loading" }} /> },
-      { active: "Rules" as const, expected: "Loading rules policies", view: <RulesPoliciesView state={{ status: "loading" }} /> },
       { active: "Settings" as const, expected: "Workspace settings", view: <SettingsView state={{ status: "loading" }} activeTab="general" /> },
       { active: "Billing" as const, expected: "Subscription", view: <BillingView state={{ status: "loading" }} billingPortalUrl={null} /> }
     ];

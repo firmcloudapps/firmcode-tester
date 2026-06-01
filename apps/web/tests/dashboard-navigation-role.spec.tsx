@@ -19,6 +19,7 @@ describe("role-based dashboard navigation", () => {
 
     expect(labels).toContain("Settings");
     expect(labels).toContain("Billing");
+    expect(labels).not.toContain("Rules / Policies");
   });
 
   it("excludes admin-only items for developers", () => {
@@ -29,6 +30,7 @@ describe("role-based dashboard navigation", () => {
     expect(labels).toContain("Overview");
     expect(labels).toContain("PR Review");
     expect(labels).toContain("Repositories");
+    expect(labels).not.toContain("Rules / Policies");
   });
 
   it("hides Settings and Billing links in the shell for developers", () => {
@@ -63,5 +65,6 @@ describe("role-based dashboard navigation", () => {
 
     expect(html).toContain('href="/settings"');
     expect(html).toContain('href="/billing"');
+    expect(html).not.toContain('href="/rules"');
   });
 });
