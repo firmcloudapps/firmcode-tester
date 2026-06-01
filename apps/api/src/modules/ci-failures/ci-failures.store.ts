@@ -13,6 +13,7 @@ import type {
 } from "@firmcode/shared";
 import type { DatabaseExecutor } from "../../infrastructure/database/migrations";
 import {
+  appendOwnPullRequestActivityCondition,
   appendRepositoryAccessCondition,
   FULL_REPOSITORY_ACCESS_SCOPE,
   type RepositoryAccessScope
@@ -180,6 +181,7 @@ function buildCiFailureWhereClause(
   const values: unknown[] = [workspaceId];
 
   appendRepositoryAccessCondition(conditions, values, accessScope);
+  appendOwnPullRequestActivityCondition(conditions, values, accessScope);
 
   if (filters.repositoryId !== undefined) {
     values.push(filters.repositoryId);

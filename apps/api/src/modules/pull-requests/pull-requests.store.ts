@@ -18,7 +18,8 @@ import type {
 } from "@firmcode/shared";
 import type { DatabaseExecutor } from "../../infrastructure/database/migrations";
 import {
-  buildRepositoryAccessClause,
+  appendOwnPullRequestActivityCondition,
+  appendRepositoryAccessCondition,
   FULL_REPOSITORY_ACCESS_SCOPE,
   type RepositoryAccessScope
 } from "../auth/repository-access-scope";
@@ -205,7 +206,13 @@ LIMIT 500
   }
 
   async getPullRequestDetail(input: PullRequestDetailLookup): Promise<PullRequestDetailResponse | null> {
-    const detailAccessClause = buildRepositoryAccessClause(input.accessScope ?? FULL_REPOSITORY_ACCESS_SCOPE, "r", 3);
+    const detailValues: unknown[] = [input.pullRequestId, input.workspaceId];
+    const detailConditions = ["pr.id = $1", "gi.workspace_id = $2"];
+    const detailScope = input.accessScope ?? FULL_REPOSITORY_ACCESS_SCOPE;
+
+    appendRepositoryAccessCondition(detailConditions, detailValues, detailScope);
+    appendOwnPullRequestActivityCondition(detailConditions, detailValues, detailScope);
+
     const pullRequestResult = await this.database.query<PullRequestRow>(
       `
 SELECT
@@ -227,10 +234,9 @@ SELECT
 FROM pull_requests pr
 JOIN repositories r ON r.id = pr.repository_id
 JOIN github_installations gi ON gi.id = r.installation_id
-WHERE pr.id = $1
-  AND gi.workspace_id = $2
-${detailAccessClause.sql === "" ? "" : `  AND ${detailAccessClause.sql}\n`}`,
-      [input.pullRequestId, input.workspaceId, ...detailAccessClause.values]
+WHERE ${detailConditions.join(" AND ")}
+`,
+      detailValues
     );
     const pullRequest = pullRequestResult.rows[0];
 
@@ -554,11 +560,8 @@ function buildPullRequestWhereClause(
   const conditions = ["gi.workspace_id = $1"];
   const values: unknown[] = [workspaceId];
 
-  const accessClause = buildRepositoryAccessClause(accessScope, "r", values.length + 1);
-  if (accessClause.sql !== "") {
-    values.push(...accessClause.values);
-    conditions.push(accessClause.sql);
-  }
+  appendRepositoryAccessCondition(conditions, values, accessScope);
+  appendOwnPullRequestActivityCondition(conditions, values, accessScope);
 
   if (filters.repositoryId !== undefined) {
     values.push(filters.repositoryId);

@@ -397,6 +397,10 @@ INSERT INTO workspace_memberships (workspace_id, clerk_user_id, role, active) VA
 ('${WORKSPACE_ID}', '${DEVELOPER_USER_ID}', 'developer', true),
 ('${WORKSPACE_ID}', '${VIEWER_USER_ID}', 'viewer', true);
 
+INSERT INTO github_oauth_connections (clerk_user_id, github_user_id, github_login, scopes_json) VALUES
+('${DEVELOPER_USER_ID}', 701, 'kelly', '[]'),
+('${VIEWER_USER_ID}', 702, 'kelly', '[]');
+
 INSERT INTO github_installations (
   id,
   workspace_id,

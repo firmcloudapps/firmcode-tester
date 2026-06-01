@@ -15,15 +15,18 @@ CREATE TABLE IF NOT EXISTS repository_access (
 CREATE INDEX IF NOT EXISTS repository_access_user_idx
   ON repository_access (clerk_user_id, repository_id);
 
--- Backfill: preserve existing visibility for current non-admin members so the
--- new scoping does not retroactively hide repositories they already worked with.
+-- Backfill only repositories where the member has existing GitHub-authored PR
+-- activity. SaaS developer accounts must not inherit workspace-wide visibility.
 INSERT INTO repository_access (repository_id, clerk_user_id, granted_by_clerk_user_id)
-SELECT r.id, wm.clerk_user_id, NULL
-FROM repositories r
+SELECT DISTINCT r.id, wm.clerk_user_id, NULL
+FROM pull_requests pr
+JOIN repositories r ON r.id = pr.repository_id
 JOIN github_installations gi ON gi.id = r.installation_id
 JOIN workspace_memberships wm ON wm.workspace_id = gi.workspace_id
+JOIN github_oauth_connections goc ON goc.clerk_user_id = wm.clerk_user_id
 WHERE wm.active = true
-  AND wm.role IN ('developer', 'viewer')
+  AND lower(wm.role) NOT IN ('owner', 'admin')
+  AND lower(goc.github_login) = lower(pr.author_login)
 ON CONFLICT (repository_id, clerk_user_id) DO NOTHING;
 `
 };

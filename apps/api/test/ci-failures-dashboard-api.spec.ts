@@ -397,6 +397,11 @@ INSERT INTO workspace_memberships (workspace_id, clerk_user_id, role, active) VA
 ('${WORKSPACE_ID}', '${VIEWER_USER_ID}', 'viewer', true),
 ('${OTHER_WORKSPACE_ID}', '${OTHER_VIEWER_USER_ID}', 'viewer', true);
 
+INSERT INTO github_oauth_connections (clerk_user_id, github_user_id, github_login, scopes_json) VALUES
+('${DEVELOPER_USER_ID}', 701, 'kelly', '[]'),
+('${VIEWER_USER_ID}', 702, 'kelly', '[]'),
+('${OTHER_VIEWER_USER_ID}', 703, 'mallory', '[]');
+
 INSERT INTO github_installations (id, workspace_id, installation_id, account_login, permissions_json) VALUES
 ('00000000-0000-4000-8000-000000000111', '${WORKSPACE_ID}', 111, 'openclaw', '{"pull_requests":"write","checks":"read","actions":"read"}'),
 ('00000000-0000-4000-8000-000000000112', '${OTHER_WORKSPACE_ID}', 112, 'other', '{"pull_requests":"write","checks":"read","actions":"read"}');

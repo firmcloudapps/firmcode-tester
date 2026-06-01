@@ -105,6 +105,22 @@ describe("pull requests dashboard API", () => {
     });
   });
 
+  it("does not expose teammate PRs even when the developer has repository access", async () => {
+    await pool.query(
+      `INSERT INTO repository_access (repository_id, clerk_user_id, granted_by_clerk_user_id)
+       VALUES ('00000000-0000-4000-8000-000000000202', $1, NULL)
+       ON CONFLICT (repository_id, clerk_user_id) DO NOTHING`,
+      [VIEWER_USER_ID]
+    );
+
+    const response = await controller.listPullRequests({ repository: "openclaw/internal" }, WORKSPACE_ID, VIEWER_USER_ID);
+
+    expect(response.pullRequests).toEqual([]);
+    await expect(
+      controller.getPullRequestDetail("00000000-0000-4000-8000-000000000302", WORKSPACE_ID, VIEWER_USER_ID)
+    ).rejects.toThrow(NotFoundException);
+  });
+
   it("applies limit behavior after dashboard risk and review status filters", async () => {
     const response = await controller.listPullRequests({ limit: "1" }, WORKSPACE_ID, VIEWER_USER_ID);
 
@@ -240,6 +256,10 @@ INSERT INTO workspaces (id, clerk_org_id, name) VALUES
 INSERT INTO workspace_memberships (workspace_id, clerk_user_id, role, active) VALUES
 ('${WORKSPACE_ID}', '${VIEWER_USER_ID}', 'viewer', true),
 ('${OTHER_WORKSPACE_ID}', '${OTHER_VIEWER_USER_ID}', 'viewer', true);
+
+INSERT INTO github_oauth_connections (clerk_user_id, github_user_id, github_login, scopes_json) VALUES
+('${VIEWER_USER_ID}', 701, 'kelly', '[]'),
+('${OTHER_VIEWER_USER_ID}', 702, 'mallory', '[]');
 
 INSERT INTO github_installations (
   id,
