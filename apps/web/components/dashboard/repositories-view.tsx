@@ -310,7 +310,7 @@ function toRepositoryControls(state: GitHubRepositoryControlsState | undefined):
 
 function headerSyncDisabledReason(input: { oauthConnected: boolean; canManage: boolean; hasInstallations: boolean }): string | undefined {
   if (!input.oauthConnected) {
-    return "Connect GitHub OAuth before syncing repositories.";
+    return "";
   }
 
   if (!input.canManage) {
