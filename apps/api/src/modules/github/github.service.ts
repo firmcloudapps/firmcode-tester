@@ -175,7 +175,11 @@ export class GitHubDashboardService {
       workspaceId: membership.workspaceId,
       installation
     });
-    const syncedRepositoryCount = await this.syncInstallationRepositories(mappedInstallation.id, mappedInstallation.installationId);
+    const syncedRepositoryCount = await this.syncInstallationRepositories(
+      mappedInstallation.id,
+      mappedInstallation.installationId,
+      membership.clerkUserId
+    );
 
     return {
       installations: await this.store.listWorkspaceInstallations(membership.workspaceId),
@@ -199,7 +203,11 @@ export class GitHubDashboardService {
         installation: installationMetadata
       });
 
-      syncedRepositoryCount += await this.syncInstallationRepositories(mappedInstallation.id, mappedInstallation.installationId);
+      syncedRepositoryCount += await this.syncInstallationRepositories(
+        mappedInstallation.id,
+        mappedInstallation.installationId,
+        membership.clerkUserId
+      );
     }
 
     return {
@@ -230,7 +238,8 @@ export class GitHubDashboardService {
     const synced = await this.store.upsertInstallationRepository({
       installationUuid: repository.installationUuid,
       repository: latest,
-      preserveExistingEnabled: true
+      preserveExistingEnabled: true,
+      grantAccessToClerkUserId: membership.clerkUserId
     });
 
     if (synced.enabled) {
@@ -243,14 +252,19 @@ export class GitHubDashboardService {
     return toRepositorySyncResponse(synced);
   }
 
-  private async syncInstallationRepositories(installationUuid: string, installationId: number): Promise<number> {
+  private async syncInstallationRepositories(
+    installationUuid: string,
+    installationId: number,
+    grantAccessToClerkUserId?: string
+  ): Promise<number> {
     const repositories = await this.installationClient.fetchInstallationRepositories(installationId);
 
     for (const repository of repositories) {
       const synced = await this.store.upsertInstallationRepository({
         installationUuid,
         repository,
-        preserveExistingEnabled: true
+        preserveExistingEnabled: true,
+        grantAccessToClerkUserId
       });
 
       if (synced.enabled) {
@@ -278,7 +292,11 @@ export class GitHubDashboardService {
         installation
       });
 
-      await this.syncInstallationRepositories(mappedInstallation.id, mappedInstallation.installationId);
+      await this.syncInstallationRepositories(
+        mappedInstallation.id,
+        mappedInstallation.installationId,
+        membership.clerkUserId
+      );
     }
   }
 

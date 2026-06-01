@@ -405,6 +405,11 @@ INSERT INTO repositories (id, installation_id, github_repository_id, owner, name
 ('00000000-0000-4000-8000-000000000201', '00000000-0000-4000-8000-000000000111', 201, 'openclaw', 'firmcode', 'openclaw/firmcode', false, 'main', true),
 ('00000000-0000-4000-8000-000000000202', '00000000-0000-4000-8000-000000000112', 202, 'other', 'private-roadmap', 'other/private-roadmap', true, 'main', true);
 
+INSERT INTO repository_access (repository_id, clerk_user_id, granted_by_clerk_user_id) VALUES
+('00000000-0000-4000-8000-000000000201', '${DEVELOPER_USER_ID}', '${ADMIN_USER_ID}'),
+('00000000-0000-4000-8000-000000000201', '${VIEWER_USER_ID}', '${ADMIN_USER_ID}'),
+('00000000-0000-4000-8000-000000000202', '${OTHER_VIEWER_USER_ID}', NULL);
+
 INSERT INTO pull_requests (
   id,
   repository_id,

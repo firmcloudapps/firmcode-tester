@@ -22,10 +22,18 @@ import type {
 } from "@firmcode/shared";
 import type { DatabaseExecutor } from "../../infrastructure/database/migrations";
 import { randomUUID } from "crypto";
+import {
+  buildRepositoryAccessClause,
+  FULL_REPOSITORY_ACCESS_SCOPE,
+  type RepositoryAccessScope
+} from "../auth/repository-access-scope";
 
 export const REVIEW_RUNS_STORE = Symbol("REVIEW_RUNS_STORE");
 
-type ReviewRunListLookup = ReviewRunListFilters & { readonly workspaceId?: string };
+type ReviewRunListLookup = ReviewRunListFilters & {
+  readonly workspaceId?: string;
+  readonly accessScope?: RepositoryAccessScope;
+};
 
 export interface ReviewRunsStore {
   listReviewRuns(filters: ReviewRunListLookup): Promise<ReviewRunListResponse>;
@@ -39,18 +47,21 @@ export interface ReviewRunDetailOptions {
   readonly workspaceId?: string;
   readonly canRetryReviewRun?: boolean;
   readonly canAccessRawArtifacts?: boolean;
+  readonly accessScope?: RepositoryAccessScope;
 }
 
 export interface RawArtifactAccessLookup {
   readonly reviewRunId: string;
   readonly artifactId: string;
   readonly workspaceId: string;
+  readonly accessScope?: RepositoryAccessScope;
 }
 
 export interface CreateRetryReviewRunInput {
   readonly reviewRunId: string;
   readonly workspaceId: string;
   readonly clerkUserId: string;
+  readonly accessScope?: RepositoryAccessScope;
 }
 
 export interface MarkRetryJobQueuedInput {
@@ -75,11 +86,11 @@ export type ReviewRunRetryCreateResult =
   | { readonly kind: "created"; readonly created: true } & ReviewRunRetryCreation
   | { readonly kind: "existing"; readonly created: false } & ReviewRunRetryCreation
   | {
-      readonly kind: "not_retryable";
-      readonly status: ReviewRunStatus;
-      readonly reason: Exclude<ReviewRunRetryReason, "retry_queued" | "duplicate_retry">;
-      readonly message: string;
-    }
+    readonly kind: "not_retryable";
+    readonly status: ReviewRunStatus;
+    readonly reason: Exclude<ReviewRunRetryReason, "retry_queued" | "duplicate_retry">;
+    readonly message: string;
+  }
   | { readonly kind: "not_found" };
 
 interface ReviewRunRow {
@@ -207,7 +218,7 @@ export class PostgresReviewRunsStore implements ReviewRunsStore {
   constructor(
     private readonly database: DatabaseExecutor,
     private readonly createId: () => string = randomUUID
-  ) {}
+  ) { }
 
   async listReviewRuns(filters: ReviewRunListLookup): Promise<ReviewRunListResponse> {
     const { whereSql, values } = buildReviewRunListWhereClause(filters);
@@ -254,8 +265,15 @@ LIMIT 100
   }
 
   async getReviewRunDetail(reviewRunId: string, options: ReviewRunDetailOptions = {}): Promise<ReviewRunDetail | null> {
-    const runWhere = options.workspaceId === undefined ? "WHERE rr.id = $1" : "WHERE rr.id = $1 AND gi.workspace_id = $2";
-    const runValues = options.workspaceId === undefined ? [reviewRunId] : [reviewRunId, options.workspaceId];
+    const runValues: unknown[] = options.workspaceId === undefined ? [reviewRunId] : [reviewRunId, options.workspaceId];
+    const accessClause =
+      options.workspaceId === undefined
+        ? { sql: "", values: [] as unknown[] }
+        : buildRepositoryAccessClause(options.accessScope ?? FULL_REPOSITORY_ACCESS_SCOPE, "r", runValues.length + 1);
+    runValues.push(...accessClause.values);
+    const runWhere =
+      (options.workspaceId === undefined ? "WHERE rr.id = $1" : "WHERE rr.id = $1 AND gi.workspace_id = $2") +
+      (accessClause.sql === "" ? "" : ` AND ${accessClause.sql}`);
     const runResult = await this.database.query<ReviewRunRow>(
       `
 SELECT
@@ -431,6 +449,7 @@ ORDER BY created_at ASC,
   }
 
   async getRawArtifactAccess(input: RawArtifactAccessLookup): Promise<RawReviewRunArtifactAccess | null> {
+    const accessClause = buildRepositoryAccessClause(input.accessScope ?? FULL_REPOSITORY_ACCESS_SCOPE, "r", 4);
     const result = await this.database.query<ArtifactRow & { review_run_id: string }>(
       `
 SELECT
@@ -447,8 +466,9 @@ JOIN github_installations gi ON gi.id = r.installation_id
 WHERE aa.id = $1
   AND aa.review_run_id = $2
   AND gi.workspace_id = $3
+${accessClause.sql === "" ? "" : `  AND ${accessClause.sql}\n`}
 `,
-      [input.artifactId, input.reviewRunId, input.workspaceId]
+      [input.artifactId, input.reviewRunId, input.workspaceId, ...accessClause.values]
     );
     const row = result.rows[0];
 
@@ -474,7 +494,11 @@ WHERE aa.id = $1
       const existingRetry = await this.loadExistingRetry(input.reviewRunId);
 
       if (existingRetry !== null) {
-        const original = await this.loadRetryableReviewRun(input.reviewRunId, input.workspaceId);
+        const original = await this.loadRetryableReviewRun(
+          input.reviewRunId,
+          input.workspaceId,
+          input.accessScope ?? FULL_REPOSITORY_ACCESS_SCOPE
+        );
 
         await this.database.query("COMMIT");
 
@@ -497,7 +521,11 @@ WHERE aa.id = $1
         };
       }
 
-      const original = await this.loadRetryableReviewRun(input.reviewRunId, input.workspaceId);
+      const original = await this.loadRetryableReviewRun(
+        input.reviewRunId,
+        input.workspaceId,
+        input.accessScope ?? FULL_REPOSITORY_ACCESS_SCOPE
+      );
 
       if (original === null) {
         await this.database.query("COMMIT");
@@ -598,7 +626,12 @@ WHERE original_review_run_id = $1
     );
   }
 
-  private async loadRetryableReviewRun(reviewRunId: string, workspaceId: string): Promise<RetryableReviewRunRow | null> {
+  private async loadRetryableReviewRun(
+    reviewRunId: string,
+    workspaceId: string,
+    accessScope: RepositoryAccessScope
+  ): Promise<RetryableReviewRunRow | null> {
+    const accessClause = buildRepositoryAccessClause(accessScope, "r", 3);
     const result = await this.database.query<RetryableReviewRunRow>(
       `
 SELECT
@@ -619,8 +652,9 @@ JOIN github_installations gi ON gi.id = r.installation_id
 JOIN pull_requests pr ON pr.id = rr.pull_request_id
 WHERE rr.id = $1
   AND gi.workspace_id = $2
+${accessClause.sql === "" ? "" : `  AND ${accessClause.sql}\n`}
 `,
-      [reviewRunId, workspaceId]
+      [reviewRunId, workspaceId, ...accessClause.values]
     );
 
     return result.rows[0] ?? null;
@@ -681,9 +715,9 @@ function getRetryability(
 ):
   | { retryable: true }
   | {
-      retryable: false;
-      result: Extract<ReviewRunRetryCreateResult, { kind: "not_retryable" }>;
-    } {
+    retryable: false;
+    result: Extract<ReviewRunRetryCreateResult, { kind: "not_retryable" }>;
+  } {
   if (row.status !== "failed") {
     return {
       retryable: false,
@@ -718,6 +752,16 @@ function buildReviewRunListWhereClause(filters: ReviewRunListLookup): { whereSql
   if (filters.workspaceId !== undefined) {
     values.push(filters.workspaceId);
     conditions.push(`gi.workspace_id = $${values.length}`);
+  }
+
+  const accessClause = buildRepositoryAccessClause(
+    filters.accessScope ?? FULL_REPOSITORY_ACCESS_SCOPE,
+    "r",
+    values.length + 1
+  );
+  if (accessClause.sql !== "") {
+    values.push(...accessClause.values);
+    conditions.push(accessClause.sql);
   }
 
   if (filters.status !== undefined) {

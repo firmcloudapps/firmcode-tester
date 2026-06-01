@@ -74,6 +74,7 @@ export interface UpsertInstallationRepositoryInput {
   readonly installationUuid: string;
   readonly repository: GitHubRepositoryMetadata;
   readonly preserveExistingEnabled?: boolean;
+  readonly grantAccessToClerkUserId?: string;
 }
 
 export interface WorkspaceRepositoryLookup {
@@ -441,7 +442,24 @@ RETURNING *
       ]
     );
 
-    return toRepositoryListItem(requireRow(result.rows[0], "repository"));
+    const repository = toRepositoryListItem(requireRow(result.rows[0], "repository"));
+
+    if (input.grantAccessToClerkUserId !== undefined && input.grantAccessToClerkUserId !== "") {
+      await this.grantRepositoryAccess(repository.id, input.grantAccessToClerkUserId);
+    }
+
+    return repository;
+  }
+
+  private async grantRepositoryAccess(repositoryId: string, clerkUserId: string): Promise<void> {
+    await this.database.query(
+      `
+INSERT INTO repository_access (repository_id, clerk_user_id, granted_by_clerk_user_id)
+VALUES ($1, $2, $2)
+ON CONFLICT (repository_id, clerk_user_id) DO NOTHING
+`,
+      [repositoryId, clerkUserId]
+    );
   }
 
   async findWorkspaceRepository(input: WorkspaceRepositoryLookup): Promise<WorkspaceRepositoryRecord | null> {

@@ -21,6 +21,7 @@ const EXPECTED_TABLES = [
   "published_comments",
   "pull_requests",
   "repositories",
+  "repository_access",
   "repository_review_configurations",
   "review_policies",
   "review_run_retries",
@@ -174,7 +175,8 @@ ORDER BY table_name
       "008_codebase_scan_persistence",
       "009_codebase_scan_dashboard_configuration",
       "010_workspace_membership_audit",
-      "011_review_policy_workspace_controls"
+      "011_review_policy_workspace_controls",
+      "012_repository_access_scope"
     ]);
     expect(secondRunMigrationIds).toEqual([]);
     expect(tables.rows.map((row) => row.table_name)).toEqual(EXPECTED_TABLES);
@@ -189,7 +191,8 @@ ORDER BY table_name
       { id: "008_codebase_scan_persistence" },
       { id: "009_codebase_scan_dashboard_configuration" },
       { id: "010_workspace_membership_audit" },
-      { id: "011_review_policy_workspace_controls" }
+      { id: "011_review_policy_workspace_controls" },
+      { id: "012_repository_access_scope" }
     ]);
   });
 

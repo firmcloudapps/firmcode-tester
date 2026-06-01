@@ -12,6 +12,11 @@ import type {
   UpdateReviewPolicyRequest
 } from "@firmcode/shared";
 import type { DatabaseExecutor } from "../../infrastructure/database/migrations";
+import {
+  buildRepositoryAccessClause,
+  FULL_REPOSITORY_ACCESS_SCOPE,
+  type RepositoryAccessScope
+} from "../auth/repository-access-scope";
 
 export const RULES_STORE = Symbol("RULES_STORE");
 
@@ -23,11 +28,13 @@ export interface RulesStore {
 export interface RulesLookup {
   readonly workspaceId: string;
   readonly repositoryId?: string;
+  readonly accessScope?: RepositoryAccessScope;
 }
 
 export interface RulesPolicyUpdate {
   readonly workspaceId: string;
   readonly repositoryId: string | null;
+  readonly accessScope?: RepositoryAccessScope;
   readonly updates: ParsedReviewPolicyUpdate;
   readonly updatedByClerkUserId: string;
 }
@@ -104,11 +111,18 @@ export class PostgresRulesStore implements RulesStore {
     }
 
     const workspacePolicy = await this.ensureWorkspacePolicy(input.workspaceId);
-    const repositoryPolicies = await this.listRepositoryPolicies(input.workspaceId);
+    const repositoryPolicies = await this.listRepositoryPolicies(
+      input.workspaceId,
+      input.accessScope ?? FULL_REPOSITORY_ACCESS_SCOPE
+    );
     const selectedRepositoryPolicy =
       input.repositoryId === undefined
         ? null
-        : await this.ensureRepositoryPolicy({ workspaceId: input.workspaceId, repositoryId: input.repositoryId });
+        : await this.ensureRepositoryPolicy({
+            workspaceId: input.workspaceId,
+            repositoryId: input.repositoryId,
+            accessScope: input.accessScope ?? FULL_REPOSITORY_ACCESS_SCOPE
+          });
 
     if (input.repositoryId !== undefined && selectedRepositoryPolicy === null) {
       return null;
@@ -125,7 +139,11 @@ export class PostgresRulesStore implements RulesStore {
     const current =
       input.repositoryId === null
         ? await this.ensureWorkspacePolicy(input.workspaceId)
-        : await this.ensureRepositoryPolicy({ workspaceId: input.workspaceId, repositoryId: input.repositoryId });
+        : await this.ensureRepositoryPolicy({
+            workspaceId: input.workspaceId,
+            repositoryId: input.repositoryId,
+            accessScope: input.accessScope ?? FULL_REPOSITORY_ACCESS_SCOPE
+          });
 
     if (current === null) {
       return null;
@@ -243,7 +261,11 @@ RETURNING
     return toReviewPolicy(row);
   }
 
-  private async ensureRepositoryPolicy(input: { workspaceId: string; repositoryId: string }): Promise<ReviewPolicy | null> {
+  private async ensureRepositoryPolicy(input: {
+    workspaceId: string;
+    repositoryId: string;
+    accessScope: RepositoryAccessScope;
+  }): Promise<ReviewPolicy | null> {
     const target = await this.findOwnedRepository(input);
 
     if (target === null) {
@@ -328,7 +350,12 @@ WHERE rp.id = $1
     return row === undefined ? null : toReviewPolicy(row);
   }
 
-  private async findOwnedRepository(input: { workspaceId: string; repositoryId: string }): Promise<RepositoryPolicyTargetRow | null> {
+  private async findOwnedRepository(input: {
+    workspaceId: string;
+    repositoryId: string;
+    accessScope: RepositoryAccessScope;
+  }): Promise<RepositoryPolicyTargetRow | null> {
+    const accessClause = buildRepositoryAccessClause(input.accessScope, "r", 3);
     const result = await this.database.query<RepositoryPolicyTargetRow>(
       `
 SELECT r.id AS repository_id
@@ -336,14 +363,19 @@ FROM repositories r
 JOIN github_installations gi ON gi.id = r.installation_id
 WHERE r.id = $1
   AND gi.workspace_id = $2
+${accessClause.sql === "" ? "" : `  AND ${accessClause.sql}\n`}
 `,
-      [input.repositoryId, input.workspaceId]
+      [input.repositoryId, input.workspaceId, ...accessClause.values]
     );
 
     return result.rows[0] ?? null;
   }
 
-  private async listRepositoryPolicies(workspaceId: string): Promise<ReviewPolicySummary[]> {
+  private async listRepositoryPolicies(
+    workspaceId: string,
+    accessScope: RepositoryAccessScope
+  ): Promise<ReviewPolicySummary[]> {
+    const accessClause = buildRepositoryAccessClause(accessScope, "r", 2);
     const result = await this.database.query<ReviewPolicyRow>(
       `
 SELECT
@@ -369,9 +401,10 @@ FROM review_policies rp
 JOIN repositories r ON r.id = rp.repository_id
 WHERE rp.workspace_id = $1
   AND rp.scope = 'repository'
+${accessClause.sql === "" ? "" : `  AND ${accessClause.sql}\n`}
 ORDER BY r.full_name ASC
 `,
-      [workspaceId]
+      [workspaceId, ...accessClause.values]
     );
 
     return result.rows.map((row) => {

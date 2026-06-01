@@ -27,6 +27,12 @@ import {
   type DashboardAuthStore
 } from "../review-runs/dashboard-auth.store";
 import {
+  buildRepositoryAccessClause,
+  FULL_REPOSITORY_ACCESS_SCOPE,
+  resolveRepositoryAccessScope,
+  type RepositoryAccessScope
+} from "../auth/repository-access-scope";
+import {
   CODEBASE_SCAN_STORE,
   type CodebaseScanRunRecord,
   type CodebaseScanStore
@@ -37,7 +43,11 @@ export const CODEBASE_SCAN_CORRELATION_ID_FACTORY = Symbol("CODEBASE_SCAN_CORREL
 
 export interface CodebaseScanTargetStore {
   findRepositoryTarget(repositoryId: string): Promise<CodebaseScanRepositoryTarget | null>;
-  findWorkspaceRepositoryTarget(input: { repositoryId: string; workspaceId: string }): Promise<CodebaseScanRepositoryTarget | null>;
+  findWorkspaceRepositoryTarget(input: {
+    repositoryId: string;
+    workspaceId: string;
+    accessScope?: RepositoryAccessScope;
+  }): Promise<CodebaseScanRepositoryTarget | null>;
 }
 
 export interface CodebaseScanRepositoryTarget {
@@ -144,7 +154,11 @@ export class CodebaseScanEnqueueService {
 
     const target = await this.targetStore.findWorkspaceRepositoryTarget({
       repositoryId: input.repositoryId,
-      workspaceId: input.workspaceId
+      workspaceId: input.workspaceId,
+      accessScope: resolveRepositoryAccessScope({
+        role: membership.role,
+        clerkUserId: membership.clerkUserId
+      })
     });
 
     if (target === null) {
@@ -301,7 +315,12 @@ WHERE r.id = $1
     return result.rows[0] === undefined ? null : toTarget(result.rows[0]);
   }
 
-  async findWorkspaceRepositoryTarget(input: { repositoryId: string; workspaceId: string }): Promise<CodebaseScanRepositoryTarget | null> {
+  async findWorkspaceRepositoryTarget(input: {
+    repositoryId: string;
+    workspaceId: string;
+    accessScope?: RepositoryAccessScope;
+  }): Promise<CodebaseScanRepositoryTarget | null> {
+    const accessClause = buildRepositoryAccessClause(input.accessScope ?? FULL_REPOSITORY_ACCESS_SCOPE, "r", 4);
     const result = await this.database.query<CodebaseScanTargetRow>(
       `
 SELECT
@@ -323,8 +342,9 @@ JOIN github_installations gi ON gi.id = r.installation_id
 LEFT JOIN repository_review_configurations rc ON rc.repository_id = r.id
 WHERE r.id = $1
   AND gi.workspace_id = $2
+${accessClause.sql === "" ? "" : `  AND ${accessClause.sql}\n`}
 `,
-      [input.repositoryId, input.workspaceId, 24]
+      [input.repositoryId, input.workspaceId, 24, ...accessClause.values]
     );
 
     return result.rows[0] === undefined ? null : toTarget(result.rows[0]);

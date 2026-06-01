@@ -11,6 +11,11 @@ import type {
   ReviewFindingStatus
 } from "@firmcode/shared";
 import type { DatabaseExecutor } from "../../infrastructure/database/migrations";
+import {
+  appendRepositoryAccessCondition,
+  FULL_REPOSITORY_ACCESS_SCOPE,
+  type RepositoryAccessScope
+} from "../auth/repository-access-scope";
 
 export const FINDINGS_STORE = Symbol("FINDINGS_STORE");
 
@@ -18,6 +23,7 @@ export interface ListFindingsInput {
   readonly workspaceId: string;
   readonly filters: FindingsListFilters;
   readonly canManageCodebaseFindings: boolean;
+  readonly accessScope?: RepositoryAccessScope;
 }
 
 export interface FindingsStore {
@@ -85,7 +91,7 @@ export class EmptyFindingsStore implements FindingsStore {
 }
 
 export class PostgresFindingsStore implements FindingsStore {
-  constructor(private readonly database: DatabaseExecutor) {}
+  constructor(private readonly database: DatabaseExecutor) { }
 
   async listFindings(input: ListFindingsInput): Promise<FindingsListResponse> {
     const pullRequestFindings = input.filters.findingType === "codebase_scan" ? [] : await this.listPullRequestFindings(input);
@@ -100,7 +106,11 @@ export class PostgresFindingsStore implements FindingsStore {
   }
 
   private async listPullRequestFindings(input: ListFindingsInput): Promise<FindingInboxItem[]> {
-    const { whereSql, values } = buildPullRequestFindingsWhereClause(input.workspaceId, input.filters);
+    const { whereSql, values } = buildPullRequestFindingsWhereClause(
+      input.workspaceId,
+      input.filters,
+      input.accessScope ?? FULL_REPOSITORY_ACCESS_SCOPE
+    );
     const result = await this.database.query<FindingInboxRow>(
       `
 SELECT
@@ -153,7 +163,11 @@ LIMIT 200
   }
 
   private async listCodebaseFindings(input: ListFindingsInput): Promise<CodebaseScanFindingInboxItem[]> {
-    const { whereSql, values } = buildCodebaseFindingsWhereClause(input.workspaceId, input.filters);
+    const { whereSql, values } = buildCodebaseFindingsWhereClause(
+      input.workspaceId,
+      input.filters,
+      input.accessScope ?? FULL_REPOSITORY_ACCESS_SCOPE
+    );
     const result = await this.database.query<CodebaseFindingInboxRow>(
       `
 SELECT
@@ -202,10 +216,15 @@ LIMIT 200
   }
 }
 
-function buildPullRequestFindingsWhereClause(workspaceId: string, filters: FindingsListFilters): { whereSql: string; values: unknown[] } {
+function buildPullRequestFindingsWhereClause(
+  workspaceId: string,
+  filters: FindingsListFilters,
+  accessScope: RepositoryAccessScope
+): { whereSql: string; values: unknown[] } {
   const conditions: string[] = ["gi.workspace_id = $1"];
   const values: unknown[] = [workspaceId];
 
+  appendRepositoryAccessCondition(conditions, values, accessScope);
   appendSharedFindingFilters("f", "rr", "r", conditions, values, filters);
 
   if (filters.status !== undefined) {
@@ -228,10 +247,15 @@ function buildPullRequestFindingsWhereClause(workspaceId: string, filters: Findi
   };
 }
 
-function buildCodebaseFindingsWhereClause(workspaceId: string, filters: FindingsListFilters): { whereSql: string; values: unknown[] } {
+function buildCodebaseFindingsWhereClause(
+  workspaceId: string,
+  filters: FindingsListFilters,
+  accessScope: RepositoryAccessScope
+): { whereSql: string; values: unknown[] } {
   const conditions: string[] = ["gi.workspace_id = $1"];
   const values: unknown[] = [workspaceId];
 
+  appendRepositoryAccessCondition(conditions, values, accessScope);
   appendSharedFindingFilters("csf", "csf", "r", conditions, values, filters);
 
   if (filters.status !== undefined) {

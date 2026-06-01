@@ -308,6 +308,10 @@ INSERT INTO repositories (
   true
 );
 
+INSERT INTO repository_access (repository_id, clerk_user_id, granted_by_clerk_user_id) VALUES
+('00000000-0000-4000-8000-000000000201', '${VIEWER_USER_ID}', NULL),
+('00000000-0000-4000-8000-000000000203', '${OTHER_VIEWER_USER_ID}', NULL);
+
 INSERT INTO pull_requests (
   id,
   repository_id,

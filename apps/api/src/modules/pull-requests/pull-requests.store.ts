@@ -17,6 +17,11 @@ import type {
   ReviewRunStatus
 } from "@firmcode/shared";
 import type { DatabaseExecutor } from "../../infrastructure/database/migrations";
+import {
+  buildRepositoryAccessClause,
+  FULL_REPOSITORY_ACCESS_SCOPE,
+  type RepositoryAccessScope
+} from "../auth/repository-access-scope";
 
 export const PULL_REQUESTS_STORE = Symbol("PULL_REQUESTS_STORE");
 
@@ -28,11 +33,13 @@ export interface PullRequestsStore {
 export interface PullRequestListInput {
   readonly workspaceId: string;
   readonly filters: PullRequestListFilters;
+  readonly accessScope?: RepositoryAccessScope;
 }
 
 export interface PullRequestDetailLookup {
   readonly workspaceId: string;
   readonly pullRequestId: string;
+  readonly accessScope?: RepositoryAccessScope;
 }
 
 interface PullRequestRow {
@@ -138,12 +145,16 @@ export class EmptyPullRequestsStore implements PullRequestsStore {
 }
 
 export class PostgresPullRequestsStore implements PullRequestsStore {
-  constructor(private readonly database: DatabaseExecutor) {}
+  constructor(private readonly database: DatabaseExecutor) { }
 
   async listPullRequests(input: PullRequestListInput): Promise<PullRequestListResponse> {
     const filters = input.filters;
     const limit = filters.limit ?? DEFAULT_PULL_REQUEST_LIMIT;
-    const { whereSql, values } = buildPullRequestWhereClause(input.workspaceId, filters);
+    const { whereSql, values } = buildPullRequestWhereClause(
+      input.workspaceId,
+      filters,
+      input.accessScope ?? FULL_REPOSITORY_ACCESS_SCOPE
+    );
     const pullRequestsResult = await this.database.query<PullRequestRow>(
       `
 SELECT
@@ -194,6 +205,7 @@ LIMIT 500
   }
 
   async getPullRequestDetail(input: PullRequestDetailLookup): Promise<PullRequestDetailResponse | null> {
+    const detailAccessClause = buildRepositoryAccessClause(input.accessScope ?? FULL_REPOSITORY_ACCESS_SCOPE, "r", 3);
     const pullRequestResult = await this.database.query<PullRequestRow>(
       `
 SELECT
@@ -217,8 +229,8 @@ JOIN repositories r ON r.id = pr.repository_id
 JOIN github_installations gi ON gi.id = r.installation_id
 WHERE pr.id = $1
   AND gi.workspace_id = $2
-`,
-      [input.pullRequestId, input.workspaceId]
+${detailAccessClause.sql === "" ? "" : `  AND ${detailAccessClause.sql}\n`}`,
+      [input.pullRequestId, input.workspaceId, ...detailAccessClause.values]
     );
     const pullRequest = pullRequestResult.rows[0];
 
@@ -536,10 +548,17 @@ const DEFAULT_PULL_REQUEST_LIMIT = 50;
 
 function buildPullRequestWhereClause(
   workspaceId: string,
-  filters: PullRequestListFilters
+  filters: PullRequestListFilters,
+  accessScope: RepositoryAccessScope
 ): { whereSql: string; values: unknown[] } {
   const conditions = ["gi.workspace_id = $1"];
   const values: unknown[] = [workspaceId];
+
+  const accessClause = buildRepositoryAccessClause(accessScope, "r", values.length + 1);
+  if (accessClause.sql !== "") {
+    values.push(...accessClause.values);
+    conditions.push(accessClause.sql);
+  }
 
   if (filters.repositoryId !== undefined) {
     values.push(filters.repositoryId);

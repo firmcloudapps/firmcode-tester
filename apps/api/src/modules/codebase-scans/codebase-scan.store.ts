@@ -19,6 +19,12 @@ import type {
 } from "@firmcode/shared";
 import { randomUUID } from "crypto";
 import type { DatabaseExecutor } from "../../infrastructure/database/migrations";
+import {
+  appendRepositoryAccessCondition,
+  buildRepositoryAccessClause,
+  FULL_REPOSITORY_ACCESS_SCOPE,
+  type RepositoryAccessScope
+} from "../auth/repository-access-scope";
 
 export const CODEBASE_SCAN_STORE = Symbol("CODEBASE_SCAN_STORE");
 
@@ -88,17 +94,20 @@ export interface ListOpenCodebaseScanFindingsInput {
 export interface ListRepositoryCodebaseScanRunsInput {
   readonly repositoryId: string;
   readonly workspaceId: string;
+  readonly accessScope?: RepositoryAccessScope;
   readonly filters?: CodebaseScanRunListFilters;
 }
 
 export interface GetCodebaseScanRunDetailInput {
   readonly scanRunId: string;
   readonly workspaceId: string;
+  readonly accessScope?: RepositoryAccessScope;
   readonly canManageCodebaseFindings: boolean;
 }
 
 export interface ListWorkspaceCodebaseScanFindingsInput {
   readonly workspaceId: string;
+  readonly accessScope?: RepositoryAccessScope;
   readonly filters: CodebaseScanFindingListFilters;
   readonly canManageCodebaseFindings: boolean;
 }
@@ -106,6 +115,7 @@ export interface ListWorkspaceCodebaseScanFindingsInput {
 export interface UpdateCodebaseScanFindingStatusInput {
   readonly findingId: string;
   readonly workspaceId: string;
+  readonly accessScope?: RepositoryAccessScope;
   readonly actorClerkUserId: string;
   readonly update: UpdateCodebaseScanFindingStatusRequest;
 }
@@ -541,7 +551,11 @@ LIMIT $${values.length}
   }
 
   async listRepositoryScanRuns(input: ListRepositoryCodebaseScanRunsInput): Promise<CodebaseScanRunListResponse | null> {
-    const owned = await this.repositoryBelongsToWorkspace(input.repositoryId, input.workspaceId);
+    const owned = await this.repositoryBelongsToWorkspace(
+      input.repositoryId,
+      input.workspaceId,
+      input.accessScope ?? FULL_REPOSITORY_ACCESS_SCOPE
+    );
 
     if (!owned) {
       return null;
@@ -584,6 +598,7 @@ LIMIT 50
   }
 
   async getScanRunDetail(input: GetCodebaseScanRunDetailInput): Promise<CodebaseScanRunDetailResponse | null> {
+    const accessClause = buildRepositoryAccessClause(input.accessScope ?? FULL_REPOSITORY_ACCESS_SCOPE, "r", 3);
     const result = await this.database.query<CodebaseScanRunDashboardRow>(
       `
 SELECT
@@ -607,9 +622,10 @@ JOIN repositories r ON r.id = csr.repository_id
 JOIN github_installations gi ON gi.id = r.installation_id
 WHERE csr.id = $1
   AND gi.workspace_id = $2
+${accessClause.sql === "" ? "" : `  AND ${accessClause.sql}\n`}
 LIMIT 1
 `,
-      [input.scanRunId, input.workspaceId]
+      [input.scanRunId, input.workspaceId, ...accessClause.values]
     );
     const row = result.rows[0];
 
@@ -618,7 +634,11 @@ LIMIT 1
     }
 
     const findingCounts = await this.loadScanRunFindingCounts([row.id]);
-    const findings = await this.listFindingsForScanRun(row.id, input.workspaceId);
+    const findings = await this.listFindingsForScanRun(
+      row.id,
+      input.workspaceId,
+      input.accessScope ?? FULL_REPOSITORY_ACCESS_SCOPE
+    );
     const rowWithCounts = withScanRunFindingCounts(row, findingCounts);
 
     return {
@@ -663,7 +683,11 @@ GROUP BY scan_run_id
   }
 
   async listWorkspaceFindings(input: ListWorkspaceCodebaseScanFindingsInput): Promise<CodebaseScanFindingListResponse> {
-    const { whereSql, values } = buildCodebaseFindingWhereClause(input.workspaceId, input.filters);
+    const { whereSql, values } = buildCodebaseFindingWhereClause(
+      input.workspaceId,
+      input.filters,
+      input.accessScope ?? FULL_REPOSITORY_ACCESS_SCOPE
+    );
     const result = await this.database.query<CodebaseScanFindingDashboardRow>(
       `
 SELECT
@@ -701,6 +725,7 @@ LIMIT 200
   }
 
   async updateFindingStatus(input: UpdateCodebaseScanFindingStatusInput): Promise<CodebaseScanFindingInboxItem | null> {
+    const accessClause = buildRepositoryAccessClause(input.accessScope ?? FULL_REPOSITORY_ACCESS_SCOPE, "r", 3);
     const current = await this.database.query<CodebaseScanFindingDashboardRow>(
       `
 SELECT
@@ -714,9 +739,10 @@ JOIN repositories r ON r.id = csf.repository_id
 JOIN github_installations gi ON gi.id = r.installation_id
 WHERE csf.id = $1
   AND gi.workspace_id = $2
+${accessClause.sql === "" ? "" : `  AND ${accessClause.sql}\n`}
 LIMIT 1
 `,
-      [input.findingId, input.workspaceId]
+      [input.findingId, input.workspaceId, ...accessClause.values]
     );
     const row = current.rows[0];
 
@@ -851,7 +877,12 @@ RETURNING id
     return result.rows.length;
   }
 
-  private async repositoryBelongsToWorkspace(repositoryId: string, workspaceId: string): Promise<boolean> {
+  private async repositoryBelongsToWorkspace(
+    repositoryId: string,
+    workspaceId: string,
+    accessScope: RepositoryAccessScope
+  ): Promise<boolean> {
+    const accessClause = buildRepositoryAccessClause(accessScope, "r", 3);
     const result = await this.database.query<{ id: string }>(
       `
 SELECT r.id
@@ -859,14 +890,20 @@ FROM repositories r
 JOIN github_installations gi ON gi.id = r.installation_id
 WHERE r.id = $1
   AND gi.workspace_id = $2
+${accessClause.sql === "" ? "" : `  AND ${accessClause.sql}\n`}
 `,
-      [repositoryId, workspaceId]
+      [repositoryId, workspaceId, ...accessClause.values]
     );
 
     return result.rows[0] !== undefined;
   }
 
-  private async listFindingsForScanRun(scanRunId: string, workspaceId: string): Promise<CodebaseScanFindingInboxItem[]> {
+  private async listFindingsForScanRun(
+    scanRunId: string,
+    workspaceId: string,
+    accessScope: RepositoryAccessScope
+  ): Promise<CodebaseScanFindingInboxItem[]> {
+    const accessClause = buildRepositoryAccessClause(accessScope, "r", 3);
     const result = await this.database.query<CodebaseScanFindingDashboardRow>(
       `
 SELECT
@@ -880,6 +917,7 @@ JOIN repositories r ON r.id = csf.repository_id
 JOIN github_installations gi ON gi.id = r.installation_id
 WHERE csf.scan_run_id = $1
   AND gi.workspace_id = $2
+${accessClause.sql === "" ? "" : `  AND ${accessClause.sql}\n`}
 ORDER BY
   CASE csf.severity
     WHEN 'critical' THEN 0
@@ -892,7 +930,7 @@ ORDER BY
   csf.file_path ASC
 LIMIT 200
 `,
-      [scanRunId, workspaceId]
+      [scanRunId, workspaceId, ...accessClause.values]
     );
 
     return result.rows.map(toCodebaseFindingInboxItem);
@@ -934,10 +972,13 @@ function buildScanRunWhereClause(
 
 function buildCodebaseFindingWhereClause(
   workspaceId: string,
-  filters: CodebaseScanFindingListFilters
+  filters: CodebaseScanFindingListFilters,
+  accessScope: RepositoryAccessScope
 ): { whereSql: string; values: unknown[] } {
   const conditions = ["gi.workspace_id = $1"];
   const values: unknown[] = [workspaceId];
+
+  appendRepositoryAccessCondition(conditions, values, accessScope);
 
   if (filters.repositoryId !== undefined) {
     values.push(filters.repositoryId);

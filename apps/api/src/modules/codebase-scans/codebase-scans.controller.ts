@@ -30,6 +30,7 @@ import {
   DashboardAuth,
   hasDashboardCapability,
   resolveDashboardMembership,
+  resolveRepositoryAccessScopeFromMembership,
   type DashboardAuthParam
 } from "../auth/dashboard-auth.context";
 import { DashboardAuthGuard } from "../auth/dashboard-auth.guard";
@@ -60,6 +61,7 @@ export class CodebaseScansController {
     const response = await this.scanStore.listRepositoryScanRuns({
       repositoryId: id,
       workspaceId: membership.workspaceId,
+      accessScope: resolveRepositoryAccessScopeFromMembership(membership),
       filters: parseScanRunListFilters(query)
     });
 
@@ -81,6 +83,7 @@ export class CodebaseScansController {
     const detail = await this.scanStore.getScanRunDetail({
       scanRunId: id,
       workspaceId: membership.workspaceId,
+      accessScope: resolveRepositoryAccessScopeFromMembership(membership),
       canManageCodebaseFindings: hasMembershipCapability(membership, "manage_codebase_scan_findings")
     });
 
@@ -102,6 +105,7 @@ export class CodebaseScansController {
 
     return this.scanStore.listWorkspaceFindings({
       workspaceId: membership.workspaceId,
+      accessScope: resolveRepositoryAccessScopeFromMembership(membership),
       filters,
       canManageCodebaseFindings: hasMembershipCapability(membership, "manage_codebase_scan_findings")
     });
@@ -124,6 +128,7 @@ export class CodebaseScansController {
     const finding = await this.scanStore.updateFindingStatus({
       findingId: id,
       workspaceId: membership.workspaceId,
+      accessScope: resolveRepositoryAccessScopeFromMembership(membership),
       actorClerkUserId: membership.clerkUserId,
       update: parseUpdateCodebaseFindingStatusRequest(body)
     });

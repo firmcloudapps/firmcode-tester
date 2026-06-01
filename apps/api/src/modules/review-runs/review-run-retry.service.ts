@@ -18,6 +18,7 @@ import {
   roleHasDashboardCapability,
   type DashboardAuthStore
 } from "./dashboard-auth.store";
+import { resolveRepositoryAccessScope } from "../auth/repository-access-scope";
 import {
   REVIEW_RUNS_STORE,
   type ReviewRunRetryCreation,
@@ -62,7 +63,11 @@ export class ReviewRunRetryService {
     const retry = await this.reviewRunsStore.createRetryReviewRun({
       reviewRunId: input.reviewRunId,
       workspaceId: input.workspaceId,
-      clerkUserId: input.clerkUserId
+      clerkUserId: input.clerkUserId,
+      accessScope: resolveRepositoryAccessScope({
+        role: membership.role,
+        clerkUserId: membership.clerkUserId
+      })
     });
 
     if (retry.kind === "not_found") {

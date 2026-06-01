@@ -13,6 +13,7 @@ import {
   DashboardAuth,
   hasDashboardCapability,
   resolveDashboardMembership,
+  resolveRepositoryAccessScopeFromMembership,
   type DashboardAuthParam
 } from "../auth/dashboard-auth.context";
 import { DashboardAuthGuard } from "../auth/dashboard-auth.guard";
@@ -29,7 +30,7 @@ export class CiFailuresController {
   constructor(
     @Inject(CI_FAILURES_STORE) private readonly ciFailuresStore: CiFailuresStore,
     @Inject(DASHBOARD_AUTH_STORE) private readonly dashboardAuthStore: DashboardAuthStore
-  ) {}
+  ) { }
 
   @Get()
   async listCiFailures(
@@ -42,7 +43,8 @@ export class CiFailuresController {
     return this.ciFailuresStore.listCiFailures({
       workspaceId: membership.workspaceId,
       canAccessRawArtifacts: hasMembershipCapability(membership, "access_raw_artifacts"),
-      filters: parseCiFailureListFilters(query)
+      filters: parseCiFailureListFilters(query),
+      accessScope: resolveRepositoryAccessScopeFromMembership(membership)
     });
   }
 
@@ -57,7 +59,8 @@ export class CiFailuresController {
     const detail = await this.ciFailuresStore.getCiFailureDetail({
       workspaceId: membership.workspaceId,
       ciFailureId: id,
-      canAccessRawArtifacts: hasMembershipCapability(membership, "access_raw_artifacts")
+      canAccessRawArtifacts: hasMembershipCapability(membership, "access_raw_artifacts"),
+      accessScope: resolveRepositoryAccessScopeFromMembership(membership)
     });
 
     if (detail === null) {
