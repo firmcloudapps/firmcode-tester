@@ -1,5 +1,5 @@
 import type { WorkspaceSettingsResponse } from "@firmcode/shared";
-import { createDashboardApiHeaders } from "./dashboard-api-proxy";
+import { createDashboardApiHeaders, getDashboardApiBaseUrl } from "./dashboard-api-proxy";
 
 export const ROLE_BASED_AUTH_REDIRECT_PATH = "/auth/redirect";
 
@@ -58,5 +58,5 @@ export function landingPathForDashboardRole(role: string | null | undefined): Ro
 }
 
 function getApiBaseUrl(env: Record<string, string | undefined>): string {
-  return env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+  return getDashboardApiBaseUrl(env);
 }

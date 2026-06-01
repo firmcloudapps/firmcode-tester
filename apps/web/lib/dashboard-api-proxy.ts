@@ -16,7 +16,7 @@ type DashboardProxyEnvironment = Record<string, string | undefined>;
 export async function forwardDashboardApiMutation(input: DashboardApiProxyInput): Promise<Response> {
   const env = input.env ?? process.env;
   const fetcher = input.fetcher ?? fetch;
-  const url = new URL(input.path, getApiBaseUrl(env));
+  const url = new URL(input.path, getDashboardApiBaseUrl(env));
   const headers = await createDashboardApiHeaders(env, input.body !== undefined);
 
   if (headers === null) {
@@ -87,6 +87,6 @@ function createUnauthenticatedDashboardResponse(): Response {
   });
 }
 
-function getApiBaseUrl(env: DashboardProxyEnvironment): string {
-  return env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+export function getDashboardApiBaseUrl(env: DashboardProxyEnvironment = process.env): string {
+  return env.API_URL ?? env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 }
