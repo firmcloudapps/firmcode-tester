@@ -24,6 +24,8 @@ import {
   DashboardAuth,
   hasDashboardCapability,
   resolveDashboardMembership,
+  resolveRepositoryAccessScopeFromAuth,
+  resolveRepositoryAccessScopeFromMembership,
   toDashboardServiceAuth,
   type DashboardAuthParam
 } from "../auth/dashboard-auth.context";
@@ -42,7 +44,7 @@ export class ReviewRunsController {
     @Inject(REVIEW_RUNS_STORE) private readonly reviewRunsStore: ReviewRunsStore,
     @Inject(DASHBOARD_AUTH_STORE) private readonly dashboardAuthStore: DashboardAuthStore,
     private readonly retryService?: ReviewRunRetryService
-  ) {}
+  ) { }
 
   @Get()
   async listReviewRuns(
@@ -56,7 +58,8 @@ export class ReviewRunsController {
 
     return this.reviewRunsStore.listReviewRuns({
       ...parseReviewRunListFilters(query),
-      workspaceId: serviceAuth.workspaceId
+      workspaceId: serviceAuth.workspaceId,
+      accessScope: resolveRepositoryAccessScopeFromAuth(auth)
     });
   }
 
@@ -71,7 +74,8 @@ export class ReviewRunsController {
     const detail = await this.reviewRunsStore.getReviewRunDetail(id, {
       workspaceId: membership.workspaceId,
       canRetryReviewRun: hasMembershipCapability(membership, "retry_review_run"),
-      canAccessRawArtifacts: hasMembershipCapability(membership, "access_raw_artifacts")
+      canAccessRawArtifacts: hasMembershipCapability(membership, "access_raw_artifacts"),
+      accessScope: resolveRepositoryAccessScopeFromMembership(membership)
     });
 
     if (detail === null) {
@@ -99,7 +103,8 @@ export class ReviewRunsController {
     const artifact = await this.reviewRunsStore.getRawArtifactAccess({
       reviewRunId: id,
       artifactId,
-      workspaceId: membership.workspaceId
+      workspaceId: membership.workspaceId,
+      accessScope: resolveRepositoryAccessScopeFromMembership(membership)
     });
 
     if (artifact === null) {

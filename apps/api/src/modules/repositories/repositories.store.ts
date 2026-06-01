@@ -26,10 +26,18 @@ import type {
   ReviewRunStatus
 } from "@firmcode/shared";
 import type { DatabaseExecutor } from "../../infrastructure/database/migrations";
+import {
+  buildRepositoryAccessClause,
+  FULL_REPOSITORY_ACCESS_SCOPE,
+  type RepositoryAccessScope
+} from "../auth/repository-access-scope";
 
 export const REPOSITORIES_STORE = Symbol("REPOSITORIES_STORE");
 
-type RepositoryListLookup = DashboardRepositoryListFilters & { readonly workspaceId?: string };
+type RepositoryListLookup = DashboardRepositoryListFilters & {
+  readonly workspaceId?: string;
+  readonly accessScope?: RepositoryAccessScope;
+};
 
 export interface RepositoriesStore {
   listRepositories(filters: RepositoryListLookup): Promise<RepositoryListResponse>;
@@ -42,13 +50,14 @@ export interface RepositoriesStore {
 export interface RepositoryConfigurationLookup {
   readonly repositoryId: string;
   readonly workspaceId: string;
+  readonly accessScope?: RepositoryAccessScope;
 }
 
 export interface RepositoryDetailLookup extends RepositoryConfigurationLookup {
   readonly permissions: RepositoryDetailPermissions;
 }
 
-export interface RepositoryActivityLookup extends RepositoryConfigurationLookup {}
+export interface RepositoryActivityLookup extends RepositoryConfigurationLookup { }
 
 export interface RepositoryConfigurationUpdate extends RepositoryConfigurationLookup {
   readonly updates: UpdateRepositoryReviewConfigurationRequest;
@@ -258,7 +267,7 @@ export class EmptyRepositoriesStore implements RepositoriesStore {
 }
 
 export class PostgresRepositoriesStore implements RepositoriesStore {
-  constructor(private readonly database: DatabaseExecutor) {}
+  constructor(private readonly database: DatabaseExecutor) { }
 
   async listRepositories(filters: RepositoryListLookup): Promise<RepositoryListResponse> {
     const { whereSql, values } = buildRepositoryWhereClause(filters);
@@ -390,6 +399,7 @@ JOIN review_runs rr ON rr.id = f.review_run_id
   }
 
   private async getOwnedRepository(input: RepositoryConfigurationLookup): Promise<RepositoryListItem | null> {
+    const accessClause = buildRepositoryAccessClause(input.accessScope ?? FULL_REPOSITORY_ACCESS_SCOPE, "r", 3);
     const result = await this.database.query<RepositoryListRow>(
       `
 SELECT
@@ -405,8 +415,8 @@ FROM repositories r
 JOIN github_installations gi ON gi.id = r.installation_id
 WHERE r.id = $1
   AND gi.workspace_id = $2
-`,
-      [input.repositoryId, input.workspaceId]
+${accessClause.sql === "" ? "" : `  AND ${accessClause.sql}\n`}`,
+      [input.repositoryId, input.workspaceId, ...accessClause.values]
     );
     const row = result.rows[0];
 
@@ -977,6 +987,7 @@ WHERE id = $1
   }
 
   private async repositoryBelongsToWorkspace(input: RepositoryConfigurationLookup): Promise<boolean> {
+    const accessClause = buildRepositoryAccessClause(input.accessScope ?? FULL_REPOSITORY_ACCESS_SCOPE, "r", 3);
     const result = await this.database.query<{ id: string }>(
       `
 SELECT r.id
@@ -984,8 +995,9 @@ FROM repositories r
 JOIN github_installations gi ON gi.id = r.installation_id
 WHERE r.id = $1
   AND gi.workspace_id = $2
+${accessClause.sql === "" ? "" : `  AND ${accessClause.sql}\n`}
 `,
-      [input.repositoryId, input.workspaceId]
+      [input.repositoryId, input.workspaceId, ...accessClause.values]
     );
 
     return result.rows[0] !== undefined;
@@ -1036,6 +1048,16 @@ function buildRepositoryWhereClause(filters: RepositoryListLookup): { whereSql: 
   if (filters.private !== undefined) {
     values.push(filters.private);
     conditions.push(`r.private = $${values.length}`);
+  }
+
+  const accessClause = buildRepositoryAccessClause(
+    filters.accessScope ?? FULL_REPOSITORY_ACCESS_SCOPE,
+    "r",
+    values.length + 1
+  );
+  if (accessClause.sql !== "") {
+    values.push(...accessClause.values);
+    conditions.push(accessClause.sql);
   }
 
   return {

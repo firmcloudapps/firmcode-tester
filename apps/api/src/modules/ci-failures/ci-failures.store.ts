@@ -12,6 +12,11 @@ import type {
   ReviewRunStatus
 } from "@firmcode/shared";
 import type { DatabaseExecutor } from "../../infrastructure/database/migrations";
+import {
+  appendRepositoryAccessCondition,
+  FULL_REPOSITORY_ACCESS_SCOPE,
+  type RepositoryAccessScope
+} from "../auth/repository-access-scope";
 
 export const CI_FAILURES_STORE = Symbol("CI_FAILURES_STORE");
 
@@ -24,12 +29,14 @@ export interface CiFailureListInput {
   readonly workspaceId: string;
   readonly canAccessRawArtifacts: boolean;
   readonly filters: CiFailureListFilters;
+  readonly accessScope?: RepositoryAccessScope;
 }
 
 export interface CiFailureDetailLookup {
   readonly workspaceId: string;
   readonly ciFailureId: string;
   readonly canAccessRawArtifacts: boolean;
+  readonly accessScope?: RepositoryAccessScope;
 }
 
 interface CiFailureArtifactRow {
@@ -85,11 +92,15 @@ export class EmptyCiFailuresStore implements CiFailuresStore {
 }
 
 export class PostgresCiFailuresStore implements CiFailuresStore {
-  constructor(private readonly database: DatabaseExecutor) {}
+  constructor(private readonly database: DatabaseExecutor) { }
 
   async listCiFailures(input: CiFailureListInput): Promise<CiFailureListResponse> {
     const limit = input.filters.limit ?? DEFAULT_CI_FAILURE_LIMIT;
-    const rows = await this.loadCandidateRows(input.workspaceId, input.filters);
+    const rows = await this.loadCandidateRows(
+      input.workspaceId,
+      input.filters,
+      input.accessScope ?? FULL_REPOSITORY_ACCESS_SCOPE
+    );
     const ciFailures = buildCiFailureRecords(rows)
       .map((record) => toCiFailureListItem(record))
       .filter((item) => matchesPostQueryFilters(item, input.filters))
@@ -106,7 +117,11 @@ export class PostgresCiFailuresStore implements CiFailuresStore {
   }
 
   async getCiFailureDetail(input: CiFailureDetailLookup): Promise<CiFailureDetailResponse | null> {
-    const rows = await this.loadCandidateRows(input.workspaceId, {});
+    const rows = await this.loadCandidateRows(
+      input.workspaceId,
+      {},
+      input.accessScope ?? FULL_REPOSITORY_ACCESS_SCOPE
+    );
     const record = buildCiFailureRecords(rows).find((candidate) => toCiFailureId(candidate) === input.ciFailureId);
 
     if (record === undefined) {
@@ -116,8 +131,12 @@ export class PostgresCiFailuresStore implements CiFailuresStore {
     return toCiFailureDetail(record, input.canAccessRawArtifacts);
   }
 
-  private async loadCandidateRows(workspaceId: string, filters: CiFailureListFilters): Promise<CiFailureArtifactRow[]> {
-    const { whereSql, values } = buildCiFailureWhereClause(workspaceId, filters);
+  private async loadCandidateRows(
+    workspaceId: string,
+    filters: CiFailureListFilters,
+    accessScope: RepositoryAccessScope
+  ): Promise<CiFailureArtifactRow[]> {
+    const { whereSql, values } = buildCiFailureWhereClause(workspaceId, filters, accessScope);
     const result = await this.database.query<CiFailureArtifactRow>(
       `
 SELECT
@@ -154,10 +173,13 @@ const DEFAULT_CI_FAILURE_LIMIT = 50;
 
 function buildCiFailureWhereClause(
   workspaceId: string,
-  filters: CiFailureListFilters
+  filters: CiFailureListFilters,
+  accessScope: RepositoryAccessScope
 ): { whereSql: string; values: unknown[] } {
   const conditions = ["gi.workspace_id = $1"];
   const values: unknown[] = [workspaceId];
+
+  appendRepositoryAccessCondition(conditions, values, accessScope);
 
   if (filters.repositoryId !== undefined) {
     values.push(filters.repositoryId);

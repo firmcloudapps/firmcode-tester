@@ -1,6 +1,6 @@
 import { DashboardShell } from "../../../components/dashboard/dashboard-shell";
 import { PullRequestDetailView } from "../../../components/dashboard/pull-requests-view";
-import { loadPullRequestDetailState } from "../../../lib/dashboard-data";
+import { loadPullRequestDetailState, resolveDashboardNavRole } from "../../../lib/dashboard-data";
 
 export const dynamic = "force-dynamic";
 
@@ -11,10 +11,10 @@ interface PullRequestDetailPageProps {
 }
 
 export default async function PullRequestDetailPage({ params }: PullRequestDetailPageProps) {
-  const state = await loadPullRequestDetailState(params.id);
+  const [state, role] = await Promise.all([loadPullRequestDetailState(params.id), resolveDashboardNavRole()]);
 
   return (
-    <DashboardShell activeItem="Pull Requests">
+    <DashboardShell activeItem="Pull Requests" role={role}>
       <PullRequestDetailView state={state} />
     </DashboardShell>
   );

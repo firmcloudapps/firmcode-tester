@@ -18,6 +18,7 @@ import {
   type DashboardAuthStore,
   type DashboardMembership
 } from "../review-runs/dashboard-auth.store";
+import { resolveRepositoryAccessScope } from "../auth/repository-access-scope";
 import { RULES_STORE, type ParsedReviewPolicyUpdate, type RulesStore } from "./rules.store";
 
 export interface RulesRequestContext {
@@ -94,7 +95,11 @@ export class RulesService {
 
     const rules = await this.rulesStore.getRules({
       workspaceId: membership.workspaceId,
-      repositoryId
+      repositoryId,
+      accessScope: resolveRepositoryAccessScope({
+        role: membership.role,
+        clerkUserId: membership.clerkUserId
+      })
     });
 
     if (rules === null) {
@@ -135,6 +140,10 @@ export class RulesService {
     const updated = await this.rulesStore.updatePolicy({
       workspaceId: membership.workspaceId,
       repositoryId,
+      accessScope: resolveRepositoryAccessScope({
+        role: membership.role,
+        clerkUserId: membership.clerkUserId
+      }),
       updates,
       updatedByClerkUserId: membership.clerkUserId
     });
@@ -145,7 +154,11 @@ export class RulesService {
 
     const rules = await this.rulesStore.getRules({
       workspaceId: membership.workspaceId,
-      repositoryId: repositoryId ?? undefined
+      repositoryId: repositoryId ?? undefined,
+      accessScope: resolveRepositoryAccessScope({
+        role: membership.role,
+        clerkUserId: membership.clerkUserId
+      })
     });
 
     if (rules === null) {

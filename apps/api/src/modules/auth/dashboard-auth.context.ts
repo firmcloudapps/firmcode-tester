@@ -14,6 +14,11 @@ import {
   type DashboardMembership,
   type DashboardRole
 } from "../review-runs/dashboard-auth.store";
+import {
+  FULL_REPOSITORY_ACCESS_SCOPE,
+  resolveRepositoryAccessScope,
+  type RepositoryAccessScope
+} from "./repository-access-scope";
 
 export interface DashboardRequestContext {
   readonly clerkUserId: string;
@@ -82,6 +87,18 @@ export function toDashboardServiceAuth(auth: DashboardAuthParam, legacyUserIdHea
     workspaceId: auth.workspaceId,
     clerkUserId: auth.clerkUserId
   };
+}
+
+export function resolveRepositoryAccessScopeFromAuth(auth: DashboardAuthParam): RepositoryAccessScope {
+  if (!isDashboardRequestContext(auth)) {
+    return FULL_REPOSITORY_ACCESS_SCOPE;
+  }
+
+  return resolveRepositoryAccessScope({ role: auth.role, clerkUserId: auth.clerkUserId });
+}
+
+export function resolveRepositoryAccessScopeFromMembership(membership: DashboardMembership): RepositoryAccessScope {
+  return resolveRepositoryAccessScope({ role: membership.role, clerkUserId: membership.clerkUserId });
 }
 
 export function hasDashboardCapability(context: DashboardRequestContext, capability: DashboardCapability): boolean {

@@ -1,6 +1,6 @@
 import { DashboardShell } from "../../components/dashboard/dashboard-shell";
 import { FindingsView } from "../../components/dashboard/findings-view";
-import { loadFindingsState } from "../../lib/dashboard-data";
+import { loadFindingsState, resolveDashboardNavRole } from "../../lib/dashboard-data";
 
 export const dynamic = "force-dynamic";
 
@@ -9,10 +9,10 @@ interface FindingsPageProps {
 }
 
 export default async function FindingsPage({ searchParams = {} }: FindingsPageProps) {
-  const state = await loadFindingsState(searchParams);
+  const [state, role] = await Promise.all([loadFindingsState(searchParams), resolveDashboardNavRole()]);
 
   return (
-    <DashboardShell activeItem="Findings">
+    <DashboardShell activeItem="Findings" role={role}>
       <FindingsView state={state} />
     </DashboardShell>
   );

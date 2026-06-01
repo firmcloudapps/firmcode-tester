@@ -421,6 +421,10 @@ INSERT INTO repositories (
   'main',
   true
 );
+
+INSERT INTO repository_access (repository_id, clerk_user_id, granted_by_clerk_user_id) VALUES
+('${REPOSITORY_ID}', '${DEVELOPER_USER_ID}', '${OWNER_USER_ID}'),
+('${REPOSITORY_ID}', '${VIEWER_USER_ID}', '${OWNER_USER_ID}');
 `
   );
 }

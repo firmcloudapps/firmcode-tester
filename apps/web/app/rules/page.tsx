@@ -1,6 +1,6 @@
 import { DashboardShell } from "../../components/dashboard/dashboard-shell";
 import { RulesPoliciesView } from "../../components/dashboard/rules-policies-view";
-import { loadRulesState } from "../../lib/dashboard-data";
+import { loadRulesState, resolveDashboardNavRole } from "../../lib/dashboard-data";
 
 export const dynamic = "force-dynamic";
 
@@ -9,10 +9,10 @@ interface RulesPageProps {
 }
 
 export default async function RulesPage({ searchParams = {} }: RulesPageProps) {
-  const state = await loadRulesState(searchParams);
+  const [state, role] = await Promise.all([loadRulesState(searchParams), resolveDashboardNavRole()]);
 
   return (
-    <DashboardShell activeItem="Rules">
+    <DashboardShell activeItem="Rules" role={role}>
       <RulesPoliciesView state={state} />
     </DashboardShell>
   );

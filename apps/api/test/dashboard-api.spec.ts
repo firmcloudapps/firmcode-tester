@@ -443,6 +443,10 @@ INSERT INTO repositories (
   false
 );
 
+INSERT INTO repository_access (repository_id, clerk_user_id, granted_by_clerk_user_id) VALUES
+('00000000-0000-4000-8000-000000000002', '${DEVELOPER_USER_ID}', '${ADMIN_USER_ID}'),
+('00000000-0000-4000-8000-000000000012', '${DEVELOPER_USER_ID}', '${ADMIN_USER_ID}');
+
 INSERT INTO pull_requests (
   id,
   repository_id,

@@ -25,6 +25,8 @@ import {
   DashboardAuth,
   hasDashboardCapability,
   resolveDashboardMembership,
+  resolveRepositoryAccessScopeFromAuth,
+  resolveRepositoryAccessScopeFromMembership,
   toDashboardServiceAuth,
   type DashboardAuthParam
 } from "../auth/dashboard-auth.context";
@@ -80,7 +82,8 @@ export class RepositoriesController {
 
     return this.repositoriesStore.listRepositories({
       ...parseRepositoryListFilters(query),
-      workspaceId: serviceAuth.workspaceId
+      workspaceId: serviceAuth.workspaceId,
+      accessScope: resolveRepositoryAccessScopeFromAuth(auth)
     });
   }
 
@@ -95,6 +98,7 @@ export class RepositoriesController {
     const detail = await this.repositoriesStore.getRepositoryDetail({
       repositoryId: id,
       workspaceId: membership.workspaceId,
+      accessScope: resolveRepositoryAccessScopeFromMembership(membership),
       permissions: {
         canManageConfiguration: hasMembershipCapability(membership, "manage_repository_configuration"),
         canRetryReviewRuns: hasMembershipCapability(membership, "retry_review_run"),
@@ -121,7 +125,8 @@ export class RepositoriesController {
     const membership = await this.requireMembership(auth, userIdHeader);
     const activity = await this.repositoriesStore.listRepositoryActivity({
       repositoryId: id,
-      workspaceId: membership.workspaceId
+      workspaceId: membership.workspaceId,
+      accessScope: resolveRepositoryAccessScopeFromMembership(membership)
     });
 
     if (activity === null) {

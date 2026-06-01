@@ -11,6 +11,7 @@ import {
   DashboardAuth,
   hasDashboardCapability,
   resolveDashboardMembership,
+  resolveRepositoryAccessScopeFromMembership,
   type DashboardAuthParam
 } from "../auth/dashboard-auth.context";
 import { DashboardAuthGuard } from "../auth/dashboard-auth.guard";
@@ -26,7 +27,7 @@ export class FindingsController {
   constructor(
     @Inject(FINDINGS_STORE) private readonly findingsStore: FindingsStore,
     @Inject(DASHBOARD_AUTH_STORE) private readonly dashboardAuthStore: DashboardAuthStore
-  ) {}
+  ) { }
 
   @Get()
   async listFindings(
@@ -40,6 +41,7 @@ export class FindingsController {
     return this.findingsStore.listFindings({
       workspaceId: membership.workspaceId,
       filters: parseFindingsListFilters(query),
+      accessScope: resolveRepositoryAccessScopeFromMembership(membership),
       canManageCodebaseFindings: hasDashboardCapability(
         {
           workspaceId: membership.workspaceId,

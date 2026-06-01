@@ -17,6 +17,7 @@ import {
 import {
   DashboardAuth,
   resolveDashboardMembership,
+  resolveRepositoryAccessScopeFromMembership,
   type DashboardAuthParam
 } from "../auth/dashboard-auth.context";
 import { DashboardAuthGuard } from "../auth/dashboard-auth.guard";
@@ -33,7 +34,7 @@ export class PullRequestsController {
   constructor(
     @Inject(PULL_REQUESTS_STORE) private readonly pullRequestsStore: PullRequestsStore,
     @Inject(DASHBOARD_AUTH_STORE) private readonly dashboardAuthStore: DashboardAuthStore
-  ) {}
+  ) { }
 
   @Get()
   async listPullRequests(
@@ -45,7 +46,8 @@ export class PullRequestsController {
 
     return this.pullRequestsStore.listPullRequests({
       workspaceId: membership.workspaceId,
-      filters: parsePullRequestListFilters(query)
+      filters: parsePullRequestListFilters(query),
+      accessScope: resolveRepositoryAccessScopeFromMembership(membership)
     });
   }
 
@@ -59,7 +61,8 @@ export class PullRequestsController {
     const membership = await this.requireMembership(auth, userIdHeader);
     const detail = await this.pullRequestsStore.getPullRequestDetail({
       workspaceId: membership.workspaceId,
-      pullRequestId: id
+      pullRequestId: id,
+      accessScope: resolveRepositoryAccessScopeFromMembership(membership)
     });
 
     if (detail === null) {

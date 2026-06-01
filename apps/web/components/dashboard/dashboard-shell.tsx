@@ -1,13 +1,16 @@
 import React from "react";
-import { DASHBOARD_NAV_ITEMS, type DashboardActiveItem } from "../../lib/dashboard-navigation";
+import { DASHBOARD_NAV_ITEMS, navItemsForRole, type DashboardActiveItem } from "../../lib/dashboard-navigation";
 import { DashboardClerkControls, DashboardWorkspaceLabel } from "./dashboard-clerk-controls";
 
 interface DashboardShellProps {
   activeItem: DashboardActiveItem;
   children: React.ReactNode;
+  role?: string | null;
 }
 
-export function DashboardShell({ activeItem, children }: DashboardShellProps) {
+export function DashboardShell({ activeItem, children, role }: DashboardShellProps) {
+  const navItems = role === undefined ? DASHBOARD_NAV_ITEMS : navItemsForRole(role);
+
   return (
     <div className="min-h-screen bg-shell text-primary" data-clerk-authenticated="required">
       <header className="sticky top-0 z-20 border-b border-border bg-surface/95 backdrop-blur">
@@ -47,15 +50,14 @@ export function DashboardShell({ activeItem, children }: DashboardShellProps) {
         <details className="border-t border-border px-4 py-2 lg:hidden">
           <summary className="cursor-pointer text-sm font-medium text-primary">Navigation</summary>
           <nav className="mt-2 grid gap-1" aria-label="Mobile dashboard">
-            {DASHBOARD_NAV_ITEMS.map((item) => {
+            {navItems.map((item) => {
               const active = item.activeItem === activeItem;
 
               return item.enabled ? (
                 <a
                   key={item.label}
-                  className={`rounded-md px-3 py-2 text-sm font-medium ${
-                    active ? "bg-blush text-accent" : "text-secondary hover:bg-blush hover:text-primary"
-                  }`}
+                  className={`rounded-md px-3 py-2 text-sm font-medium ${active ? "bg-blush text-accent" : "text-secondary hover:bg-blush hover:text-primary"
+                    }`}
                   href={item.href}
                   aria-current={active ? "page" : undefined}
                 >
@@ -87,17 +89,16 @@ export function DashboardShell({ activeItem, children }: DashboardShellProps) {
             </div>
           </div>
           <nav className="flex flex-col gap-1" aria-label="Dashboard">
-            {DASHBOARD_NAV_ITEMS.map((item) => {
+            {navItems.map((item) => {
               const active = item.activeItem === activeItem;
 
               return item.enabled ? (
                 <a
                   key={item.label}
-                  className={`rounded-md border px-3 py-2 text-sm font-medium transition ${
-                    active
-                      ? "border-border bg-blush text-primary shadow-sm"
-                      : "border-transparent text-secondary hover:border-border hover:bg-shell hover:text-primary"
-                  }`}
+                  className={`rounded-md border px-3 py-2 text-sm font-medium transition ${active
+                    ? "border-border bg-blush text-primary shadow-sm"
+                    : "border-transparent text-secondary hover:border-border hover:bg-shell hover:text-primary"
+                    }`}
                   href={item.href}
                   aria-current={active ? "page" : undefined}
                 >

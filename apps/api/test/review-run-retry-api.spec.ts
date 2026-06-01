@@ -225,6 +225,9 @@ INSERT INTO repositories (
   true
 );
 
+INSERT INTO repository_access (repository_id, clerk_user_id, granted_by_clerk_user_id) VALUES
+('00000000-0000-4000-8000-000000000211', '${DEVELOPER_USER_ID}', '${OWNER_USER_ID}');
+
 INSERT INTO pull_requests (
   id,
   repository_id,

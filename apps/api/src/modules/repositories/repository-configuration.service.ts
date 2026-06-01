@@ -15,6 +15,10 @@ import {
   roleHasDashboardCapability,
   type DashboardAuthStore
 } from "../review-runs/dashboard-auth.store";
+import {
+  resolveRepositoryAccessScope,
+  type RepositoryAccessScope
+} from "../auth/repository-access-scope";
 import { CodebaseScanEnqueueService } from "../codebase-scans/codebase-scan-enqueue.service";
 import { REPOSITORIES_STORE, type RepositoriesStore } from "./repositories.store";
 
@@ -130,6 +134,7 @@ export class RepositoryConfigurationService {
     repositoryId: string;
     workspaceId: string;
     clerkUserId: string;
+    accessScope: RepositoryAccessScope;
   }> {
     assertUuid("repository ID", input.repositoryId);
     assertAuthenticated(input);
@@ -151,7 +156,11 @@ export class RepositoryConfigurationService {
     return {
       repositoryId: input.repositoryId,
       workspaceId: input.workspaceId,
-      clerkUserId: input.clerkUserId
+      clerkUserId: input.clerkUserId,
+      accessScope: resolveRepositoryAccessScope({
+        role: membership.role,
+        clerkUserId: membership.clerkUserId
+      })
     };
   }
 }

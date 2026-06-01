@@ -17,9 +17,10 @@ export default async function GitHubInstallationsPage({ searchParams = {} }: Git
   const state = await loadGitHubInstallationsState();
   const installConfig = loadGitHubAppInstallConfig();
   const notice = parseGitHubInstallationsNotice(searchParams);
+  const role = state.status === "empty" || state.status === "populated" ? state.data.settings.workspace.role : "developer";
 
   return (
-    <DashboardShell activeItem="PR Review">
+    <DashboardShell activeItem="PR Review" role={role}>
       <GitHubInstallationsView state={state} installConfig={installConfig} notice={notice} />
     </DashboardShell>
   );
