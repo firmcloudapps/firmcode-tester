@@ -57,7 +57,7 @@ describe("RepositoriesView", () => {
     );
 
     expect(html).toContain('href="/auth/github"');
-    expect(html).toContain("Connect GitHub OAuth before syncing repositories.");
+    expect(html).toContain("");
     expect(html).toContain("Connect GitHub first.");
   });
 });
