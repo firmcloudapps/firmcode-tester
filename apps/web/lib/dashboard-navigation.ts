@@ -29,7 +29,6 @@ export const DASHBOARD_NAV_ITEMS: readonly DashboardNavItem[] = [
   { label: "Review Runs", href: "/review-runs", enabled: true, activeItem: "Review Runs", audience: "all" },
   { label: "Findings", href: "/findings", enabled: true, activeItem: "Findings", audience: "all" },
   { label: "CI Failures", href: "/ci-failures", enabled: true, activeItem: "CI Failures", audience: "all" },
-  { label: "Rules / Policies", href: "/rules", enabled: true, activeItem: "Rules", audience: "all" },
   { label: "Settings", href: "/settings", enabled: true, activeItem: "Settings", audience: "admin" },
   { label: "Billing", href: "/billing", enabled: true, activeItem: "Billing", audience: "admin" }
 ] as const;

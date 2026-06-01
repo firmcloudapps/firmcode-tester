@@ -28,7 +28,7 @@ Copy-ready prompts for implementing and QAing the dashboard live in `docs/DASHBO
 
 ### Palette
 
-Use a neutral shell with restrained accent color. The default design remains light-mode for the MVP, but the PR Review workspace may use a darker developer-console variant if implemented consistently across the dashboard, similar to the attached reference: dark sidebar, compact cards, strong active nav state, and high-contrast status pills.
+Use a neutral shell with restrained accent color. The dashboard remains light-mode for the MVP, including the PR Review workspace. Reference screenshots can inform spacing, hierarchy, and status treatment, but not a dark-mode treatment.
 
 - App background: `#F8FAFC`
 - Surface: `#FFFFFF`
@@ -77,9 +77,6 @@ Left Sidebar
 │   ├── Review Runs
 │   ├── Findings
 │   └── CI Failures
-├── Configuration
-│   ├── Rules / Policies
-│   └── GitHub App
 └── Account
     ├── Billing
     └── Settings
@@ -105,7 +102,7 @@ Left Sidebar
 
 ### Reference-Informed PR Review Workspace
 
-The PR Review page should learn from developer tools that put setup status and repo automation in one focused workspace. The attached Planarc reference is the right product shape: a left navigation rail, a focused PR Review page, provider tabs, GitHub OAuth/App setup cards, repository rows, enabled toggles, run controls, and pricing/settings access. Do not copy the brand directly; adapt the structure into Firmcode's system.
+The PR Review page should learn from developer tools that put setup status and repo automation in one focused workspace, while staying information-light. The attached Planarc reference is useful for layout restraint: a left navigation rail, focused PR Review page, GitHub OAuth/App setup cards, repository rows, enabled toggles, and run controls. Do not copy the brand directly; adapt the structure into Firmcode's light-mode system.
 
 Recommended layout:
 
@@ -114,12 +111,6 @@ Header
 ├── Title: PR Review
 ├── Description: Automated pull request review status
 └── Refresh / Sync action
-
-Provider Tabs
-├── GitHub
-├── GitLab disabled planned state
-├── Bitbucket disabled planned state
-└── Azure DevOps disabled planned state
 
 Connection Cards
 ├── GitHub OAuth / account connection status
@@ -138,11 +129,10 @@ Behavior notes:
 
 - GitHub is the only active provider in the MVP. Other providers should appear only as disabled planned states if shown at all.
 - Connection cards should separate required user/account OAuth connection from GitHub App installation status.
-- Every signed-in Firmcode user must connect GitHub OAuth before using GitHub-backed workflows. Developers can add GitHub accounts/repositories, enable automation, run reviews, and track report analysis. Admins can additionally manage billing, member access, global workspace settings, and support/safety controls.
+- Every signed-in Firmcode user must connect GitHub OAuth before using GitHub-backed workflows. Developer-facing pages should avoid surfacing admin-role explanations unless the user is blocked by a permission decision.
 - PR reviews, repository sync, and PR publishing must use GitHub App installation tokens, not individual users' OAuth tokens.
 - Repository rows should make automation state obvious: Ready, Needs setup, Enabled, Disabled, Last reviewed, Failed, or Running.
 - Run/retry controls must respect role capabilities and duplicate-click protection.
-- A short tip can clarify that repositories are matched by exact `owner/repo` name.
 - The page should support a manual refresh/sync action, but it must be disabled until the sync API is implemented.
 
 ## Clerk Responsibilities
@@ -325,10 +315,6 @@ Purpose: provide the primary operational workspace for GitHub connection health 
 Header
 ├── PR Review
 └── Refresh / Sync
-
-Provider Tabs
-├── GitHub active
-└── Planned providers disabled
 
 Connection Status Grid
 ├── GitHub account/OAuth connection
@@ -553,11 +539,11 @@ Purpose: explain broken checks and workflow failures.
 
 Raw logs should be collapsed by default and redacted before display.
 
-## 7. Rules / Policies
+## 7. Review Preferences
 
-Purpose: control review behavior.
+Purpose: control review behavior without adding a first-level Rules / Policies menu item.
 
-Sections:
+Place these controls inside Settings or repository configuration when they are needed:
 
 - Review preferences.
 - Security rules.
@@ -616,7 +602,7 @@ Build in this order:
 6. Findings.
 7. Settings.
 
-Pull Requests, CI Failures, Rules / Policies, and Billing can follow once the core review loop is visible.
+Pull Requests, CI Failures, Billing, and deeper review-preference controls can follow once the core review loop is visible.
 
 ## Tailwind Implementation Notes
 

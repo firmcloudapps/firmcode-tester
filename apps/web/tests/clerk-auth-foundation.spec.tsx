@@ -338,9 +338,10 @@ describe("role landing dashboard pages", () => {
       const html = renderToString(await DeveloperDashboardPage());
 
       expect(html).toContain('data-clerk-authenticated="required"');
-      expect(html).toContain('data-dashboard-role="developer"');
-      expect(html).toContain("Developer dashboard");
-      expect(html).toContain("Code Review");
+      expect(html).not.toContain("data-dashboard-role");
+      expect(html).not.toContain("Developer dashboard");
+      expect(html).not.toContain("PR review workspace");
+      expect(html).toContain("PR Review");
       expect(html).toContain("GitHub OAuth");
       expect(html).toContain("GitHub App");
       expect(html).not.toContain("Workspace settings");

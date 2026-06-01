@@ -20,13 +20,12 @@ interface DeveloperPrReviewDashboardProps {
 
 export function DeveloperPrReviewDashboard({ state, installConfig }: DeveloperPrReviewDashboardProps) {
   return (
-    <div className="min-h-screen bg-shell text-primary" data-clerk-authenticated="required" data-dashboard-role="developer">
+    <div className="min-h-screen bg-shell text-primary" data-clerk-authenticated="required">
       <div className="flex min-h-screen">
         <DeveloperSidebar oauthConnected={readOAuthConnected(state)} />
         <main className="min-w-0 flex-1 px-4 py-5 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-7xl space-y-4">
             <DeveloperHeader state={state} />
-            <ProviderTabs />
             {state.status === "loading" ? <DeveloperLoadingState /> : null}
             {state.status === "signed-out" ? <DeveloperSignedOutState /> : null}
             {state.status === "error" ? <DeveloperErrorState message={state.message} /> : null}
@@ -40,11 +39,11 @@ export function DeveloperPrReviewDashboard({ state, installConfig }: DeveloperPr
 }
 
 function DeveloperSidebar({ oauthConnected }: { oauthConnected: boolean }) {
-  const plannerLinks = [
-    ["Overview", "/dashboard"],
-    ["Projects", "/repositories"],
-    ["New Plan", "/repositories"],
-    ["Enhance Repo", "/findings"]
+  const links = [
+    { label: "PR Review", href: "/dashboard/developer", active: true },
+    { label: "Repositories", href: "/repositories", active: false },
+    { label: "Pull Requests", href: "/pull-requests", active: false },
+    { label: "Review Runs", href: "/review-runs", active: false }
   ] as const;
 
   return (
@@ -60,55 +59,30 @@ function DeveloperSidebar({ oauthConnected }: { oauthConnected: boolean }) {
           </span>
         </a>
       </div>
-      <nav className="flex-1 space-y-6 p-4" aria-label="Developer dashboard">
-        <DeveloperNavGroup title="Planner" items={plannerLinks} />
-        <div>
-          <p className="px-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-secondary">PR Review</p>
+      <nav className="flex-1 p-4" aria-label="PR review navigation">
+        <div className="grid gap-1">
+          {links.map((link) => (
+            <a
+              key={link.label}
+              className={`rounded-md px-3 py-2 text-sm font-medium ${
+                link.active ? "border border-border bg-blush text-accent" : "text-secondary hover:bg-subtle hover:text-primary"
+              }`}
+              href={link.href}
+              aria-current={link.active ? "page" : undefined}
+            >
+              {link.label}
+            </a>
+          ))}
           <a
-            className="mt-2 flex items-center justify-between rounded-md border border-border bg-blush px-3 py-2 text-sm font-semibold text-accent"
-            href="/dashboard/developer"
-            aria-current="page"
+            className="mt-3 flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium text-secondary hover:bg-subtle hover:text-primary"
+            href="/auth/github"
           >
-            Code Review
-            <span className="h-2 w-2 rounded-full bg-success" aria-hidden="true" />
-          </a>
-        </div>
-        <div>
-          <p className="px-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-secondary">Connections</p>
-          <a className="mt-2 flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium text-secondary hover:bg-subtle hover:text-primary" href="/auth/github">
-            GitHub OAuth
+            GitHub
             <span className={`h-2 w-2 rounded-full ${oauthConnected ? "bg-success" : "bg-warning"}`} aria-hidden="true" />
           </a>
         </div>
       </nav>
-      <div className="border-t border-border p-4">
-        <a className="block rounded-md px-3 py-2 text-sm font-medium text-secondary hover:bg-subtle hover:text-primary" href="/billing">
-          Pricing
-        </a>
-        <a className="block rounded-md px-3 py-2 text-sm font-medium text-secondary hover:bg-subtle hover:text-primary" href="/settings">
-          Settings
-        </a>
-        <div className="mt-3 rounded-md border border-border bg-shell p-3">
-          <p className="text-sm font-semibold text-primary">Developer</p>
-          <p className="mt-1 text-xs text-secondary">PR review workspace</p>
-        </div>
-      </div>
     </aside>
-  );
-}
-
-function DeveloperNavGroup({ title, items }: { title: string; items: readonly (readonly [string, string])[] }) {
-  return (
-    <div>
-      <p className="px-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-secondary">{title}</p>
-      <div className="mt-2 grid gap-1">
-        {items.map(([label, href]) => (
-          <a key={label} className="rounded-md px-3 py-2 text-sm font-medium text-secondary hover:bg-subtle hover:text-primary" href={href}>
-            {label}
-          </a>
-        ))}
-      </div>
-    </div>
   );
 }
 
@@ -116,11 +90,8 @@ function DeveloperHeader({ state }: { state: GitHubInstallationsState }) {
   return (
     <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
       <div>
-        <p className="text-sm font-medium text-accent">Developer dashboard</p>
-        <h1 className="mt-1 text-2xl font-semibold tracking-normal text-primary">PR Review</h1>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-secondary">
-          Automatically review new pull requests, run analysis on demand, and keep repository automation ready.
-        </p>
+        <h1 className="text-2xl font-semibold tracking-normal text-primary">PR Review</h1>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-secondary">Connect GitHub and keep repository reviews running.</p>
       </div>
       {state.status === "empty" || state.status === "populated" ? (
         <GitHubInstallationSyncButton
@@ -134,28 +105,6 @@ function DeveloperHeader({ state }: { state: GitHubInstallationsState }) {
         </button>
       )}
     </header>
-  );
-}
-
-function ProviderTabs() {
-  return (
-    <nav className="overflow-x-auto" aria-label="Review providers">
-      <div className="flex min-w-max gap-2">
-        <span className="rounded-md border border-accent bg-blush px-3 py-2 text-sm font-semibold text-accent" aria-current="page">
-          GitHub
-        </span>
-        {["GitLab - Coming soon", "Bitbucket - Coming soon", "Azure DevOps - Coming soon"].map((provider) => (
-          <span
-            key={provider}
-            className="cursor-not-allowed rounded-md border border-border bg-surface px-3 py-2 text-sm font-medium text-secondary"
-            aria-disabled="true"
-            title="Planned provider"
-          >
-            {provider}
-          </span>
-        ))}
-      </div>
-    </nav>
   );
 }
 
@@ -217,13 +166,11 @@ function DeveloperContent({
         <OAuthSetupCard data={data} />
         <GitHubAppSetupCard data={data} installConfig={installConfig} />
       </section>
-      <section className="space-y-3" aria-label="Developer repository review queue">
+      <section className="space-y-3" aria-label="Repository review queue">
         {data.repositories.repositories.length === 0 ? (
           <article className="rounded-lg border border-border bg-surface p-5">
-            <h2 className="text-base font-semibold text-primary">No repositories synced yet</h2>
-            <p className="mt-2 text-sm leading-6 text-secondary">
-              Connect GitHub OAuth, install the GitHub App, then refresh repository metadata to start review automation.
-            </p>
+            <h2 className="text-base font-semibold text-primary">No repositories yet</h2>
+            <p className="mt-2 text-sm leading-6 text-secondary">Add repositories from the GitHub App installation to start PR reviews.</p>
           </article>
         ) : (
           data.repositories.repositories.map((repository) => (
@@ -238,9 +185,6 @@ function DeveloperContent({
           ))
         )}
       </section>
-      <p className="text-sm leading-6 text-secondary">
-        Tip: a project is reviewed only when its repository matches owner/repo exactly.
-      </p>
     </div>
   );
 }
@@ -253,7 +197,7 @@ function OAuthSetupCard({ data }: { data: GitHubSyncDashboardData }) {
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="text-base font-semibold text-primary">GitHub OAuth</h2>
-          <p className="mt-1 text-sm leading-6 text-secondary">Used for importing and analyzing repositories.</p>
+          <p className="mt-1 text-sm leading-6 text-secondary">Connect your account to list repositories.</p>
         </div>
         <ConnectionPill tone={connected ? "success" : "warning"}>{connected ? "Connected" : "Required"}</ConnectionPill>
       </div>
@@ -286,7 +230,7 @@ function GitHubAppSetupCard({
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="text-base font-semibold text-primary">Firmcode GitHub App</h2>
-          <p className="mt-1 text-sm leading-6 text-secondary">Required for automatic PR review.</p>
+          <p className="mt-1 text-sm leading-6 text-secondary">Grant repository access for PR reviews.</p>
         </div>
         <ConnectionPill tone={installed ? "success" : "warning"}>{installed ? "Installed" : "Missing"}</ConnectionPill>
       </div>
@@ -299,7 +243,7 @@ function GitHubAppSetupCard({
             href={installConfig.installUrl}
             rel="noreferrer"
           >
-            Add Repo
+            Add repositories
           </a>
         ) : (
           <button
@@ -308,12 +252,12 @@ function GitHubAppSetupCard({
             disabled
             title={data.oauth.connected ? "GitHub App install URL is not configured." : "Connect GitHub OAuth before adding repositories."}
           >
-            Add Repo
+            Add repositories
           </button>
         )}
         {data.oauth.connected && !installed ? (
           <a className="rounded-md border border-border px-3 py-2 text-sm font-medium text-primary" href="/auth/github">
-            Detect installed app
+            Refresh app status
           </a>
         ) : null}
         {installed ? <InstallationSummary installations={installations} /> : null}
@@ -439,7 +383,7 @@ function rowSyncDisabledReason(input: { hasOAuth: boolean; canManageRepositories
   }
 
   if (!input.canManageRepositories) {
-    return "Developer or Admin required to manage repository automation.";
+    return "You do not have permission to manage repository automation.";
   }
 
   if (!input.hasInstallations) {
