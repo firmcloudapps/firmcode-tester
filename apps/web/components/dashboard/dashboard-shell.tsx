@@ -11,6 +11,7 @@ interface DashboardShellProps {
 export function DashboardShell({ activeItem, children, role }: DashboardShellProps) {
   const navItems = role === undefined ? DASHBOARD_NAV_ITEMS : navItemsForRole(role);
   const showCompanyIdentity = role === undefined || isAdminDashboardRole(role);
+  const showGitHubShortcut = activeItem !== "PR Review" || role?.toLowerCase() !== "developer";
 
   return (
     <div className="min-h-screen bg-shell text-primary" data-clerk-authenticated="required">
@@ -32,12 +33,14 @@ export function DashboardShell({ activeItem, children, role }: DashboardShellPro
               aria-label="Global search"
             />
           </label>
-          <a
-            className="hidden shrink-0 rounded-md border border-border bg-surface px-3 py-2 text-sm font-medium text-primary shadow-sm hover:border-accent sm:inline-flex"
-            href="/github/installations"
-          >
-            Connect GitHub
-          </a>
+          {showGitHubShortcut ? (
+            <a
+              className="hidden shrink-0 rounded-md border border-border bg-surface px-3 py-2 text-sm font-medium text-primary shadow-sm hover:border-accent sm:inline-flex"
+              href="/github/installations"
+            >
+              Connect GitHub
+            </a>
+          ) : null}
           <button
             className="hidden h-9 w-9 items-center justify-center rounded-md border border-border bg-surface text-sm font-semibold text-accent shadow-sm hover:border-accent sm:inline-flex"
             type="button"

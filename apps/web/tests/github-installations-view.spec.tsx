@@ -22,7 +22,7 @@ describe("GitHubInstallationsView", () => {
     expect(html).toContain("disabled=\"\"");
   });
 
-  it("renders missing OAuth as the required first step and disables GitHub-backed controls", () => {
+  it("renders missing OAuth as compact developer actions and disables GitHub-backed controls", () => {
     const html = renderToString(
       <GitHubInstallationsView
         state={{ status: "empty", data: syncData(emptySettings, false) }}
@@ -34,16 +34,17 @@ describe("GitHubInstallationsView", () => {
       />
     );
 
-    expect(html).toContain("GitHub account");
-    expect(html).toContain("Required");
+    expect(html).not.toContain("GitHub account");
+    expect(html).not.toContain("GitHub connection status");
     expect(html).toContain('href="/auth/github"');
-    expect(html).toContain("Connect GitHub first");
-    expect(html).toContain("Connect GitHub OAuth before syncing repositories.");
+    expect(html).toContain("GitHub App");
+    expect(html).toContain("Connect GitHub before installing the GitHub App.");
+    expect(html).toContain("Connect GitHub before syncing repositories.");
     expect(html).toContain("Needs account");
     expect(html).not.toContain("Setup order");
   });
 
-  it("renders signed-in setup status with OAuth connected, no installation, and a configured install URL", () => {
+  it("renders signed-in developer setup as compact header actions", () => {
     const html = renderToString(
       <GitHubInstallationsView
         state={{ status: "empty", data: syncData(emptySettings, true) }}
@@ -55,12 +56,14 @@ describe("GitHubInstallationsView", () => {
       />
     );
 
-    expect(html).toContain("Connected");
-    expect(html).toContain("kelly");
-    expect(html).toContain("Missing");
-    expect(html).toContain("No repositories have been granted yet");
-    expect(html).toContain("Refresh app status");
-    expect(html).toContain('href="/auth/github"');
+    expect(html).toContain("GitHub connected");
+    expect(html).toContain("GitHub App");
+    expect(html).not.toContain("GitHub account");
+    expect(html).not.toContain("kelly");
+    expect(html).not.toContain("Missing");
+    expect(html).not.toContain("No repositories have been granted yet");
+    expect(html).not.toContain("Refresh app status");
+    expect(html).not.toContain('href="/auth/github"');
     expect(html).not.toContain("Configured install URL");
     expect(html).toContain('href="https://github.com/apps/firmcode/installations/new"');
   });
@@ -77,10 +80,28 @@ describe("GitHubInstallationsView", () => {
       />
     );
 
-    expect(html).toContain("Installed");
-    expect(html).toContain("openclaw");
-    expect(html).toContain("repositories have review automation enabled");
-    expect(html).toContain("installation:<!-- -->301");
+    expect(html).toContain("GitHub App installed");
+    expect(html).toContain("openclaw/firmcode");
+    expect(html).not.toContain("repositories have review automation enabled");
+    expect(html).not.toContain("installation:<!-- -->301");
+  });
+
+  it("keeps setup status cards available for admin roles", () => {
+    const html = renderToString(
+      <GitHubInstallationsView
+        state={{ status: "empty", data: syncData(adminSettings, false) }}
+        installConfig={{
+          status: "configured",
+          installUrl: "https://github.com/apps/firmcode/installations/new",
+          source: "GITHUB_APP_INSTALL_URL"
+        }}
+      />
+    );
+
+    expect(html).toContain("GitHub account");
+    expect(html).toContain("GitHub App");
+    expect(html).toContain("Connect GitHub first");
+    expect(html).toContain("GitHub connection status");
   });
 
   it("renders a minimal repository review list without provider tabs", () => {
@@ -169,7 +190,7 @@ describe("GitHubInstallationsView", () => {
       />
     );
 
-    expect(html).toContain("Install URL not configured");
+    expect(html).toContain("Set GITHUB_APP_INSTALL_URL or GITHUB_APP_SLUG before installing the GitHub App.");
     expect(html).not.toContain("Missing GitHub App install config");
     expect(html).not.toContain("API-side GitHub App credentials remain server-only");
     expect(html).not.toContain("GITHUB_APP_PRIVATE_KEY");
@@ -283,6 +304,19 @@ const developerSettings: WorkspaceSettingsResponse = {
 
 const emptySettings: WorkspaceSettingsResponse = {
   ...developerSettings,
+  githubApp: {
+    ...developerSettings.githubApp,
+    installations: []
+  }
+};
+
+const adminSettings: WorkspaceSettingsResponse = {
+  ...developerSettings,
+  workspace: {
+    ...developerSettings.workspace,
+    role: "admin",
+    canManageSensitiveSettings: true
+  },
   githubApp: {
     ...developerSettings.githubApp,
     installations: []
