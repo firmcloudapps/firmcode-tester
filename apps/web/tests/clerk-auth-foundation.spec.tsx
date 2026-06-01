@@ -330,7 +330,11 @@ describe("role landing dashboard pages", () => {
         return jsonResponse({ connected: false, user: null });
       }
 
-      return jsonResponse({ repositories: [], filters: {} });
+      if (pathname === "/api/review-runs") {
+        return jsonResponse({ reviewRuns: [], filters: {} });
+      }
+
+      return jsonResponse({});
     });
     vi.stubGlobal("fetch", fetcher);
 
@@ -342,8 +346,12 @@ describe("role landing dashboard pages", () => {
       expect(html).not.toContain("Developer dashboard");
       expect(html).not.toContain("PR review workspace");
       expect(html).toContain("PR Review");
+      expect(html).toContain("Review Run History");
+      expect(html).toContain("No PR reviews yet");
       expect(html).toContain("GitHub App");
       expect(html).toContain("Connect GitHub");
+      expect(html).not.toContain("Repositories available for automated PR review.");
+      expect(html).not.toContain("No repositories yet");
       expect(html).not.toContain("GitHub OAuth");
       expect(html).not.toContain("Firmcode GitHub App");
       expect(html).not.toContain("Workspace settings");

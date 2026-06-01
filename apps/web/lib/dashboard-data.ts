@@ -38,6 +38,19 @@ export interface GitHubSyncDashboardData {
   repositories: RepositoryListResponse;
 }
 
+export interface DeveloperPrReviewData {
+  settings: WorkspaceSettingsResponse;
+  oauth: GitHubOAuthStatusResponse;
+  reviewRuns: ReviewRunListResponse;
+}
+
+export type DeveloperPrReviewState =
+  | { status: "loading" }
+  | { status: "signed-out" }
+  | { status: "empty"; data: DeveloperPrReviewData }
+  | { status: "error"; message: string }
+  | { status: "populated"; data: DeveloperPrReviewData };
+
 export type GitHubRepositoryControlsState =
   | { status: "ready"; data: Pick<GitHubSyncDashboardData, "settings" | "oauth"> }
   | { status: "signed-out" }
@@ -204,6 +217,25 @@ export async function loadGitHubInstallationsState(): Promise<GitHubInstallation
     const data = { settings, oauth, repositories };
 
     return settings.githubApp.installations.length === 0 ? { status: "empty", data } : { status: "populated", data };
+  } catch (error) {
+    if (error instanceof DashboardApiError && error.status === 401) {
+      return { status: "signed-out" };
+    }
+
+    return { status: "error", message: toErrorMessage(error) };
+  }
+}
+
+export async function loadDeveloperPrReviewState(): Promise<DeveloperPrReviewState> {
+  try {
+    const [settings, oauth, reviewRuns] = await Promise.all([
+      requestAuthenticatedJson<WorkspaceSettingsResponse>("/api/settings"),
+      requestAuthenticatedJson<GitHubOAuthStatusResponse>("/api/github/oauth/status"),
+      requestJson<ReviewRunListResponse>("/api/review-runs", {})
+    ]);
+    const data = { settings, oauth, reviewRuns };
+
+    return reviewRuns.reviewRuns.length === 0 ? { status: "empty", data } : { status: "populated", data };
   } catch (error) {
     if (error instanceof DashboardApiError && error.status === 401) {
       return { status: "signed-out" };
