@@ -26,35 +26,26 @@ export function GitHubInstallationsView({ state, installConfig, notice = null }:
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-sm font-medium text-accent">PR Review</p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-normal text-primary">PR Review</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-secondary">
-            Connect GitHub, verify the Firmcode GitHub App, and manage repository review automation from one workspace.
-          </p>
+          <h1 className="text-2xl font-semibold tracking-normal text-primary">PR Review</h1>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-secondary">Connect GitHub and review repositories.</p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          {state.status === "empty" || state.status === "populated" ? (
-            <GitHubInstallationSyncButton
-              disabled={!canSyncGitHub(state.data)}
-              disabledReason={syncDisabledReason(state.data)}
-            />
-          ) : (
-            <button
-              className="rounded-md border border-border bg-subtle px-3 py-2 text-sm font-medium text-secondary"
-              type="button"
-              disabled
-              title="GitHub connection status must load before syncing."
-            >
-              Sync GitHub
-            </button>
-          )}
-          <a className="rounded-md border border-border px-3 py-2 text-sm font-medium text-primary" href="/settings?tab=github-app">
-            GitHub App settings
-          </a>
-        </div>
+        {state.status === "empty" || state.status === "populated" ? (
+          <GitHubInstallationSyncButton
+            disabled={!canSyncGitHub(state.data)}
+            disabledReason={syncDisabledReason(state.data)}
+          />
+        ) : (
+          <button
+            className="rounded-md border border-border bg-subtle px-3 py-2 text-sm font-medium text-secondary"
+            type="button"
+            disabled
+            title="GitHub connection status must load before syncing."
+          >
+            Sync GitHub
+          </button>
+        )}
       </div>
 
-      <ProviderTabs />
       {notice === null ? null : <SetupNotice notice={notice} />}
 
       {state.status === "loading" ? <InstallLoadingState /> : null}
@@ -71,17 +62,17 @@ function SetupNotice({ notice }: { notice: GitHubInstallationsNotice }) {
     "oauth-connected": {
       tone: "success",
       title: "GitHub account connected",
-      body: "Your GitHub OAuth account is connected. Install or sync the Firmcode GitHub App to enable repository workflows."
+      body: "Your GitHub account is connected. Add repositories from the GitHub App to enable review workflows."
     },
     "oauth-error": {
       tone: "error",
       title: "GitHub OAuth did not complete",
-      body: "Retry the GitHub account connection from this page. Firmcode will bind the OAuth state to your signed-in Clerk workspace."
+      body: "Retry the GitHub account connection from this page."
     },
     "installation-connected": {
       tone: "success",
       title: "GitHub App installation connected",
-      body: "Firmcode mapped the GitHub App installation to this workspace. Sync GitHub to refresh repository metadata."
+      body: "The GitHub App installation is connected. Sync GitHub to refresh repository metadata."
     },
     "installation-error": {
       tone: "error",
@@ -102,28 +93,6 @@ function SetupNotice({ notice }: { notice: GitHubInstallationsNotice }) {
   );
 }
 
-function ProviderTabs() {
-  return (
-    <nav className="overflow-x-auto rounded-lg border border-border bg-surface p-1" aria-label="Review providers">
-      <div className="flex min-w-max gap-1">
-        <span className="rounded-md bg-blush px-3 py-2 text-sm font-medium text-accent" aria-current="page">
-          GitHub
-        </span>
-        {["GitLab", "Bitbucket", "Azure DevOps"].map((provider) => (
-          <span
-            key={provider}
-            className="cursor-not-allowed rounded-md px-3 py-2 text-sm font-medium text-secondary opacity-55"
-            aria-disabled="true"
-            title="Planned provider"
-          >
-            {provider}
-          </span>
-        ))}
-      </div>
-    </nav>
-  );
-}
-
 function InstallLoadingState() {
   return (
     <section className="rounded-lg border border-border bg-surface p-4" aria-label="Loading GitHub installation status">
@@ -139,23 +108,18 @@ function InstallLoadingState() {
 
 function SignedOutState({ installConfig }: { installConfig: GitHubAppInstallConfig }) {
   return (
-    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_24rem]">
-      <section className="rounded-lg border border-amber-200 bg-amber-50 p-5">
-        <h2 className="text-base font-semibold text-amber-900">Sign in is required</h2>
-        <p className="mt-2 text-sm leading-6 text-amber-800">
-          Firmcode needs a Clerk workspace session before it can connect a GitHub account or map a GitHub App installation.
-        </p>
-        <button
-          className="mt-4 rounded-md bg-slate-200 px-3 py-2 text-sm font-medium text-secondary"
-          type="button"
-          disabled
-          title="Sign in before connecting GitHub."
-        >
-          Connect GitHub
-        </button>
-      </section>
-      <InstallConfigPanel installConfig={installConfig} />
-    </div>
+    <section className="rounded-lg border border-border bg-surface p-5">
+      <h2 className="text-base font-semibold text-primary">Sign in is required</h2>
+      <p className="mt-2 text-sm leading-6 text-secondary">Sign in before connecting GitHub repositories.</p>
+      <button
+        className="mt-4 rounded-md bg-subtle px-3 py-2 text-sm font-medium text-secondary"
+        type="button"
+        disabled
+        title={installConfig.status === "configured" ? "Sign in before connecting GitHub." : "GitHub setup is not ready."}
+      >
+        Connect GitHub
+      </button>
+    </section>
   );
 }
 
@@ -183,10 +147,11 @@ function InstallContent({
   const hasInstallations = settings.githubApp.installations.length > 0;
   const canManageRepositories = canManageRepositoryConfiguration(settings.workspace.role);
   const canRetry = canRetryReviewRuns(settings.workspace.role);
+  const showAdminInstallConfig = isAdminRole(settings.workspace.role);
 
   return (
     <div className="space-y-4">
-      <section className="grid gap-4 lg:grid-cols-2" aria-label="GitHub connection status">
+      <section className="grid gap-3 lg:grid-cols-2" aria-label="GitHub connection status">
         <GitHubOAuthCard connected={oauth.connected} user={oauth.user} />
         <GitHubAppCard
           canManage={canManageInstallations}
@@ -196,24 +161,15 @@ function InstallContent({
         />
       </section>
 
-      <SetupInstructions hasInstallations={hasInstallations} hasOAuth={oauth.connected} />
-
       <section className="rounded-lg border border-border bg-surface p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h2 className="text-base font-semibold text-primary">Repository automation</h2>
-            <p className="mt-1 max-w-2xl text-sm leading-6 text-secondary">
-              Repositories are matched by exact owner/repo name and reviewed through the Firmcode GitHub App.
-            </p>
+            <h2 className="text-base font-semibold text-primary">Repositories</h2>
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-secondary">Repositories available for automated PR review.</p>
           </div>
-          <span className="inline-flex w-fit rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-secondary">
-            {settings.workspace.role.charAt(0).toUpperCase() + settings.workspace.role.slice(1)}
-          </span>
         </div>
         {repositories.repositories.length === 0 ? (
-          <p className="mt-4 rounded-md border border-border bg-subtle p-3 text-sm leading-6 text-secondary">
-            No repositories are synced yet. Connect GitHub OAuth, install the GitHub App, then sync GitHub to populate repository automation rows.
-          </p>
+          <EmptyRepositoriesMessage hasInstallations={hasInstallations} hasOAuth={oauth.connected} />
         ) : (
           <div className="mt-4 divide-y divide-border overflow-hidden rounded-md border border-border">
             {repositories.repositories.map((repository) => (
@@ -230,32 +186,8 @@ function InstallContent({
         )}
       </section>
 
-      <InstallConfigPanel installConfig={installConfig} />
+      {showAdminInstallConfig ? <InstallConfigPanel installConfig={installConfig} /> : null}
     </div>
-  );
-}
-
-function SetupInstructions({ hasInstallations, hasOAuth }: { hasInstallations: boolean; hasOAuth: boolean }) {
-  return (
-    <section className="rounded-lg border border-border bg-surface p-5" aria-label="GitHub setup instructions">
-      <h2 className="text-base font-semibold text-primary">Setup order</h2>
-      <ol className="mt-3 grid gap-2 text-sm leading-6 text-secondary md:grid-cols-3">
-        <li className="rounded-md border border-border bg-subtle p-3">
-          <span className="font-medium text-primary">1. Connect GitHub OAuth</span>
-          <span className="mt-1 block">{hasOAuth ? "Your user account is connected." : "Required for the signed-in Clerk user."}</span>
-        </li>
-        <li className="rounded-md border border-border bg-subtle p-3">
-          <span className="font-medium text-primary">2. Install the GitHub App</span>
-          <span className="mt-1 block">
-            {hasInstallations ? "An installation is mapped to this workspace." : "Choose the repositories Firmcode can review."}
-          </span>
-        </li>
-        <li className="rounded-md border border-border bg-subtle p-3">
-          <span className="font-medium text-primary">3. Sync repositories</span>
-          <span className="mt-1 block">Refresh repository metadata, then enable automation per repository.</span>
-        </li>
-      </ol>
-    </section>
   );
 }
 
@@ -271,9 +203,7 @@ function GitHubOAuthCard({
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-base font-semibold text-primary">GitHub account</h2>
-          <p className="mt-2 text-sm leading-6 text-secondary">
-            Required for every signed-in user before GitHub-backed dashboard workflows become available.
-          </p>
+          <p className="mt-2 text-sm leading-6 text-secondary">Used to list repositories.</p>
         </div>
         <ConnectionPill tone={connected ? "success" : "warning"}>{connected ? "Connected" : "Required"}</ConnectionPill>
       </div>
@@ -311,10 +241,8 @@ function GitHubAppCard({
     <article className="rounded-lg border border-border bg-surface p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-base font-semibold text-primary">Firmcode GitHub App</h2>
-          <p className="mt-2 text-sm leading-6 text-secondary">
-            Developers and Admins install or manage repository access after their GitHub account is connected.
-          </p>
+          <h2 className="text-base font-semibold text-primary">GitHub App</h2>
+          <p className="mt-2 text-sm leading-6 text-secondary">Repository access for PR reviews.</p>
         </div>
         <ConnectionPill tone={hasInstallations ? "success" : "warning"}>{hasInstallations ? "Installed" : "Missing"}</ConnectionPill>
       </div>
@@ -327,7 +255,7 @@ function GitHubAppCard({
         />
         {hasOAuth && canManage && !hasInstallations ? (
           <a className="rounded-md border border-border px-3 py-2 text-sm font-medium text-primary" href="/auth/github">
-            Detect installed app
+            Refresh app status
           </a>
         ) : null}
       </div>
@@ -335,9 +263,7 @@ function GitHubAppCard({
         {hasInstallations ? (
           installations.map((installation) => <InstallationCard key={installation.id} installation={installation} />)
         ) : (
-          <p className="rounded-md border border-border bg-subtle p-3 text-sm leading-6 text-secondary">
-            No installation is mapped to this workspace yet.
-          </p>
+          <p className="text-sm leading-6 text-secondary">No repositories have been granted yet.</p>
         )}
       </div>
     </article>
@@ -372,9 +298,9 @@ function InstallAction({
         className="rounded-md bg-slate-200 px-3 py-2 text-sm font-medium text-secondary"
         type="button"
         disabled
-        title="Developer or Admin required to install the GitHub App."
+        title="You do not have permission to install the GitHub App."
       >
-        Developer or Admin required
+        Unavailable
       </button>
     );
   }
@@ -523,7 +449,7 @@ function RepositoryAutomationRow({
 
 function InstallationCard({ installation }: { installation: WorkspaceSettingsInstallation }) {
   return (
-    <article className="rounded-md border border-border bg-subtle p-3">
+    <article className="rounded-md border border-border bg-surface p-3">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h3 className="font-medium text-primary">{installation.accountLogin ?? `Installation ${installation.installationId}`}</h3>
@@ -588,7 +514,7 @@ function ConnectionPill({ children, tone }: { children: React.ReactNode; tone: "
   return (
     <span
       className={`inline-flex w-fit rounded-full px-2 py-1 text-xs font-medium ${
-        tone === "success" ? "bg-green-50 text-success" : "bg-amber-50 text-amber-800"
+        tone === "success" ? "bg-green-50 text-success" : "bg-slate-100 text-secondary"
       }`}
     >
       {children}
@@ -614,7 +540,7 @@ function installationSyncDisabledReason(input: { hasOAuth: boolean; canManage: b
   }
 
   if (!input.canManage) {
-    return "Developer or Admin required to sync GitHub installations.";
+    return "You do not have permission to sync GitHub installations.";
   }
 
   if (!input.hasInstallations) {
@@ -630,7 +556,7 @@ function rowSyncDisabledReason(input: { hasOAuth: boolean; canManageRepositories
   }
 
   if (!input.canManageRepositories) {
-    return "Developer or Admin required.";
+    return "You do not have permission.";
   }
 
   if (!input.hasInstallations) {
@@ -638,6 +564,25 @@ function rowSyncDisabledReason(input: { hasOAuth: boolean; canManageRepositories
   }
 
   return undefined;
+}
+
+function EmptyRepositoriesMessage({ hasInstallations, hasOAuth }: { hasInstallations: boolean; hasOAuth: boolean }) {
+  const message = !hasOAuth
+    ? "Connect GitHub to load repositories."
+    : !hasInstallations
+      ? "Install the GitHub App to add repositories."
+      : "Sync GitHub to load repositories.";
+
+  return (
+    <div className="mt-4 rounded-md border border-border bg-surface p-6 text-center">
+      <h3 className="text-sm font-semibold text-primary">No repositories yet</h3>
+      <p className="mt-2 text-sm leading-6 text-secondary">{message}</p>
+    </div>
+  );
+}
+
+function isAdminRole(role: string): boolean {
+  return role === "admin" || role === "owner";
 }
 
 function repositoryReadiness(input: {
