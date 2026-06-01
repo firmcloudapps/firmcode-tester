@@ -249,7 +249,7 @@ describe("GitHubInstallationsView", () => {
     );
 
     expect(html).toContain('data-clerk-authenticated="required"');
-    expect(html).toContain('href="/github/installations" aria-current="page"');
+    expect(html).toContain('href="/dashboard/developer" aria-current="page"');
   });
 });
 

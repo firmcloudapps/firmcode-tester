@@ -56,6 +56,56 @@ export type GitHubRepositoryControlsState =
   | { status: "signed-out" }
   | { status: "error"; message: string };
 
+async function reportPrReviewDebug(input: {
+  hypothesisId: string;
+  location: string;
+  msg: string;
+  data?: Record<string, unknown>;
+  runId?: string;
+}): Promise<void> {
+  // #region debug-point A:report-pr-review-loader-state
+  try {
+    const { readFileSync } = await import("node:fs");
+    const http = await import("node:http");
+    const https = await import("node:https");
+    let url = "http://127.0.0.1:7777/event";
+    let sessionId = "pr-review-503";
+    try {
+      const env = readFileSync(".dbg/pr-review-503.env", "utf8");
+      url = env.match(/DEBUG_SERVER_URL=(.+)/)?.[1] ?? url;
+      sessionId = env.match(/DEBUG_SESSION_ID=(.+)/)?.[1] ?? sessionId;
+    } catch { }
+    const target = new URL(url);
+    const body = JSON.stringify({
+      sessionId,
+      runId: input.runId ?? "pre-fix",
+      hypothesisId: input.hypothesisId,
+      location: input.location,
+      msg: `[DEBUG] ${input.msg}`,
+      data: input.data ?? {},
+      ts: Date.now()
+    });
+    const client = target.protocol === "https:" ? https : http;
+    await new Promise<void>((resolve) => {
+      const request = client.request(
+        target,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "content-length": Buffer.byteLength(body)
+          }
+        },
+        () => resolve()
+      );
+      request.on("error", () => resolve());
+      request.write(body);
+      request.end();
+    });
+  } catch { }
+  // #endregion
+}
+
 class DashboardApiError extends Error {
   constructor(
     message: string,
@@ -209,6 +259,14 @@ export async function loadRulesState(searchParams: SearchParams = {}): Promise<V
 
 export async function loadGitHubInstallationsState(): Promise<GitHubInstallationsState> {
   try {
+    // #region debug-point B:load-github-installations-start
+    await reportPrReviewDebug({
+      hypothesisId: "B",
+      location: "dashboard-data.ts:loadGitHubInstallationsState:start",
+      msg: "loadGitHubInstallationsState invoked",
+      data: { apiBaseUrl: getApiBaseUrl() }
+    });
+    // #endregion
     const [settings, oauth, repositories] = await Promise.all([
       requestAuthenticatedJson<WorkspaceSettingsResponse>("/api/settings"),
       requestAuthenticatedJson<GitHubOAuthStatusResponse>("/api/github/oauth/status"),
@@ -216,8 +274,33 @@ export async function loadGitHubInstallationsState(): Promise<GitHubInstallation
     ]);
     const data = { settings, oauth, repositories };
 
+    // #region debug-point B:load-github-installations-success
+    await reportPrReviewDebug({
+      hypothesisId: "B",
+      location: "dashboard-data.ts:loadGitHubInstallationsState:success",
+      msg: "loadGitHubInstallationsState resolved",
+      data: {
+        status: settings.githubApp.installations.length === 0 ? "empty" : "populated",
+        oauthConnected: oauth.connected,
+        repositoryCount: repositories.repositories.length
+      }
+    });
+    // #endregion
+
     return settings.githubApp.installations.length === 0 ? { status: "empty", data } : { status: "populated", data };
   } catch (error) {
+    // #region debug-point B:load-github-installations-error
+    await reportPrReviewDebug({
+      hypothesisId: "B",
+      location: "dashboard-data.ts:loadGitHubInstallationsState:error",
+      msg: "loadGitHubInstallationsState failed",
+      data: {
+        errorName: error instanceof Error ? error.name : typeof error,
+        errorMessage: error instanceof Error ? error.message : String(error),
+        status: error instanceof DashboardApiError ? error.status : null
+      }
+    });
+    // #endregion
     if (error instanceof DashboardApiError && error.status === 401) {
       return { status: "signed-out" };
     }
@@ -228,6 +311,14 @@ export async function loadGitHubInstallationsState(): Promise<GitHubInstallation
 
 export async function loadDeveloperPrReviewState(): Promise<DeveloperPrReviewState> {
   try {
+    // #region debug-point A:load-developer-pr-review-start
+    await reportPrReviewDebug({
+      hypothesisId: "A",
+      location: "dashboard-data.ts:loadDeveloperPrReviewState:start",
+      msg: "loadDeveloperPrReviewState invoked",
+      data: { apiBaseUrl: getApiBaseUrl() }
+    });
+    // #endregion
     const [settings, oauth, reviewRuns] = await Promise.all([
       requestAuthenticatedJson<WorkspaceSettingsResponse>("/api/settings"),
       requestAuthenticatedJson<GitHubOAuthStatusResponse>("/api/github/oauth/status"),
@@ -235,8 +326,33 @@ export async function loadDeveloperPrReviewState(): Promise<DeveloperPrReviewSta
     ]);
     const data = { settings, oauth, reviewRuns };
 
+    // #region debug-point A:load-developer-pr-review-success
+    await reportPrReviewDebug({
+      hypothesisId: "A",
+      location: "dashboard-data.ts:loadDeveloperPrReviewState:success",
+      msg: "loadDeveloperPrReviewState resolved",
+      data: {
+        status: reviewRuns.reviewRuns.length === 0 ? "empty" : "populated",
+        oauthConnected: oauth.connected,
+        reviewRunCount: reviewRuns.reviewRuns.length
+      }
+    });
+    // #endregion
+
     return reviewRuns.reviewRuns.length === 0 ? { status: "empty", data } : { status: "populated", data };
   } catch (error) {
+    // #region debug-point A:load-developer-pr-review-error
+    await reportPrReviewDebug({
+      hypothesisId: "A",
+      location: "dashboard-data.ts:loadDeveloperPrReviewState:error",
+      msg: "loadDeveloperPrReviewState failed",
+      data: {
+        errorName: error instanceof Error ? error.name : typeof error,
+        errorMessage: error instanceof Error ? error.message : String(error),
+        status: error instanceof DashboardApiError ? error.status : null
+      }
+    });
+    // #endregion
     if (error instanceof DashboardApiError && error.status === 401) {
       return { status: "signed-out" };
     }

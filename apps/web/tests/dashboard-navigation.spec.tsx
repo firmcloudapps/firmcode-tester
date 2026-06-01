@@ -7,7 +7,7 @@ import { RepositoriesView } from "../components/dashboard/repositories-view";
 import { SettingsView } from "../components/dashboard/settings-view";
 
 describe("dashboard navigation", () => {
-  it("routes Connect GitHub and PR Review to the implemented installation workspace", () => {
+  it("routes Connect GitHub to installations and PR Review to the developer review workspace", () => {
     const html = renderToString(
       <DashboardShell activeItem="Overview">
         <main>Dashboard body</main>
@@ -16,6 +16,7 @@ describe("dashboard navigation", () => {
 
     expect(html).toContain('href="/github/installations"');
     expect(html).toContain(">Connect GitHub</a>");
+    expect(html).toContain('href="/dashboard/developer"');
     expect(html).toContain(">PR Review</a>");
     expect(html).not.toContain("GitHub App connection is not wired");
   });
