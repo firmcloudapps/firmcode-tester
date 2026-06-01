@@ -19,7 +19,7 @@ import type {
   WorkspaceBillingResponse,
   WorkspaceSettingsResponse
 } from "@firmcode/shared";
-import { createDashboardApiHeaders } from "./dashboard-api-proxy";
+import { createDashboardApiHeaders, getDashboardApiBaseUrl } from "./dashboard-api-proxy";
 import { buildOverviewDashboardData } from "./overview-data";
 import type { ViewState } from "./view-state";
 
@@ -413,7 +413,7 @@ async function requestAuthenticatedJson<T>(path: string): Promise<T> {
 }
 
 function getApiBaseUrl(): string {
-  return process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+  return getDashboardApiBaseUrl(process.env);
 }
 
 function parseBoolean(value: string | undefined): boolean | undefined {

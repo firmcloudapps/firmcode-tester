@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { GitHubOAuthStartResponse } from "@firmcode/shared";
-import { createDashboardApiHeaders } from "../../../lib/dashboard-api-proxy";
+import { createDashboardApiHeaders, getDashboardApiBaseUrl } from "../../../lib/dashboard-api-proxy";
 
 export async function GET(): Promise<Response> {
   const headers = await createDashboardApiHeaders(process.env, false);
@@ -9,7 +9,7 @@ export async function GET(): Promise<Response> {
     return NextResponse.redirect(new URL("/sign-in", getDashboardBaseUrl()));
   }
 
-  const response = await fetch(new URL("/auth/github", process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001"), {
+  const response = await fetch(new URL("/auth/github", getDashboardApiBaseUrl(process.env)), {
     cache: "no-store",
     headers
   });

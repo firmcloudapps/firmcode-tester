@@ -146,7 +146,8 @@ Neither Compose file runs PostgreSQL or the Next.js dashboard. PostgreSQL is Neo
    - `NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up`
    - `NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/auth/redirect`
    - `NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/auth/redirect`
-   - `NEXT_PUBLIC_API_URL=<Coolify API URL>`
+   - `API_URL=<Coolify API URL>`
+   - `NEXT_PUBLIC_API_URL=<Coolify API URL>` when a public API fallback is needed
    - `CLERK_BILLING_PORTAL_URL`
 4. Set Coolify API env vars:
    - `CLERK_SECRET_KEY`

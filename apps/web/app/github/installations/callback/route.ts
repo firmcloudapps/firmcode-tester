@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { createDashboardApiHeaders } from "../../../../lib/dashboard-api-proxy";
+import { createDashboardApiHeaders, getDashboardApiBaseUrl } from "../../../../lib/dashboard-api-proxy";
 
 export async function GET(request: Request): Promise<Response> {
-  const callbackUrl = new URL("/github/installations/callback", process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001");
+  const callbackUrl = new URL("/github/installations/callback", getDashboardApiBaseUrl(process.env));
   const incomingUrl = new URL(request.url);
   const headers = await createDashboardApiHeaders(process.env, false);
 

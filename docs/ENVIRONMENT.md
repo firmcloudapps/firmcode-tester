@@ -8,8 +8,8 @@ Firmcode should use typed configuration validation in every runtime. Missing req
 | --- | --- | --- |
 | `NODE_ENV` | yes | `development`, `test`, or `production`. |
 | `APP_URL` | yes | Public web app URL. The API uses this to build the GitHub OAuth callback URL. |
-| `API_URL` | yes | Public API URL for webhooks and dashboard calls. |
-| `NEXT_PUBLIC_API_URL` | web | Public API URL used by the Vercel dashboard. |
+| `API_URL` | yes | Public API URL for webhooks and server-side dashboard calls. The Vercel web app uses this before `NEXT_PUBLIC_API_URL` when fetching Nest API data. |
+| `NEXT_PUBLIC_API_URL` | web | Public API URL fallback for the Vercel dashboard and local simple setups. Keep it pointed at the API, not the web frontend. |
 | `FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN` | tests only | Explicit web unit-test fixture token used to avoid live Clerk calls. This must not be set in production. |
 | `FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID` | tests only | Optional workspace selector fixture sent only with a Clerk/test bearer token outside production. This must not be used as caller identity. |
 | `CORS_ALLOWED_ORIGINS` | api | Comma-separated Vercel production, Vercel preview, and local web origins. |
@@ -130,7 +130,7 @@ https://firmcode.firmoncloud.com/github/installations/callback
 
 In the setup URL flow, enable **Redirect on update** so repository-access changes return to Firmcode instead of leaving the user on GitHub's installation configuration page. GitHub disables the setup URL field when OAuth during installation is enabled.
 
-Keep `APP_URL=https://firmcode.firmoncloud.com` on the API service and `NEXT_PUBLIC_API_URL=https://firmcodeapi.firmoncloud.com` on the web service so the dashboard callback can forward securely to the API token exchange endpoint.
+Keep `APP_URL=https://firmcode.firmoncloud.com` on the API service and `API_URL=https://firmcodeapi.firmoncloud.com` on the web service so dashboard server actions and callbacks forward securely to the API token exchange endpoint. `NEXT_PUBLIC_API_URL` may mirror the API URL, but it must not point at the web frontend.
 
 ## LLM
 

@@ -16,7 +16,7 @@ import {
   updateCodebaseFindingStatus,
   updateRepositoryAutomation
 } from "../lib/dashboard-actions";
-import { createDashboardApiHeaders } from "../lib/dashboard-api-proxy";
+import { createDashboardApiHeaders, getDashboardApiBaseUrl } from "../lib/dashboard-api-proxy";
 
 describe("dashboard retry controls", () => {
   it("queues a retry through the typed dashboard mutation endpoint", async () => {
@@ -144,6 +144,18 @@ describe("repository automation controls", () => {
     expect(headers?.get("authorization")).toBe("Bearer session-token");
     expect(headers?.get("x-firmcode-user-id")).toBeNull();
     expect(headers?.get("x-firmcode-workspace-id")).toBeNull();
+  });
+
+  it("prefers the server API URL over the public dashboard URL for server-side API calls", () => {
+    expect(
+      getDashboardApiBaseUrl({
+        API_URL: "https://firmcodeapi.example.test",
+        NEXT_PUBLIC_API_URL: "https://firmcode.example.test"
+      })
+    ).toBe("https://firmcodeapi.example.test");
+    expect(getDashboardApiBaseUrl({ NEXT_PUBLIC_API_URL: "https://firmcodeapi.example.test" })).toBe(
+      "https://firmcodeapi.example.test"
+    );
   });
 });
 
