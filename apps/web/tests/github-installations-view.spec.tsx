@@ -39,6 +39,8 @@ describe("GitHubInstallationsView", () => {
     expect(html).toContain('href="/auth/github"');
     expect(html).toContain("Connect GitHub first");
     expect(html).toContain("Connect GitHub OAuth before syncing repositories.");
+    expect(html).toContain("Needs account");
+    expect(html).not.toContain("Setup order");
   });
 
   it("renders signed-in setup status with OAuth connected, no installation, and a configured install URL", () => {
@@ -56,11 +58,10 @@ describe("GitHubInstallationsView", () => {
     expect(html).toContain("Connected");
     expect(html).toContain("kelly");
     expect(html).toContain("Missing");
-    expect(html).toContain("No installation is mapped to this workspace yet");
-    expect(html).toContain("Detect installed app");
+    expect(html).toContain("No repositories have been granted yet");
+    expect(html).toContain("Refresh app status");
     expect(html).toContain('href="/auth/github"');
-    expect(html).toContain("Configured install URL");
-    expect(html).toContain("https://github.com/apps/firmcode/installations/new");
+    expect(html).not.toContain("Configured install URL");
     expect(html).toContain('href="https://github.com/apps/firmcode/installations/new"');
   });
 
@@ -82,7 +83,7 @@ describe("GitHubInstallationsView", () => {
     expect(html).toContain("installation:<!-- -->301");
   });
 
-  it("renders provider tabs and repository automation rows", () => {
+  it("renders a minimal repository review list without provider tabs", () => {
     const html = renderToString(
       <GitHubInstallationsView
         state={{ status: "populated", data: syncData(developerSettings, true) }}
@@ -94,19 +95,20 @@ describe("GitHubInstallationsView", () => {
       />
     );
 
-    expect(html).toContain("Review providers");
-    expect(html).toContain("GitHub");
-    expect(html).toContain("GitLab");
-    expect(html).toContain("Planned provider");
-    expect(html).toContain("Repository automation");
+    expect(html).not.toContain("Review providers");
+    expect(html).not.toContain("GitLab");
+    expect(html).not.toContain("Bitbucket");
+    expect(html).not.toContain("Azure DevOps");
+    expect(html).toContain("Repositories");
     expect(html).toContain("openclaw/firmcode");
     expect(html).toContain("Ready");
     expect(html).toContain("Configure");
     expect(html).toContain('href="/repositories/00000000-0000-4000-8000-000000000201?tab=configuration"');
     expect(html).toContain("Run");
+    expect(html).not.toContain("Developer");
   });
 
-  it("renders installation instructions in the setup workspace", () => {
+  it("does not render setup instructions or admin install details for developers", () => {
     const html = renderToString(
       <GitHubInstallationsView
         state={{ status: "populated", data: syncData(developerSettings, true) }}
@@ -118,10 +120,10 @@ describe("GitHubInstallationsView", () => {
       />
     );
 
-    expect(html).toContain("GitHub setup instructions");
-    expect(html).toContain("1. Connect GitHub OAuth");
-    expect(html).toContain("2. Install the GitHub App");
-    expect(html).toContain("3. Sync repositories");
+    expect(html).not.toContain("GitHub setup instructions");
+    expect(html).not.toContain("Setup order");
+    expect(html).not.toContain("Configured install URL");
+    expect(html).not.toContain("workspace admins");
   });
 
   it("renders OAuth callback success and retry error notices without raw payloads", () => {
@@ -156,7 +158,7 @@ describe("GitHubInstallationsView", () => {
     expect(`${successHtml}\n${errorHtml}`).not.toContain("access_token");
   });
 
-  it("renders missing install config as a disabled setup state", () => {
+  it("hides missing install config details from the developer setup state", () => {
     const html = renderToString(
       <GitHubInstallationsView
         state={{ status: "empty", data: syncData(emptySettings, true) }}
@@ -167,9 +169,9 @@ describe("GitHubInstallationsView", () => {
       />
     );
 
-    expect(html).toContain("Missing GitHub App install config");
     expect(html).toContain("Install URL not configured");
-    expect(html).toContain("API-side GitHub App credentials remain server-only");
+    expect(html).not.toContain("Missing GitHub App install config");
+    expect(html).not.toContain("API-side GitHub App credentials remain server-only");
     expect(html).not.toContain("GITHUB_APP_PRIVATE_KEY");
     expect(html).not.toContain("GITHUB_WEBHOOK_SECRET");
     expect(html).not.toContain("GITHUB_CLIENT_SECRET");
@@ -205,8 +207,8 @@ describe("GitHubInstallationsView", () => {
       />
     );
 
-    expect(html).toContain("Developer or Admin required");
-    expect(html).toContain("Developer or Admin required to sync GitHub installations.");
+    expect(html).toContain("Unavailable");
+    expect(html).toContain("You do not have permission to sync GitHub installations.");
     expect(html).not.toContain('href="https://github.com/apps/firmcode/installations/new"');
     expect(html).not.toContain('?tab=configuration"');
   });

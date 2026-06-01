@@ -1,5 +1,5 @@
 import React from "react";
-import { DASHBOARD_NAV_ITEMS, navItemsForRole, type DashboardActiveItem } from "../../lib/dashboard-navigation";
+import { DASHBOARD_NAV_ITEMS, isAdminDashboardRole, navItemsForRole, type DashboardActiveItem } from "../../lib/dashboard-navigation";
 import { DashboardClerkControls, DashboardWorkspaceLabel } from "./dashboard-clerk-controls";
 
 interface DashboardShellProps {
@@ -10,6 +10,7 @@ interface DashboardShellProps {
 
 export function DashboardShell({ activeItem, children, role }: DashboardShellProps) {
   const navItems = role === undefined ? DASHBOARD_NAV_ITEMS : navItemsForRole(role);
+  const showCompanyIdentity = role === undefined || isAdminDashboardRole(role);
 
   return (
     <div className="min-h-screen bg-shell text-primary" data-clerk-authenticated="required">
@@ -81,11 +82,15 @@ export function DashboardShell({ activeItem, children, role }: DashboardShellPro
         <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-border bg-surface px-4 py-5 lg:block">
           <div className="mb-8 flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-md bg-accent text-lg font-black text-white shadow-sm">
-              F
+              {showCompanyIdentity ? "F" : "PR"}
             </div>
             <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-secondary">Company</p>
-              <p className="truncate text-base font-semibold text-primary">Firmcode</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-secondary">
+                {showCompanyIdentity ? "Company" : "Workspace"}
+              </p>
+              <p className="truncate text-base font-semibold text-primary">
+                {showCompanyIdentity ? "Firmcode" : <DashboardWorkspaceLabel />}
+              </p>
             </div>
           </div>
           <nav className="flex flex-col gap-1" aria-label="Dashboard">

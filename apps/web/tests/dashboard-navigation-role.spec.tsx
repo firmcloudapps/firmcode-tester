@@ -45,6 +45,18 @@ describe("role-based dashboard navigation", () => {
     expect(html).toContain('href="/repositories"');
   });
 
+  it("hides company branding in the shell for developers", () => {
+    const html = renderToString(
+      <DashboardShell activeItem="PR Review" role="developer">
+        <main>Dashboard body</main>
+      </DashboardShell>
+    );
+
+    expect(html).not.toContain(">Company</p>");
+    expect(html).not.toContain(">Firmcode</p>");
+    expect(html).toContain(">Workspace</p>");
+  });
+
   it("shows Settings and Billing links in the shell for admins", () => {
     const html = renderToString(
       <DashboardShell activeItem="Overview" role="admin">
