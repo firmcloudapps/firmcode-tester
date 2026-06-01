@@ -54,6 +54,7 @@ describe("role-based dashboard navigation", () => {
 
     expect(html).not.toContain(">Company</p>");
     expect(html).not.toContain(">Firmcode</p>");
+    expect(html).not.toContain(">Connect GitHub</a>");
     expect(html).toContain(">Workspace</p>");
   });
 

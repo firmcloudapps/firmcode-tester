@@ -29,21 +29,7 @@ export function GitHubInstallationsView({ state, installConfig, notice = null }:
           <h1 className="text-2xl font-semibold tracking-normal text-primary">PR Review</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-secondary">Connect GitHub and review repositories.</p>
         </div>
-        {state.status === "empty" || state.status === "populated" ? (
-          <GitHubInstallationSyncButton
-            disabled={!canSyncGitHub(state.data)}
-            disabledReason={syncDisabledReason(state.data)}
-          />
-        ) : (
-          <button
-            className="rounded-md border border-border bg-subtle px-3 py-2 text-sm font-medium text-secondary"
-            type="button"
-            disabled
-            title="GitHub connection status must load before syncing."
-          >
-            Sync GitHub
-          </button>
-        )}
+        <GitHubHeaderActions state={state} installConfig={installConfig} />
       </div>
 
       {notice === null ? null : <SetupNotice notice={notice} />}
@@ -148,18 +134,21 @@ function InstallContent({
   const canManageRepositories = canManageRepositoryConfiguration(settings.workspace.role);
   const canRetry = canRetryReviewRuns(settings.workspace.role);
   const showAdminInstallConfig = isAdminRole(settings.workspace.role);
+  const showConnectionCards = !isDeveloperRole(settings.workspace.role);
 
   return (
     <div className="space-y-4">
-      <section className="grid gap-3 lg:grid-cols-2" aria-label="GitHub connection status">
-        <GitHubOAuthCard connected={oauth.connected} user={oauth.user} />
-        <GitHubAppCard
-          canManage={canManageInstallations}
-          hasOAuth={oauth.connected}
-          installConfig={installConfig}
-          installations={settings.githubApp.installations}
-        />
-      </section>
+      {showConnectionCards ? (
+        <section className="grid gap-3 lg:grid-cols-2" aria-label="GitHub connection status">
+          <GitHubOAuthCard connected={oauth.connected} user={oauth.user} />
+          <GitHubAppCard
+            canManage={canManageInstallations}
+            hasOAuth={oauth.connected}
+            installConfig={installConfig}
+            installations={settings.githubApp.installations}
+          />
+        </section>
+      ) : null}
 
       <section className="rounded-lg border border-border bg-surface p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -188,6 +177,160 @@ function InstallContent({
 
       {showAdminInstallConfig ? <InstallConfigPanel installConfig={installConfig} /> : null}
     </div>
+  );
+}
+
+function GitHubHeaderActions({
+  state,
+  installConfig
+}: {
+  state: GitHubInstallationsState;
+  installConfig: GitHubAppInstallConfig;
+}) {
+  if (state.status !== "empty" && state.status !== "populated") {
+    return (
+      <button
+        className="rounded-md border border-border bg-subtle px-3 py-2 text-sm font-medium text-secondary"
+        type="button"
+        disabled
+        title="GitHub connection status must load before syncing."
+      >
+        Sync GitHub
+      </button>
+    );
+  }
+
+  if (isDeveloperRole(state.data.settings.workspace.role)) {
+    return <DeveloperGitHubActions data={state.data} installConfig={installConfig} />;
+  }
+
+  return (
+    <GitHubInstallationSyncButton
+      disabled={!canSyncGitHub(state.data)}
+      disabledReason={syncDisabledReason(state.data)}
+    />
+  );
+}
+
+function DeveloperGitHubActions({
+  data,
+  installConfig
+}: {
+  data: GitHubSyncDashboardData;
+  installConfig: GitHubAppInstallConfig;
+}) {
+  const hasInstallations = data.settings.githubApp.installations.length > 0;
+  const canManageInstallations = canManageRepositoryConfiguration(data.settings.workspace.role);
+
+  return (
+    <div className="flex flex-wrap items-start gap-2 sm:justify-end">
+      <GitHubOAuthHeaderAction connected={data.oauth.connected} />
+      <GitHubAppHeaderAction
+        canManage={canManageInstallations}
+        hasInstallations={hasInstallations}
+        hasOAuth={data.oauth.connected}
+        installConfig={installConfig}
+      />
+      <GitHubInstallationSyncButton
+        compact
+        disabled={!canSyncGitHub(data)}
+        disabledReason={syncDisabledReason(data)}
+      />
+    </div>
+  );
+}
+
+function GitHubOAuthHeaderAction({ connected }: { connected: boolean }) {
+  if (!connected) {
+    return (
+      <a className="rounded-md bg-accent px-3 py-2 text-sm font-medium text-white" href="/auth/github">
+        Connect GitHub
+      </a>
+    );
+  }
+
+  return (
+    <span
+      className="inline-flex rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm font-medium text-success"
+      title="Connected."
+    >
+      GitHub connected
+    </span>
+  );
+}
+
+function GitHubAppHeaderAction({
+  canManage,
+  hasInstallations,
+  hasOAuth,
+  installConfig
+}: {
+  canManage: boolean;
+  hasInstallations: boolean;
+  hasOAuth: boolean;
+  installConfig: GitHubAppInstallConfig;
+}) {
+  if (hasInstallations) {
+    return (
+      <span className="inline-flex rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm font-medium text-success">
+        GitHub App installed
+      </span>
+    );
+  }
+
+  if (!hasOAuth) {
+    return (
+      <button
+        className="rounded-md border border-border bg-subtle px-3 py-2 text-sm font-medium text-secondary"
+        type="button"
+        disabled
+        title="Connect GitHub before installing the GitHub App."
+      >
+        GitHub App
+      </button>
+    );
+  }
+
+  if (!canManage) {
+    return (
+      <button
+        className="rounded-md border border-border bg-subtle px-3 py-2 text-sm font-medium text-secondary"
+        type="button"
+        disabled
+        title="You do not have permission to install the GitHub App."
+      >
+        GitHub App
+      </button>
+    );
+  }
+
+  if (installConfig.status === "configured" && isAllowedExternalDashboardUrl(installConfig.installUrl, "github")) {
+    return (
+      <a
+        className="rounded-md border border-border bg-surface px-3 py-2 text-sm font-medium text-primary shadow-sm hover:border-accent"
+        data-dashboard-destination="external"
+        data-dashboard-provider="github"
+        href={installConfig.installUrl}
+        rel="noreferrer"
+      >
+        GitHub App
+      </a>
+    );
+  }
+
+  return (
+    <button
+      className="rounded-md border border-border bg-subtle px-3 py-2 text-sm font-medium text-secondary"
+      type="button"
+      disabled
+      title={
+        installConfig.status === "configured"
+          ? "GitHub App install URL must be an external GitHub URL."
+          : "Set GITHUB_APP_INSTALL_URL or GITHUB_APP_SLUG before installing the GitHub App."
+      }
+    >
+      GitHub App
+    </button>
   );
 }
 
@@ -536,7 +679,7 @@ function syncDisabledReason(data: GitHubSyncDashboardData): string | undefined {
 
 function installationSyncDisabledReason(input: { hasOAuth: boolean; canManage: boolean; hasInstallations: boolean }): string | undefined {
   if (!input.hasOAuth) {
-    return "Connect GitHub OAuth before syncing repositories.";
+    return "Connect GitHub before syncing repositories.";
   }
 
   if (!input.canManage) {
@@ -583,6 +726,10 @@ function EmptyRepositoriesMessage({ hasInstallations, hasOAuth }: { hasInstallat
 
 function isAdminRole(role: string): boolean {
   return role === "admin" || role === "owner";
+}
+
+function isDeveloperRole(role: string): boolean {
+  return role.toLowerCase() === "developer";
 }
 
 function repositoryReadiness(input: {

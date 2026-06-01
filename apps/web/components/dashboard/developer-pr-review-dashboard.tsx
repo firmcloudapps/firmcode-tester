@@ -2,8 +2,7 @@ import React from "react";
 import {
   canManageRepositoryConfiguration,
   canRetryReviewRuns,
-  type RepositoryListItem,
-  type WorkspaceSettingsInstallation
+  type RepositoryListItem
 } from "@firmcode/shared";
 import type { GitHubAppInstallConfig } from "../../config/github-app-installation";
 import type { GitHubInstallationsState, GitHubSyncDashboardData } from "../../lib/dashboard-data";
@@ -25,12 +24,12 @@ export function DeveloperPrReviewDashboard({ state, installConfig }: DeveloperPr
         <DeveloperSidebar oauthConnected={readOAuthConnected(state)} />
         <main className="min-w-0 flex-1 px-4 py-5 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-7xl space-y-4">
-            <DeveloperHeader state={state} />
+            <DeveloperHeader state={state} installConfig={installConfig} />
             {state.status === "loading" ? <DeveloperLoadingState /> : null}
             {state.status === "signed-out" ? <DeveloperSignedOutState /> : null}
             {state.status === "error" ? <DeveloperErrorState message={state.message} /> : null}
-            {state.status === "empty" ? <DeveloperContent data={state.data} installConfig={installConfig} /> : null}
-            {state.status === "populated" ? <DeveloperContent data={state.data} installConfig={installConfig} /> : null}
+            {state.status === "empty" ? <DeveloperContent data={state.data} /> : null}
+            {state.status === "populated" ? <DeveloperContent data={state.data} /> : null}
           </div>
         </main>
       </div>
@@ -78,7 +77,7 @@ function DeveloperSidebar({ oauthConnected }: { oauthConnected: boolean }) {
             href="/auth/github"
           >
             GitHub
-            <span className={`h-2 w-2 rounded-full ${oauthConnected ? "bg-success" : "bg-warning"}`} aria-hidden="true" />
+            <span className={`h-2 w-2 rounded-full ${oauthConnected ? "bg-success" : "bg-slate-300"}`} aria-hidden="true" />
           </a>
         </div>
       </nav>
@@ -86,24 +85,20 @@ function DeveloperSidebar({ oauthConnected }: { oauthConnected: boolean }) {
   );
 }
 
-function DeveloperHeader({ state }: { state: GitHubInstallationsState }) {
+function DeveloperHeader({
+  state,
+  installConfig
+}: {
+  state: GitHubInstallationsState;
+  installConfig: GitHubAppInstallConfig;
+}) {
   return (
     <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
       <div>
         <h1 className="text-2xl font-semibold tracking-normal text-primary">PR Review</h1>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-secondary">Connect GitHub and keep repository reviews running.</p>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-secondary">Review repositories and pull requests.</p>
       </div>
-      {state.status === "empty" || state.status === "populated" ? (
-        <GitHubInstallationSyncButton
-          label="Refresh"
-          disabled={!canSyncGitHub(state.data)}
-          disabledReason={syncDisabledReason(state.data)}
-        />
-      ) : (
-        <button className="rounded-md border border-border bg-surface px-3 py-2 text-sm font-medium text-secondary" type="button" disabled>
-          Refresh
-        </button>
-      )}
+      <DeveloperHeaderActions state={state} installConfig={installConfig} />
     </header>
   );
 }
@@ -149,127 +144,155 @@ function DeveloperErrorState({ message }: { message: string }) {
   );
 }
 
-function DeveloperContent({
-  data,
-  installConfig
-}: {
-  data: GitHubSyncDashboardData;
-  installConfig: GitHubAppInstallConfig;
-}) {
+function DeveloperContent({ data }: { data: GitHubSyncDashboardData }) {
   const hasInstallations = data.settings.githubApp.installations.length > 0;
   const canManageRepositories = canManageRepositoryConfiguration(data.settings.workspace.role);
   const canRetry = canRetryReviewRuns(data.settings.workspace.role);
 
   return (
-    <div className="space-y-4">
-      <section className="grid gap-3 lg:grid-cols-2" aria-label="GitHub connection status">
-        <OAuthSetupCard data={data} />
-        <GitHubAppSetupCard data={data} installConfig={installConfig} />
-      </section>
-      <section className="space-y-3" aria-label="Repository review queue">
+    <div>
+      <section className="rounded-lg border border-border bg-surface p-5" aria-label="Repository review queue">
+        <div>
+          <h2 className="text-base font-semibold text-primary">Repositories</h2>
+          <p className="mt-1 max-w-2xl text-sm leading-6 text-secondary">Repositories available for automated PR review.</p>
+        </div>
         {data.repositories.repositories.length === 0 ? (
-          <article className="rounded-lg border border-border bg-surface p-5">
-            <h2 className="text-base font-semibold text-primary">No repositories yet</h2>
-            <p className="mt-2 text-sm leading-6 text-secondary">Add repositories from the GitHub App installation to start PR reviews.</p>
-          </article>
+          <div className="mt-4 rounded-md border border-border bg-surface p-6 text-center">
+            <h3 className="text-sm font-semibold text-primary">No repositories yet</h3>
+            <p className="mt-2 text-sm leading-6 text-secondary">{emptyRepositoryMessage(data.oauth.connected, hasInstallations)}</p>
+          </div>
         ) : (
-          data.repositories.repositories.map((repository) => (
-            <DeveloperRepositoryRow
-              key={repository.id}
-              canManageRepositories={canManageRepositories}
-              canRetry={canRetry}
-              hasInstallations={hasInstallations}
-              hasOAuth={data.oauth.connected}
-              repository={repository}
-            />
-          ))
+          <div className="mt-4 space-y-3">
+            {data.repositories.repositories.map((repository) => (
+              <DeveloperRepositoryRow
+                key={repository.id}
+                canManageRepositories={canManageRepositories}
+                canRetry={canRetry}
+                hasInstallations={hasInstallations}
+                hasOAuth={data.oauth.connected}
+                repository={repository}
+              />
+            ))}
+          </div>
         )}
       </section>
     </div>
   );
 }
 
-function OAuthSetupCard({ data }: { data: GitHubSyncDashboardData }) {
-  const connected = data.oauth.connected;
-
-  return (
-    <article className="rounded-lg border border-border bg-surface p-5 shadow-sm">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-base font-semibold text-primary">GitHub OAuth</h2>
-          <p className="mt-1 text-sm leading-6 text-secondary">Connect your account to list repositories.</p>
-        </div>
-        <ConnectionPill tone={connected ? "success" : "warning"}>{connected ? "Connected" : "Required"}</ConnectionPill>
-      </div>
-      {connected && data.oauth.user !== null ? (
-        <p className="mt-4 text-sm text-secondary">
-          Connected as <span className="font-medium text-primary">@{data.oauth.user.login}</span>
-        </p>
-      ) : (
-        <a className="mt-4 inline-flex rounded-md bg-accent px-3 py-2 text-sm font-medium text-white" href="/auth/github">
-          Connect GitHub
-        </a>
-      )}
-    </article>
-  );
-}
-
-function GitHubAppSetupCard({
-  data,
+function DeveloperHeaderActions({
+  state,
   installConfig
 }: {
-  data: GitHubSyncDashboardData;
+  state: GitHubInstallationsState;
   installConfig: GitHubAppInstallConfig;
 }) {
-  const installations = data.settings.githubApp.installations;
-  const installed = installations.length > 0;
-  const canInstall = data.oauth.connected && installConfig.status === "configured" && isAllowedExternalDashboardUrl(installConfig.installUrl, "github");
+  if (state.status !== "empty" && state.status !== "populated") {
+    return (
+      <button className="rounded-md border border-border bg-surface px-3 py-2 text-sm font-medium text-secondary" type="button" disabled>
+        Sync GitHub
+      </button>
+    );
+  }
+
+  const hasInstallations = state.data.settings.githubApp.installations.length > 0;
+  const canManageInstallations = canManageRepositoryConfiguration(state.data.settings.workspace.role);
 
   return (
-    <article className="rounded-lg border border-border bg-surface p-5 shadow-sm">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-base font-semibold text-primary">Firmcode GitHub App</h2>
-          <p className="mt-1 text-sm leading-6 text-secondary">Grant repository access for PR reviews.</p>
-        </div>
-        <ConnectionPill tone={installed ? "success" : "warning"}>{installed ? "Installed" : "Missing"}</ConnectionPill>
-      </div>
-      <div className="mt-4 flex flex-wrap gap-2">
-        {canInstall ? (
-          <a
-            className="rounded-md bg-accent px-3 py-2 text-sm font-medium text-white"
-            data-dashboard-destination="external"
-            data-dashboard-provider="github"
-            href={installConfig.installUrl}
-            rel="noreferrer"
-          >
-            Add repositories
-          </a>
-        ) : (
-          <button
-            className="rounded-md bg-subtle px-3 py-2 text-sm font-medium text-secondary"
-            type="button"
-            disabled
-            title={data.oauth.connected ? "GitHub App install URL is not configured." : "Connect GitHub OAuth before adding repositories."}
-          >
-            Add repositories
-          </button>
-        )}
-        {data.oauth.connected && !installed ? (
-          <a className="rounded-md border border-border px-3 py-2 text-sm font-medium text-primary" href="/auth/github">
-            Refresh app status
-          </a>
-        ) : null}
-        {installed ? <InstallationSummary installations={installations} /> : null}
-      </div>
-    </article>
+    <div className="flex flex-wrap items-start gap-2 sm:justify-end">
+      <GitHubOAuthHeaderAction connected={state.data.oauth.connected} />
+      <GitHubAppHeaderAction
+        canManage={canManageInstallations}
+        hasInstallations={hasInstallations}
+        hasOAuth={state.data.oauth.connected}
+        installConfig={installConfig}
+      />
+      <GitHubInstallationSyncButton
+        compact
+        disabled={!canSyncGitHub(state.data)}
+        disabledReason={syncDisabledReason(state.data)}
+      />
+    </div>
   );
 }
 
-function InstallationSummary({ installations }: { installations: readonly WorkspaceSettingsInstallation[] }) {
-  const repositoryCount = installations.reduce((total, installation) => total + installation.repositoryCount, 0);
+function GitHubOAuthHeaderAction({ connected }: { connected: boolean }) {
+  if (!connected) {
+    return (
+      <a className="rounded-md bg-accent px-3 py-2 text-sm font-medium text-white" href="/auth/github">
+        Connect GitHub
+      </a>
+    );
+  }
 
-  return <span className="rounded-md border border-border bg-subtle px-3 py-2 text-sm text-secondary">{repositoryCount} repositories available</span>;
+  return (
+    <span className="inline-flex rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm font-medium text-success">
+      GitHub connected
+    </span>
+  );
+}
+
+function GitHubAppHeaderAction({
+  canManage,
+  hasInstallations,
+  hasOAuth,
+  installConfig
+}: {
+  canManage: boolean;
+  hasInstallations: boolean;
+  hasOAuth: boolean;
+  installConfig: GitHubAppInstallConfig;
+}) {
+  if (hasInstallations) {
+    return (
+      <span className="inline-flex rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm font-medium text-success">
+        GitHub App installed
+      </span>
+    );
+  }
+
+  if (hasOAuth && canManage && installConfig.status === "configured" && isAllowedExternalDashboardUrl(installConfig.installUrl, "github")) {
+    return (
+      <a
+        className="rounded-md border border-border bg-surface px-3 py-2 text-sm font-medium text-primary shadow-sm hover:border-accent"
+        data-dashboard-destination="external"
+        data-dashboard-provider="github"
+        href={installConfig.installUrl}
+        rel="noreferrer"
+      >
+        GitHub App
+      </a>
+    );
+  }
+
+  return (
+    <button
+      className="rounded-md border border-border bg-subtle px-3 py-2 text-sm font-medium text-secondary"
+      type="button"
+      disabled
+      title={
+        !hasOAuth
+          ? "Connect GitHub before installing the GitHub App."
+          : !canManage
+            ? "You do not have permission to install the GitHub App."
+            : "Set GITHUB_APP_INSTALL_URL or GITHUB_APP_SLUG before installing the GitHub App."
+      }
+    >
+      GitHub App
+    </button>
+  );
+}
+
+function emptyRepositoryMessage(hasOAuth: boolean, hasInstallations: boolean): string {
+  if (!hasOAuth) {
+    return "Connect GitHub to load repositories.";
+  }
+
+  if (!hasInstallations) {
+    return "Install the GitHub App to add repositories.";
+  }
+
+  return "Sync GitHub to load repositories.";
 }
 
 function DeveloperRepositoryRow({
@@ -353,7 +376,7 @@ function ConnectionPill({ children, tone }: { children: React.ReactNode; tone: "
   return (
     <span
       className={`inline-flex w-fit rounded-full px-2 py-1 text-xs font-medium ${
-        tone === "success" ? "bg-green-50 text-success" : "bg-amber-50 text-amber-800"
+        tone === "success" ? "bg-green-50 text-success" : "bg-slate-100 text-secondary"
       }`}
     >
       {children}
@@ -379,7 +402,7 @@ function syncDisabledReason(data: GitHubSyncDashboardData): string | undefined {
 
 function rowSyncDisabledReason(input: { hasOAuth: boolean; canManageRepositories: boolean; hasInstallations: boolean }): string | undefined {
   if (!input.hasOAuth) {
-    return "Connect GitHub OAuth before syncing repositories.";
+    return "Connect GitHub before syncing repositories.";
   }
 
   if (!input.canManageRepositories) {

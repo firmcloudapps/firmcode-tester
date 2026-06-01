@@ -317,7 +317,7 @@ describe("role landing dashboard pages", () => {
     }
   });
 
-  it("renders the Developer dashboard route with the existing PR Review setup workflow", async () => {
+  it("renders the Developer dashboard route with compact PR Review actions", async () => {
     const restore = withDashboardEnv();
     const fetcher = vi.fn(async (input: Parameters<typeof fetch>[0]) => {
       const pathname = new URL(String(input)).pathname;
@@ -342,8 +342,10 @@ describe("role landing dashboard pages", () => {
       expect(html).not.toContain("Developer dashboard");
       expect(html).not.toContain("PR review workspace");
       expect(html).toContain("PR Review");
-      expect(html).toContain("GitHub OAuth");
       expect(html).toContain("GitHub App");
+      expect(html).toContain("Connect GitHub");
+      expect(html).not.toContain("GitHub OAuth");
+      expect(html).not.toContain("Firmcode GitHub App");
       expect(html).not.toContain("Workspace settings");
       expect(fetcher).toHaveBeenCalledTimes(3);
     } finally {
