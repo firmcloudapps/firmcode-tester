@@ -19,69 +19,14 @@ interface DeveloperPrReviewDashboardProps {
 
 export function DeveloperPrReviewDashboard({ state, installConfig }: DeveloperPrReviewDashboardProps) {
   return (
-    <div className="min-h-screen bg-shell text-primary" data-clerk-authenticated="required">
-      <div className="flex min-h-screen">
-        <DeveloperSidebar oauthConnected={readOAuthConnected(state)} />
-        <main className="min-w-0 flex-1 px-4 py-5 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-7xl space-y-4">
-            <DeveloperHeader state={state} installConfig={installConfig} />
-            {state.status === "loading" ? <DeveloperLoadingState /> : null}
-            {state.status === "signed-out" ? <DeveloperSignedOutState /> : null}
-            {state.status === "error" ? <DeveloperErrorState message={state.message} /> : null}
-            {state.status === "empty" ? <DeveloperContent data={state.data} /> : null}
-            {state.status === "populated" ? <DeveloperContent data={state.data} /> : null}
-          </div>
-        </main>
-      </div>
+    <div className="space-y-4">
+      <DeveloperHeader state={state} installConfig={installConfig} />
+      {state.status === "loading" ? <DeveloperLoadingState /> : null}
+      {state.status === "signed-out" ? <DeveloperSignedOutState /> : null}
+      {state.status === "error" ? <DeveloperErrorState message={state.message} /> : null}
+      {state.status === "empty" ? <DeveloperContent data={state.data} /> : null}
+      {state.status === "populated" ? <DeveloperContent data={state.data} /> : null}
     </div>
-  );
-}
-
-function DeveloperSidebar({ oauthConnected }: { oauthConnected: boolean }) {
-  const links = [
-    { label: "PR Review", href: "/dashboard/developer", active: true },
-    { label: "Repositories", href: "/repositories", active: false },
-    { label: "Pull Requests", href: "/pull-requests", active: false },
-    { label: "Review Runs", href: "/review-runs", active: false }
-  ] as const;
-
-  return (
-    <aside className="hidden w-64 shrink-0 border-r border-border bg-surface lg:flex lg:flex-col">
-      <div className="border-b border-border p-5">
-        <a className="flex items-center gap-3" href="/dashboard/developer">
-          <span className="flex h-10 w-10 items-center justify-center rounded-md bg-accent text-lg font-black text-white shadow-sm">
-            F
-          </span>
-          <span className="min-w-0">
-            <span className="block truncate text-base font-semibold text-primary">firmcode.dev</span>
-            <span className="block text-xs font-medium uppercase text-secondary">Review smarter</span>
-          </span>
-        </a>
-      </div>
-      <nav className="flex-1 p-4" aria-label="PR review navigation">
-        <div className="grid gap-1">
-          {links.map((link) => (
-            <a
-              key={link.label}
-              className={`rounded-md px-3 py-2 text-sm font-medium ${
-                link.active ? "border border-border bg-blush text-accent" : "text-secondary hover:bg-subtle hover:text-primary"
-              }`}
-              href={link.href}
-              aria-current={link.active ? "page" : undefined}
-            >
-              {link.label}
-            </a>
-          ))}
-          <a
-            className="mt-3 flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium text-secondary hover:bg-subtle hover:text-primary"
-            href="/auth/github"
-          >
-            GitHub
-            <span className={`h-2 w-2 rounded-full ${oauthConnected ? "bg-success" : "bg-slate-300"}`} aria-hidden="true" />
-          </a>
-        </div>
-      </nav>
-    </aside>
   );
 }
 
@@ -439,10 +384,6 @@ function ReviewRunRow({ canRetry, run }: { canRetry: boolean; run: ReviewRunList
       </td>
     </tr>
   );
-}
-
-function readOAuthConnected(state: DeveloperPrReviewState): boolean {
-  return (state.status === "empty" || state.status === "populated") && state.data.oauth.connected;
 }
 
 function canSyncGitHub(data: DeveloperPrReviewData): boolean {
