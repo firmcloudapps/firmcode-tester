@@ -30,9 +30,10 @@ interface SettingsViewProps {
   state: ViewState<WorkspaceSettingsResponse>;
   activeTab: SettingsTabKey;
   githubAppInstallUrl?: string | null;
+  tabBasePath?: string;
 }
 
-export function SettingsView({ state, activeTab, githubAppInstallUrl = null }: SettingsViewProps) {
+export function SettingsView({ state, activeTab, githubAppInstallUrl = null, tabBasePath = "/settings" }: SettingsViewProps) {
   return (
     <div className="space-y-4">
       <div>
@@ -42,7 +43,7 @@ export function SettingsView({ state, activeTab, githubAppInstallUrl = null }: S
           Manage the Firmcode-owned workspace surfaces while Clerk owns identity, members, and billing.
         </p>
       </div>
-      <SettingsTabs activeTab={activeTab} />
+      <SettingsTabs activeTab={activeTab} tabBasePath={tabBasePath} />
       {state.status === "loading" ? <SettingsLoadingState /> : null}
       {state.status === "error" ? <SettingsErrorState message={state.message} /> : null}
       {state.status === "empty" ? <SettingsContent data={state.data} activeTab={activeTab} githubAppInstallUrl={githubAppInstallUrl} empty /> : null}
@@ -56,7 +57,7 @@ export function parseSettingsTab(value: string | string[] | undefined): Settings
   return SETTINGS_TABS.some((tab) => tab.key === candidate) ? (candidate as SettingsTabKey) : "general";
 }
 
-function SettingsTabs({ activeTab }: { activeTab: SettingsTabKey }) {
+function SettingsTabs({ activeTab, tabBasePath = "/settings" }: { activeTab: SettingsTabKey; tabBasePath?: string }) {
   return (
     <nav className="overflow-x-auto rounded-lg border border-border bg-surface p-1" aria-label="Settings">
       <div className="flex min-w-max gap-1">
@@ -69,7 +70,7 @@ function SettingsTabs({ activeTab }: { activeTab: SettingsTabKey }) {
               className={`rounded-md px-3 py-2 text-sm font-medium ${
                 active ? "bg-blush text-accent" : "text-secondary hover:bg-subtle hover:text-primary"
               }`}
-              href={`/settings?tab=${tab.key}`}
+              href={`${tabBasePath}?tab=${tab.key}`}
               aria-current={active ? "page" : undefined}
             >
               {tab.label}

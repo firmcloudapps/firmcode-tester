@@ -1,7 +1,7 @@
 import React from "react";
 import { renderToString } from "react-dom/server";
 import HoldingPage from "../app/page";
-import AdminDashboardPage from "../app/dashboard/admin/page";
+import AdminDashboardPage from "../app/(admin)/dashboard/admin/page";
 import DeveloperDashboardPage from "../app/dashboard/developer/page";
 import SignInPage from "../app/sign-in/[[...sign-in]]/page";
 import SignUpPage from "../app/sign-up/[[...sign-up]]/page";
