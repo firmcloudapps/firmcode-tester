@@ -1,10 +1,10 @@
-import { DashboardShell } from "../../../components/dashboard/dashboard-shell";
+import { DeveloperDashboardShell } from "../../../components/dashboard/developer-dashboard-shell";
 import { RulesPoliciesView } from "../../../components/dashboard/rules-policies-view";
 
 export default function RulesLoading() {
   return (
-    <DashboardShell activeItem="Rules">
+    <DeveloperDashboardShell activeItem="Rules">
       <RulesPoliciesView state={{ status: "loading" }} />
-    </DashboardShell>
+    </DeveloperDashboardShell>
   );
 }
