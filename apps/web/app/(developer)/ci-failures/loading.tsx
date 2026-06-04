@@ -1,5 +1,5 @@
-import { DashboardShell } from "../../components/dashboard/dashboard-shell";
-import { CiFailuresView } from "../../components/dashboard/ci-failures-view";
+import { DashboardShell } from "../../../components/dashboard/dashboard-shell";
+import { CiFailuresView } from "../../../components/dashboard/ci-failures-view";
 
 export default function CiFailuresLoading() {
   return (

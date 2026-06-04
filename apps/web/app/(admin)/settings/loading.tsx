@@ -1,5 +1,5 @@
-import { DashboardShell } from "../../components/dashboard/dashboard-shell";
-import { SettingsView } from "../../components/dashboard/settings-view";
+import { DashboardShell } from "../../../components/dashboard/dashboard-shell";
+import { SettingsView } from "../../../components/dashboard/settings-view";
 
 export default function SettingsLoading() {
   return (

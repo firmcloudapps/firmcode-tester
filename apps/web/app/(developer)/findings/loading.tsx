@@ -1,5 +1,5 @@
-import { DashboardShell } from "../../components/dashboard/dashboard-shell";
-import { FindingsView } from "../../components/dashboard/findings-view";
+import { DashboardShell } from "../../../components/dashboard/dashboard-shell";
+import { FindingsView } from "../../../components/dashboard/findings-view";
 
 export default function FindingsLoading() {
   return (

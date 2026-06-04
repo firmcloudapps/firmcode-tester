@@ -1,5 +1,5 @@
-import { DashboardShell } from "../../components/dashboard/dashboard-shell";
-import { ReviewRunsView } from "../../components/dashboard/review-runs-view";
+import { DashboardShell } from "../../../components/dashboard/dashboard-shell";
+import { ReviewRunsView } from "../../../components/dashboard/review-runs-view";
 
 export default function ReviewRunsLoading() {
   return (

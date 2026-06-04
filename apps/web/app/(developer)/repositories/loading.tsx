@@ -1,5 +1,5 @@
-import { DashboardShell } from "../../components/dashboard/dashboard-shell";
-import { RepositoriesView } from "../../components/dashboard/repositories-view";
+import { DashboardShell } from "../../../components/dashboard/dashboard-shell";
+import { RepositoriesView } from "../../../components/dashboard/repositories-view";
 
 export default function RepositoriesLoading() {
   return (

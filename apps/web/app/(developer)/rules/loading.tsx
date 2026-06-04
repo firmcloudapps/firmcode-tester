@@ -1,5 +1,5 @@
-import { DashboardShell } from "../../components/dashboard/dashboard-shell";
-import { RulesPoliciesView } from "../../components/dashboard/rules-policies-view";
+import { DashboardShell } from "../../../components/dashboard/dashboard-shell";
+import { RulesPoliciesView } from "../../../components/dashboard/rules-policies-view";
 
 export default function RulesLoading() {
   return (
