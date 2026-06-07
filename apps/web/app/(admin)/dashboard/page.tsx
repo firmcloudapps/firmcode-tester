@@ -1,15 +1,15 @@
 import { AdminDashboardShell } from "../../../components/dashboard/admin-dashboard-shell";
-import { OverviewView } from "../../../components/dashboard/overview-view";
-import { loadOverviewState } from "../../../lib/dashboard-data";
+import { AdminOverviewView } from "../../../components/dashboard/admin-overview-view";
+import { loadAdminOverviewState } from "../../../lib/dashboard-data";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const state = await loadOverviewState();
+  const state = await loadAdminOverviewState();
 
   return (
     <AdminDashboardShell activeItem="Overview">
-      <OverviewView state={state} />
+      <AdminOverviewView state={state} />
     </AdminDashboardShell>
   );
 }

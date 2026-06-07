@@ -264,23 +264,23 @@ export function canManageSensitiveWorkspaceSettings(role: DashboardWorkspaceRole
 }
 
 export function canRetryReviewRuns(role: DashboardWorkspaceRole): boolean {
-  return role === "owner" || role === "admin" || role === "developer";
+  return role === "developer";
 }
 
 export function canManageRepositoryConfiguration(role: DashboardWorkspaceRole): boolean {
-  return role === "admin" || role === "developer";
+  return role === "developer";
 }
 
 export function canTriggerCodebaseScans(role: DashboardWorkspaceRole): boolean {
-  return role === "owner" || role === "admin" || role === "developer";
+  return role === "developer";
 }
 
 export function canManageCodebaseScans(role: DashboardWorkspaceRole): boolean {
-  return role === "owner" || role === "admin" || role === "developer";
+  return role === "developer";
 }
 
 export function canAccessRawReviewArtifacts(role: DashboardWorkspaceRole): boolean {
-  return role === "admin";
+  return role === "developer";
 }
 
 export function canManageBilling(role: DashboardWorkspaceRole, hasClerkBillingCapability = false): boolean {
