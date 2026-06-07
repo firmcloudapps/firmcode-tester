@@ -1,37 +1,33 @@
-describe("Clerk session token forwarding", () => {
+describe("dashboard session token forwarding", () => {
   afterEach(() => {
-    vi.doUnmock("@clerk/nextjs/server");
     vi.resetModules();
   });
 
-  it("requests the configured Clerk JWT template for web-to-API bearer tokens", async () => {
-    const getToken = vi.fn(async () => "clerk-session-token");
+  it("reads the explicit non-production dashboard session token override", async () => {
+    const { getDashboardApiBearerToken } = await import("../lib/clerk-auth");
 
-    vi.doMock("@clerk/nextjs/server", () => ({
-      auth: vi.fn(async () => ({
-        userId: "user_123",
-        sessionId: "sess_123",
-        getToken
-      }))
-    }));
-
-    const { getClerkApiBearerToken } = await import("../lib/clerk-auth");
-
-    await expect(getClerkApiBearerToken({ CLERK_JWT_AUDIENCE: "firmcode-api" })).resolves.toBe("clerk-session-token");
-    expect(getToken).toHaveBeenCalledWith({ template: "firmcode-api" });
+    await expect(
+      getDashboardApiBearerToken({
+        NODE_ENV: "test",
+        FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN: "session-token"
+      })
+    ).resolves.toBe("session-token");
   });
 
-  it("treats missing Clerk user or session state as unauthenticated", async () => {
-    vi.doMock("@clerk/nextjs/server", () => ({
-      auth: vi.fn(async () => ({
-        userId: null,
-        sessionId: null,
-        getToken: vi.fn(async () => "token-without-session")
-      }))
-    }));
+  it("keeps the legacy test token override working during the migration", async () => {
+    const { getDashboardApiBearerToken } = await import("../lib/clerk-auth");
 
-    const { getClerkApiBearerToken } = await import("../lib/clerk-auth");
+    await expect(
+      getDashboardApiBearerToken({
+        NODE_ENV: "test",
+        FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN: "legacy-session-token"
+      })
+    ).resolves.toBe("legacy-session-token");
+  });
 
-    await expect(getClerkApiBearerToken({ CLERK_JWT_AUDIENCE: "firmcode-api" })).resolves.toBeNull();
+  it("treats missing request auth context as signed out", async () => {
+    const { getDashboardApiBearerToken } = await import("../lib/clerk-auth");
+
+    await expect(getDashboardApiBearerToken({ NODE_ENV: "test" })).resolves.toBeNull();
   });
 });

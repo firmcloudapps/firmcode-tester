@@ -12,7 +12,7 @@ import { PullRequestsView } from "../components/dashboard/pull-requests-view";
 import { RepositoriesView } from "../components/dashboard/repositories-view";
 import { ReviewRunsView } from "../components/dashboard/review-runs-view";
 import { SettingsView } from "../components/dashboard/settings-view";
-import { DASHBOARD_NAV_ITEMS } from "../lib/dashboard-navigation";
+import { DEVELOPER_NAV_ITEMS } from "../lib/developer-dashboard-nav";
 
 describe("dashboard visual navigation smoke", () => {
   it("renders the full-width light shell with desktop and mobile navigation states", () => {
@@ -31,7 +31,7 @@ describe("dashboard visual navigation smoke", () => {
     expect(html).toContain("lg:hidden");
     expect(html).toContain("fixed inset-y-0 left-0");
 
-    for (const item of DASHBOARD_NAV_ITEMS) {
+    for (const item of DEVELOPER_NAV_ITEMS) {
       expect(html, item.label).toContain(`href="${item.href}"`);
     }
 
@@ -41,19 +41,23 @@ describe("dashboard visual navigation smoke", () => {
 
   it("covers every active dashboard page with route-safe shell rendering", () => {
     const pages = [
-      { active: "Overview" as const, expected: "Review operations", view: <OverviewView state={{ status: "loading" }} /> },
-      { active: "PR Review" as const, expected: "PR Review", view: <GitHubInstallationsView state={{ status: "loading" }} installConfig={installConfig} /> },
-      { active: "Repositories" as const, expected: "Repository review coverage", view: <RepositoriesView state={{ status: "loading" }} /> },
-      { active: "Pull Requests" as const, expected: "Engineering review queue", view: <PullRequestsView state={{ status: "loading" }} /> },
-      { active: "Review Runs" as const, expected: "Pipeline executions", view: <ReviewRunsView state={{ status: "loading" }} /> },
-      { active: "Findings" as const, expected: "Findings inbox", view: <FindingsView state={{ status: "loading" }} /> },
-      { active: "CI Failures" as const, expected: "Broken checks queue", view: <CiFailuresView state={{ status: "loading" }} /> },
-      { active: "Settings" as const, expected: "Workspace settings", view: <SettingsView state={{ status: "loading" }} activeTab="general" /> },
-      { active: "Billing" as const, expected: "Subscription", view: <BillingView state={{ status: "loading" }} billingPortalUrl={null} /> }
+      { active: "Overview" as const, expected: "Review operations", role: "admin", view: <OverviewView state={{ status: "loading" }} /> },
+      { active: "PR Review" as const, expected: "PR Review", role: "developer", view: <GitHubInstallationsView state={{ status: "loading" }} installConfig={installConfig} /> },
+      { active: "Repositories" as const, expected: "Repository review coverage", role: "developer", view: <RepositoriesView state={{ status: "loading" }} /> },
+      { active: "Pull Requests" as const, expected: "Engineering review queue", role: "developer", view: <PullRequestsView state={{ status: "loading" }} /> },
+      { active: "Review Runs" as const, expected: "Pipeline executions", role: "developer", view: <ReviewRunsView state={{ status: "loading" }} /> },
+      { active: "Findings" as const, expected: "Findings inbox", role: "developer", view: <FindingsView state={{ status: "loading" }} /> },
+      { active: "CI Failures" as const, expected: "Broken checks queue", role: "developer", view: <CiFailuresView state={{ status: "loading" }} /> },
+      { active: "Settings" as const, expected: "Workspace settings", role: "admin", view: <SettingsView state={{ status: "loading" }} activeTab="general" /> },
+      { active: "Billing" as const, expected: "Subscription", role: "admin", view: <BillingView state={{ status: "loading" }} billingPortalUrl={null} /> }
     ];
 
     for (const page of pages) {
-      const html = renderToString(<DashboardShell activeItem={page.active}>{page.view}</DashboardShell>);
+      const html = renderToString(
+        <DashboardShell activeItem={page.active} role={page.role}>
+          {page.view}
+        </DashboardShell>
+      );
 
       expect(html, page.active).toContain('data-clerk-authenticated="required"');
       expect(html, page.active).toContain(page.expected);

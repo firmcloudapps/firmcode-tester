@@ -69,15 +69,15 @@ describe("role-based dashboard navigation", () => {
     expect(html).toContain('href="/billing"');
   });
 
-  it("falls back to the full menu when no role is provided", () => {
+  it("falls back to the developer menu when no role is provided", () => {
     const html = renderToString(
       <DashboardShell activeItem="Overview">
         <main>Dashboard body</main>
       </DashboardShell>
     );
 
-    expect(html).toContain('href="/settings"');
-    expect(html).toContain('href="/billing"');
-    expect(html).not.toContain('href="/rules"');
+    expect(html).not.toContain('href="/settings"');
+    expect(html).not.toContain('href="/billing"');
+    expect(html).toContain('href="/rules"');
   });
 });

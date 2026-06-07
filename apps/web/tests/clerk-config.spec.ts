@@ -1,78 +1,15 @@
-import { createWebClerkConfig } from "@firmcode/shared";
-import { loadWebClerkAuthRenderConfig } from "../config/clerk";
+import { getAuthProvider, hasInsForgeConfig, loadWebInsForgeAuthRenderConfig } from "../config/insforge";
 
-describe("web Clerk config", () => {
-  it("validates the Clerk publishable key and billing portal entry point", () => {
-    const config = createWebClerkConfig({
-      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_example",
-      CLERK_BILLING_PORTAL_URL: "https://accounts.clerk.example/billing"
-    });
-
-    expect(config).toEqual({
-      publishableKey: "pk_test_example",
-      signInUrl: "/sign-in",
-      signUpUrl: "/sign-up",
-      afterSignInUrl: "/",
-      afterSignUpUrl: "/",
-      billingPortalUrl: "https://accounts.clerk.example/billing"
-    });
-  });
-
-  it("accepts explicit Clerk sign-in, sign-up, and after-auth routes", () => {
-    const config = createWebClerkConfig({
-      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_example",
-      NEXT_PUBLIC_CLERK_SIGN_IN_URL: "/sign-in",
-      NEXT_PUBLIC_CLERK_SIGN_UP_URL: "/sign-up",
-      NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL: "/repositories",
-      NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL: "/github/installations"
-    });
-
-    expect(config.signInUrl).toBe("/sign-in");
-    expect(config.signUpUrl).toBe("/sign-up");
-    expect(config.afterSignInUrl).toBe("/repositories");
-    expect(config.afterSignUpUrl).toBe("/github/installations");
-  });
-
-  it("treats a missing billing portal URL as an unavailable Clerk Billing entry point", () => {
-    const config = createWebClerkConfig({
-      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_example"
-    });
-
-    expect(config.billingPortalUrl).toBeNull();
-  });
-
-  it("fails when the Clerk publishable key is missing", () => {
-    expect(() => createWebClerkConfig({})).toThrow(/NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is required/);
-  });
-
-  it("rejects a relative billing portal URL", () => {
-    expect(() =>
-      createWebClerkConfig({
-        NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_example",
-        CLERK_BILLING_PORTAL_URL: "/billing"
-      })
-    ).toThrow(/CLERK_BILLING_PORTAL_URL must be an absolute/);
-  });
-
-  it("rejects invalid Clerk route values", () => {
-    expect(() =>
-      createWebClerkConfig({
-        NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_example",
-        NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL: "dashboard"
-      })
-    ).toThrow(/NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL must be an absolute http\(s\) URL or app-relative path/);
-  });
-});
-
-describe("web Clerk auth render config", () => {
-  it("keeps sign-in rendering independent from optional billing configuration", () => {
+describe("web InsForge auth config", () => {
+  it("loads InsForge auth routes with role-based redirect defaults", () => {
     expect(
-      loadWebClerkAuthRenderConfig({
-        NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_example",
-        CLERK_BILLING_PORTAL_URL: "/billing"
+      loadWebInsForgeAuthRenderConfig({
+        NEXT_PUBLIC_INSFORGE_BASE_URL: "https://firmcode.eu-central.insforge.app",
+        NEXT_PUBLIC_INSFORGE_ANON_KEY: "anon_test_key"
       })
     ).toEqual({
-      publishableKey: "pk_test_example",
+      baseUrl: "https://firmcode.eu-central.insforge.app",
+      anonKey: "anon_test_key",
       signInUrl: "/sign-in",
       signUpUrl: "/sign-up",
       afterSignInUrl: "/auth/redirect",
@@ -80,16 +17,35 @@ describe("web Clerk auth render config", () => {
     });
   });
 
-  it("falls back for malformed optional auth route values instead of breaking the public auth page", () => {
-    expect(
-      loadWebClerkAuthRenderConfig({
-        NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_example",
-        NEXT_PUBLIC_CLERK_SIGN_IN_URL: "sign-in",
-        NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL: "dashboard"
-      })
-    ).toMatchObject({
-      signInUrl: "/sign-in",
-      afterSignInUrl: "/auth/redirect"
+  it("accepts explicit public auth routes", () => {
+    const config = loadWebInsForgeAuthRenderConfig({
+      NEXT_PUBLIC_INSFORGE_BASE_URL: "https://firmcode.eu-central.insforge.app",
+      NEXT_PUBLIC_INSFORGE_ANON_KEY: "anon_test_key",
+      NEXT_PUBLIC_INSFORGE_SIGN_IN_URL: "/login",
+      NEXT_PUBLIC_INSFORGE_SIGN_UP_URL: "/register",
+      NEXT_PUBLIC_INSFORGE_AFTER_SIGN_IN_URL: "/dashboard/developer",
+      NEXT_PUBLIC_INSFORGE_AFTER_SIGN_UP_URL: "/github/installations"
     });
+
+    expect(config.signInUrl).toBe("/login");
+    expect(config.signUpUrl).toBe("/register");
+    expect(config.afterSignInUrl).toBe("/dashboard/developer");
+    expect(config.afterSignUpUrl).toBe("/github/installations");
+  });
+
+  it("detects whether the public InsForge config is complete", () => {
+    expect(hasInsForgeConfig({})).toBe(false);
+    expect(
+      hasInsForgeConfig({
+        NEXT_PUBLIC_INSFORGE_BASE_URL: "https://firmcode.eu-central.insforge.app",
+        NEXT_PUBLIC_INSFORGE_ANON_KEY: "anon_test_key"
+      })
+    ).toBe(true);
+  });
+
+  it("defaults the auth provider to InsForge unless an old Clerk flag is still set", () => {
+    expect(getAuthProvider({})).toBe("insforge");
+    expect(getAuthProvider({ NEXT_PUBLIC_AUTH_PROVIDER: "insforge" })).toBe("insforge");
+    expect(getAuthProvider({ NEXT_PUBLIC_AUTH_PROVIDER: "clerk" })).toBe("clerk");
   });
 });

@@ -1,8 +1,6 @@
 import { CanActivate, ExecutionContext, Inject, Injectable, UnauthorizedException } from "@nestjs/common";
-import {
-  CLERK_TOKEN_VERIFIER,
-  type ClerkTokenVerifier
-} from "./clerk-token-verifier";
+import type { ApiRuntimeConfig } from "@firmcode/shared";
+import { API_RUNTIME_CONFIG } from "../../config/api-config.provider";
 import {
   deriveDashboardCapabilities,
   type DashboardAuthenticatedRequest,
@@ -12,6 +10,7 @@ import {
   DASHBOARD_WORKSPACE_RESOLVER,
   type DashboardWorkspaceResolver
 } from "./workspace-resolver";
+import { TOKEN_VERIFIER, type TokenVerifier, type VerifiedToken } from "./token-verifier";
 
 const WORKSPACE_HEADER = "x-firmcode-workspace-id";
 const USER_HEADER = "x-firmcode-user-id";
@@ -19,9 +18,10 @@ const USER_HEADER = "x-firmcode-user-id";
 @Injectable()
 export class DashboardAuthGuard implements CanActivate {
   constructor(
-    @Inject(CLERK_TOKEN_VERIFIER) private readonly verifier: ClerkTokenVerifier,
+    @Inject(API_RUNTIME_CONFIG) private readonly config: ApiRuntimeConfig,
+    @Inject(TOKEN_VERIFIER) private readonly verifier: TokenVerifier,
     @Inject(DASHBOARD_WORKSPACE_RESOLVER) private readonly workspaceResolver: DashboardWorkspaceResolver
-  ) {}
+  ) { }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<DashboardAuthenticatedRequest>();
@@ -35,26 +35,33 @@ export class DashboardAuthGuard implements CanActivate {
     const token = readBearerToken(readHeader(headers, "authorization"));
 
     if (token === null) {
-      throw new UnauthorizedException("Clerk bearer token is required");
+      throw new UnauthorizedException("Bearer token is required");
     }
 
     const verified = await this.verifier.verify(token);
 
     if (verified.sessionId === null) {
-      throw new UnauthorizedException("Clerk session is required");
+      throw new UnauthorizedException("Session is required");
     }
 
     const workspace = await this.workspaceResolver.resolve({
       token: verified,
       selectedWorkspaceId: readHeader(headers, WORKSPACE_HEADER)
     });
+
+    const capabilities = deriveDashboardCapabilities(workspace.role, workspace.billingCapabilities);
     const requestContext: DashboardRequestContext = {
-      clerkUserId: workspace.clerkUserId,
-      clerkOrgId: workspace.clerkOrgId,
+      userId: workspace.userId,
+      orgId: workspace.orgId,
       sessionId: workspace.sessionId,
       workspaceId: workspace.workspaceId,
       role: workspace.role,
-      capabilities: deriveDashboardCapabilities(workspace.role, workspace.billingCapabilities),
+      capabilities,
+      billingCapabilities: workspace.billingCapabilities,
+      provider: verified.provider,
+      // Deprecated fields for backward compatibility
+      clerkUserId: workspace.userId,
+      clerkOrgId: workspace.orgId,
       clerkCapabilities: workspace.billingCapabilities
     };
 

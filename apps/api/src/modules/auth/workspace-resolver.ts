@@ -3,22 +3,26 @@ import { ForbiddenException, Injectable } from "@nestjs/common";
 import type { DefaultClerkOrganizationConfig } from "@firmcode/shared";
 import type { DatabaseExecutor } from "../../infrastructure/database/migrations";
 import type { DashboardRole } from "../review-runs/dashboard-auth.store";
-import type { VerifiedClerkToken } from "./clerk-token-verifier";
+import type { VerifiedToken } from "./token-verifier";
 
 export const DASHBOARD_WORKSPACE_RESOLVER = Symbol("DASHBOARD_WORKSPACE_RESOLVER");
 
 export interface ResolvedDashboardWorkspace {
   readonly workspaceId: string;
-  readonly clerkUserId: string;
-  readonly clerkOrgId: string | null;
+  readonly userId: string;
+  readonly orgId: string | null;
   readonly sessionId: string | null;
   readonly role: DashboardRole;
   readonly billingCapabilities: readonly string[];
+  /** @deprecated Use userId instead */
+  readonly clerkUserId?: string;
+  /** @deprecated Use orgId instead */
+  readonly clerkOrgId?: string | null;
 }
 
 export interface DashboardWorkspaceResolver {
   resolve(input: {
-    readonly token: VerifiedClerkToken;
+    readonly token: VerifiedToken;
     readonly selectedWorkspaceId: string | null;
   }): Promise<ResolvedDashboardWorkspace>;
 }
@@ -31,9 +35,11 @@ interface WorkspaceRow {
 interface MembershipRow {
   readonly workspace_id: string;
   readonly clerk_user_id: string;
+  readonly user_id?: string | null;
   readonly role: DashboardRole;
   readonly active?: boolean;
   readonly clerk_org_id?: string | null;
+  readonly identity_provider_org_id?: string | null;
 }
 
 @Injectable()
@@ -42,14 +48,17 @@ export class PostgresDashboardWorkspaceResolver implements DashboardWorkspaceRes
     private readonly database: DatabaseExecutor,
     private readonly uuidFactory: () => string = randomUUID,
     private readonly defaultOrganization: DefaultClerkOrganizationConfig | null = null
-  ) {}
+  ) { }
 
   async resolve(input: {
-    readonly token: VerifiedClerkToken;
+    readonly token: VerifiedToken;
     readonly selectedWorkspaceId: string | null;
   }): Promise<ResolvedDashboardWorkspace> {
+    const userId = input.token.userId;
+    const orgId = input.token.orgId;
+
     if (input.selectedWorkspaceId !== null) {
-      const membership = await this.findActiveMembership(input.selectedWorkspaceId, input.token.clerkUserId);
+      const membership = await this.findActiveMembership(input.selectedWorkspaceId, userId);
 
       if (membership === null) {
         throw new ForbiddenException("Workspace membership is required");
@@ -58,21 +67,23 @@ export class PostgresDashboardWorkspaceResolver implements DashboardWorkspaceRes
       return toResolvedWorkspace(input.token, membership);
     }
 
-    if (input.token.clerkOrgId !== null) {
+    if (orgId !== null) {
       const workspaceId = await this.ensureOrganizationWorkspace({
-        clerkOrgId: input.token.clerkOrgId,
-        name: `Clerk organization ${input.token.clerkOrgId}`
+        orgId,
+        name: `Organization ${orgId}`,
+        provider: input.token.provider
       });
       const membership = await this.ensureMembership({
         workspaceId,
-        clerkUserId: input.token.clerkUserId,
+        userId,
         role: resolveOrganizationRole(input.token),
         source: resolveOrganizationRoleSource(input.token),
         syncExistingRole: hasExplicitTrustedRole(input.token),
         metadata: {
-          clerkOrgId: input.token.clerkOrgId,
-          clerkOrgRole: input.token.orgRole,
-          firmcodeRole: input.token.firmcodeRole
+          orgId,
+          orgRole: input.token.orgRole,
+          firmcodeRole: input.token.firmcodeRole,
+          provider: input.token.provider
         }
       });
 
@@ -81,28 +92,30 @@ export class PostgresDashboardWorkspaceResolver implements DashboardWorkspaceRes
 
     if (this.defaultOrganization !== null) {
       const workspaceId = await this.ensureOrganizationWorkspace({
-        clerkOrgId: this.defaultOrganization.id,
-        name: this.defaultOrganization.name
+        orgId: this.defaultOrganization.id,
+        name: this.defaultOrganization.name,
+        provider: input.token.provider
       });
-      const defaultRole = resolveConfiguredOrganizationRole(this.defaultOrganization.role);
+      const defaultRole = resolveConfiguredOrganizationRole("org:developer");
       const membership = await this.ensureMembership({
         workspaceId,
-        clerkUserId: input.token.clerkUserId,
+        userId,
         role: defaultRole,
-        source: "default_clerk_organization_signup",
+        source: "default_organization_signup",
         syncExistingRole: false,
         metadata: {
-          clerkOrgId: this.defaultOrganization.id,
-          clerkOrgRole: this.defaultOrganization.role,
-          firmcodeRole: input.token.firmcodeRole
+          orgId: this.defaultOrganization.id,
+          orgRole: "org:developer",
+          firmcodeRole: input.token.firmcodeRole,
+          provider: input.token.provider
         }
       });
 
       return toResolvedWorkspace(
         {
           ...input.token,
-          clerkOrgId: this.defaultOrganization.id,
-          orgRole: this.defaultOrganization.role
+          orgId: this.defaultOrganization.id,
+          orgRole: "org:developer"
         },
         membership
       );
@@ -112,8 +125,12 @@ export class PostgresDashboardWorkspaceResolver implements DashboardWorkspaceRes
     return toResolvedWorkspace(input.token, membership);
   }
 
-  private async ensureOrganizationWorkspace(input: { readonly clerkOrgId: string; readonly name: string }): Promise<string> {
-    const existing = await this.database.query<WorkspaceRow>("SELECT id FROM workspaces WHERE clerk_org_id = $1", [input.clerkOrgId]);
+  private async ensureOrganizationWorkspace(input: { readonly orgId: string; readonly name: string; readonly provider?: string }): Promise<string> {
+    const identityProvider = input.provider ?? "clerk";
+    const existing = await this.database.query<WorkspaceRow>(
+      "SELECT id FROM workspaces WHERE identity_provider_org_id = $1 OR clerk_org_id = $1",
+      [input.orgId]
+    );
 
     if (existing.rows[0] !== undefined) {
       return existing.rows[0].id;
@@ -122,43 +139,46 @@ export class PostgresDashboardWorkspaceResolver implements DashboardWorkspaceRes
     const workspaceId = this.uuidFactory();
     const result = await this.database.query<WorkspaceRow>(
       `
-INSERT INTO workspaces (id, clerk_org_id, name)
-VALUES ($1, $2, $3)
-ON CONFLICT (clerk_org_id) DO UPDATE SET updated_at = now()
+INSERT INTO workspaces (id, identity_provider, identity_provider_org_id, clerk_org_id, name)
+VALUES ($1, $2, $3, CASE WHEN $2 = 'clerk' THEN $3 ELSE NULL END, $4)
+ON CONFLICT (identity_provider_org_id) DO UPDATE SET updated_at = now()
 RETURNING id
 `,
-      [workspaceId, input.clerkOrgId, input.name]
+      [workspaceId, identityProvider, input.orgId, input.name]
     );
 
     return result.rows[0]?.id ?? workspaceId;
   }
 
-  private async ensurePersonalWorkspace(token: VerifiedClerkToken): Promise<MembershipRow> {
+  private async ensurePersonalWorkspace(token: VerifiedToken): Promise<MembershipRow> {
+    const userId = token.userId;
     const existing = await this.database.query<MembershipRow>(
       `
-SELECT wm.workspace_id, wm.clerk_user_id, wm.role, w.clerk_org_id
+SELECT wm.workspace_id, wm.clerk_user_id, wm.user_id, wm.role, w.clerk_org_id, w.identity_provider_org_id
 FROM workspace_memberships wm
 JOIN workspaces w ON w.id = wm.workspace_id
-WHERE wm.clerk_user_id = $1
+WHERE (wm.clerk_user_id = $1 OR wm.user_id = $1)
   AND wm.active = true
   AND w.clerk_org_id IS NULL
+  AND w.identity_provider_org_id IS NULL
 ORDER BY wm.created_at ASC
 LIMIT 1
 `,
-      [token.clerkUserId]
+      [userId]
     );
 
     if (existing.rows[0] !== undefined) {
       return this.ensureMembership({
         workspaceId: existing.rows[0].workspace_id,
-        clerkUserId: token.clerkUserId,
+        userId,
         role: resolvePersonalRole(token),
         source: resolvePersonalRoleSource(token),
         syncExistingRole: hasExplicitFirmcodeRole(token),
         metadata: {
-          clerkOrgId: null,
-          clerkOrgRole: null,
-          firmcodeRole: token.firmcodeRole
+          orgId: null,
+          orgRole: null,
+          firmcodeRole: token.firmcodeRole,
+          provider: token.provider
         }
       });
     }
@@ -166,35 +186,36 @@ LIMIT 1
     const workspaceId = this.uuidFactory();
     await this.database.query(
       `
-INSERT INTO workspaces (id, clerk_org_id, name)
-VALUES ($1, NULL, $2)
+INSERT INTO workspaces (id, clerk_org_id, identity_provider_org_id, name)
+VALUES ($1, NULL, NULL, $2)
 `,
       [workspaceId, "Personal workspace"]
     );
 
     return this.ensureMembership({
       workspaceId,
-      clerkUserId: token.clerkUserId,
+      userId,
       role: resolvePersonalRole(token),
       source: resolvePersonalRoleSource(token),
       syncExistingRole: hasExplicitFirmcodeRole(token),
       metadata: {
-        clerkOrgId: null,
-        clerkOrgRole: null,
-        firmcodeRole: token.firmcodeRole
+        orgId: null,
+        orgRole: null,
+        firmcodeRole: token.firmcodeRole,
+        provider: token.provider
       }
     });
   }
 
   private async ensureMembership(input: {
     readonly workspaceId: string;
-    readonly clerkUserId: string;
+    readonly userId: string;
     readonly role: DashboardRole;
     readonly source: string;
     readonly syncExistingRole: boolean;
     readonly metadata: Record<string, unknown>;
   }): Promise<MembershipRow> {
-    const existing = await this.findMembership(input.workspaceId, input.clerkUserId);
+    const existing = await this.findMembership(input.workspaceId, input.userId);
 
     if (existing !== null && existing.active !== true) {
       throw new ForbiddenException("Workspace membership is inactive");
@@ -212,21 +233,25 @@ SET role = $3,
     active = true,
     updated_at = now()
 WHERE workspace_id = $1
-  AND clerk_user_id = $2
-RETURNING workspace_id, clerk_user_id, role
+  AND (clerk_user_id = $2 OR user_id = $2)
+RETURNING workspace_id, clerk_user_id, user_id, role
 `,
-        [input.workspaceId, input.clerkUserId, input.role]
+        [input.workspaceId, input.userId, input.role]
       );
       const membership = result.rows[0] ?? {
         workspace_id: input.workspaceId,
-        clerk_user_id: input.clerkUserId,
+        clerk_user_id: input.userId,
+        user_id: input.userId,
         role: input.role
       };
 
       await this.auditRoleChangeIfElevated({
-        ...input,
+        workspaceId: input.workspaceId,
+        userId: input.userId,
         previousRole: existing.role,
-        nextRole: input.role
+        nextRole: input.role,
+        source: input.source,
+        metadata: input.metadata
       });
 
       return membership;
@@ -234,12 +259,12 @@ RETURNING workspace_id, clerk_user_id, role
 
     const result = await this.database.query<MembershipRow>(
       `
-INSERT INTO workspace_memberships (workspace_id, clerk_user_id, role, active)
-VALUES ($1, $2, $3, true)
+INSERT INTO workspace_memberships (workspace_id, clerk_user_id, user_id, role, active)
+VALUES ($1, CASE WHEN $4 = 'clerk' THEN $2 ELSE NULL END, CASE WHEN $4 = 'insforge' THEN $2 ELSE NULL END, $3, true)
 ON CONFLICT (workspace_id, clerk_user_id) DO NOTHING
-RETURNING workspace_id, clerk_user_id, role
+RETURNING workspace_id, clerk_user_id, user_id, role
 `,
-      [input.workspaceId, input.clerkUserId, input.role]
+      [input.workspaceId, input.userId, input.role, input.metadata.provider ?? 'clerk']
     );
 
     if (result.rows[0] === undefined) {
@@ -247,40 +272,43 @@ RETURNING workspace_id, clerk_user_id, role
     }
 
     await this.auditRoleChangeIfElevated({
-      ...input,
+      workspaceId: input.workspaceId,
+      userId: input.userId,
       previousRole: null,
-      nextRole: input.role
+      nextRole: input.role,
+      source: input.source,
+      metadata: input.metadata
     });
 
     return result.rows[0];
   }
 
-  private async findActiveMembership(workspaceId: string, clerkUserId: string): Promise<MembershipRow | null> {
+  private async findActiveMembership(workspaceId: string, userId: string): Promise<MembershipRow | null> {
     const result = await this.database.query<MembershipRow>(
       `
-SELECT wm.workspace_id, wm.clerk_user_id, wm.role, wm.active, w.clerk_org_id
+SELECT wm.workspace_id, wm.clerk_user_id, wm.user_id, wm.role, wm.active, w.clerk_org_id, w.identity_provider_org_id
 FROM workspace_memberships wm
 JOIN workspaces w ON w.id = wm.workspace_id
 WHERE wm.workspace_id = $1
-  AND wm.clerk_user_id = $2
+  AND (wm.clerk_user_id = $2 OR wm.user_id = $2)
   AND wm.active = true
 `,
-      [workspaceId, clerkUserId]
+      [workspaceId, userId]
     );
 
     return result.rows[0] ?? null;
   }
 
-  private async findMembership(workspaceId: string, clerkUserId: string): Promise<MembershipRow | null> {
+  private async findMembership(workspaceId: string, userId: string): Promise<MembershipRow | null> {
     const result = await this.database.query<MembershipRow>(
       `
-SELECT wm.workspace_id, wm.clerk_user_id, wm.role, wm.active, w.clerk_org_id
+SELECT wm.workspace_id, wm.clerk_user_id, wm.user_id, wm.role, wm.active, w.clerk_org_id, w.identity_provider_org_id
 FROM workspace_memberships wm
 JOIN workspaces w ON w.id = wm.workspace_id
 WHERE wm.workspace_id = $1
-  AND wm.clerk_user_id = $2
+  AND (wm.clerk_user_id = $2 OR wm.user_id = $2)
 `,
-      [workspaceId, clerkUserId]
+      [workspaceId, userId]
     );
 
     return result.rows[0] ?? null;
@@ -288,7 +316,7 @@ WHERE wm.workspace_id = $1
 
   private async auditRoleChangeIfElevated(input: {
     readonly workspaceId: string;
-    readonly clerkUserId: string;
+    readonly userId: string;
     readonly previousRole: DashboardRole | null;
     readonly nextRole: DashboardRole;
     readonly source: string;
@@ -298,24 +326,31 @@ WHERE wm.workspace_id = $1
       return;
     }
 
+    const provider = input.metadata.provider ?? 'clerk';
+    const actorClerkUserId = provider === 'clerk' ? input.userId : null;
+    const actorUserId = provider === 'insforge' ? input.userId : input.userId; // Store both when possible
+
     await this.database.query(
       `
 INSERT INTO workspace_audit_events (
   id,
   workspace_id,
   actor_clerk_user_id,
+  actor_user_id,
   target_clerk_user_id,
+  target_user_id,
   event_type,
   previous_role,
   next_role,
   source,
   metadata_json
-) VALUES ($1, $2, $3, $3, 'membership_role_changed', $4, $5, $6, $7::jsonb)
+) VALUES ($1, $2, $3, $4, $3, $4, 'membership_role_changed', $5, $6, $7, $8::jsonb)
 `,
       [
         this.uuidFactory(),
         input.workspaceId,
-        input.clerkUserId,
+        actorClerkUserId,
+        actorUserId,
         input.previousRole,
         input.nextRole,
         input.source,
@@ -331,15 +366,15 @@ export class EmptyDashboardWorkspaceResolver implements DashboardWorkspaceResolv
   }
 }
 
-function resolvePersonalRole(token: VerifiedClerkToken): DashboardRole {
+function resolvePersonalRole(token: VerifiedToken): DashboardRole {
   return normalizeFirmcodeRole(token.firmcodeRole) ?? "developer";
 }
 
-function resolvePersonalRoleSource(token: VerifiedClerkToken): string {
-  return hasExplicitFirmcodeRole(token) ? "clerk_firmcode_role_metadata" : "personal_first_login";
+function resolvePersonalRoleSource(token: VerifiedToken): string {
+  return hasExplicitFirmcodeRole(token) ? "token_firmcode_role_metadata" : "personal_first_login";
 }
 
-function resolveOrganizationRole(token: VerifiedClerkToken): DashboardRole {
+function resolveOrganizationRole(token: VerifiedToken): DashboardRole {
   return normalizeClerkOrganizationRole(token.orgRole) ?? normalizeFirmcodeRole(token.firmcodeRole) ?? "developer";
 }
 
@@ -347,19 +382,19 @@ function resolveConfiguredOrganizationRole(role: string): DashboardRole {
   return normalizeClerkOrganizationRole(role) ?? normalizeFirmcodeRole(role) ?? "developer";
 }
 
-function resolveOrganizationRoleSource(token: VerifiedClerkToken): string {
+function resolveOrganizationRoleSource(token: VerifiedToken): string {
   if (normalizeClerkOrganizationRole(token.orgRole) !== null) {
-    return "clerk_organization_role";
+    return "organization_role";
   }
 
-  return normalizeFirmcodeRole(token.firmcodeRole) !== null ? "clerk_firmcode_role_metadata" : "default_developer";
+  return normalizeFirmcodeRole(token.firmcodeRole) !== null ? "token_firmcode_role_metadata" : "default_developer";
 }
 
-function hasExplicitTrustedRole(token: VerifiedClerkToken): boolean {
+function hasExplicitTrustedRole(token: VerifiedToken): boolean {
   return normalizeClerkOrganizationRole(token.orgRole) !== null || normalizeFirmcodeRole(token.firmcodeRole) !== null;
 }
 
-function hasExplicitFirmcodeRole(token: VerifiedClerkToken): boolean {
+function hasExplicitFirmcodeRole(token: VerifiedToken): boolean {
   return normalizeFirmcodeRole(token.firmcodeRole) !== null;
 }
 
@@ -397,13 +432,24 @@ function isElevatedRole(role: DashboardRole | null): boolean {
   return role === "owner" || role === "admin";
 }
 
-function toResolvedWorkspace(token: VerifiedClerkToken, membership: MembershipRow): ResolvedDashboardWorkspace {
+function toResolvedWorkspace(token: VerifiedToken, membership: MembershipRow): ResolvedDashboardWorkspace {
+  const userId = membership.user_id ?? membership.clerk_user_id ?? token.userId;
+
+  // Determine orgId from membership or fall back to token
+  const orgId = membership.identity_provider_org_id
+    ?? membership.clerk_org_id
+    ?? token.orgId
+    ?? null;
+
   return {
     workspaceId: membership.workspace_id,
-    clerkUserId: membership.clerk_user_id,
-    clerkOrgId: "clerk_org_id" in membership ? membership.clerk_org_id ?? null : token.clerkOrgId,
+    userId,
+    orgId,
     sessionId: token.sessionId,
     role: membership.role,
-    billingCapabilities: token.billingCapabilities
+    billingCapabilities: token.billingCapabilities,
+    // Deprecated fields for backward compatibility
+    clerkUserId: userId,
+    clerkOrgId: orgId
   };
 }

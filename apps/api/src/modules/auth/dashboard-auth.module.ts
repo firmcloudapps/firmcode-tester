@@ -2,8 +2,9 @@ import { Global, Module } from "@nestjs/common";
 import { Pool } from "pg";
 import type { ApiRuntimeConfig } from "@firmcode/shared";
 import { API_RUNTIME_CONFIG, apiRuntimeConfigProvider } from "../../config/api-config.provider";
-import { CLERK_TOKEN_VERIFIER, ClerkBackendTokenVerifier } from "./clerk-token-verifier";
 import { DashboardAuthGuard } from "./dashboard-auth.guard";
+import { InsForgeTokenVerifier } from "./insforge-token-verifier";
+import { TOKEN_VERIFIER } from "./token-verifier";
 import {
   DASHBOARD_WORKSPACE_RESOLVER,
   EmptyDashboardWorkspaceResolver,
@@ -15,8 +16,9 @@ import {
   providers: [
     apiRuntimeConfigProvider,
     {
-      provide: CLERK_TOKEN_VERIFIER,
-      useClass: ClerkBackendTokenVerifier
+      provide: TOKEN_VERIFIER,
+      useFactory: (config: ApiRuntimeConfig) => new InsForgeTokenVerifier(config),
+      inject: [API_RUNTIME_CONFIG]
     },
     {
       provide: DASHBOARD_WORKSPACE_RESOLVER,
@@ -31,13 +33,13 @@ import {
             ssl: config.database.ssl ? { rejectUnauthorized: false } : false
           }),
           undefined,
-          config.clerk.defaultOrganization
+          config.auth?.defaultWorkspace ?? null
         );
       },
       inject: [API_RUNTIME_CONFIG]
     },
     DashboardAuthGuard
   ],
-  exports: [CLERK_TOKEN_VERIFIER, DASHBOARD_WORKSPACE_RESOLVER, DashboardAuthGuard]
+  exports: [TOKEN_VERIFIER, DASHBOARD_WORKSPACE_RESOLVER, DashboardAuthGuard]
 })
-export class DashboardAuthModule {}
+export class DashboardAuthModule { }

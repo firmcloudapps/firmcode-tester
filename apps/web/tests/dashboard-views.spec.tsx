@@ -38,7 +38,8 @@ describe("RepositoriesView", () => {
     expect(html).toContain(">7</a>");
     expect(html).toContain("View runs");
     expect(html).toContain("Sync GitHub");
-    expect(html).toContain(">Manage GitHub App</a>");
+    expect(html).toContain("Connect GitHub App");
+    expect(html).toContain("Developer or Admin required to sync GitHub installations.");
     expect(html).not.toContain("not wired");
   });
 

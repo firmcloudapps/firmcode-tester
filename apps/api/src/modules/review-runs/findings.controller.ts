@@ -45,12 +45,16 @@ export class FindingsController {
       canManageCodebaseFindings: hasDashboardCapability(
         {
           workspaceId: membership.workspaceId,
+          userId: membership.userId ?? membership.clerkUserId,
+          orgId: null,
           clerkUserId: membership.clerkUserId,
           clerkOrgId: null,
           sessionId: null,
           role: membership.role,
           capabilities: [],
-          clerkCapabilities: []
+          billingCapabilities: [],
+          clerkCapabilities: [],
+          provider: "insforge"
         },
         "manage_codebase_scan_findings"
       )

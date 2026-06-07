@@ -382,7 +382,7 @@ async function requestJson<T>(path: string, query: object): Promise<T> {
   const headers = await createDashboardApiHeaders(process.env, false);
 
   if (headers === null) {
-    throw new DashboardApiError("A signed-in Clerk session is required.", 401);
+    throw new DashboardApiError("A signed-in session is required.", 401);
   }
 
   for (const [key, value] of Object.entries(query)) {
@@ -408,7 +408,7 @@ async function requestAuthenticatedJsonWithQuery<T>(path: string, query: object)
   const headers = await createDashboardApiHeaders(process.env, false);
 
   if (headers === null) {
-    throw new DashboardApiError("A signed-in Clerk session is required.", 401);
+    throw new DashboardApiError("A signed-in session is required.", 401);
   }
 
   for (const [key, value] of Object.entries(query)) {
@@ -434,7 +434,7 @@ async function requestAuthenticatedJson<T>(path: string): Promise<T> {
   const headers = await createDashboardApiHeaders(process.env, false);
 
   if (headers === null) {
-    throw new DashboardApiError("A signed-in Clerk session is required.", 401);
+    throw new DashboardApiError("A signed-in session is required.", 401);
   }
 
   const response = await fetch(url, {

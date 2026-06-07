@@ -33,7 +33,9 @@ export const NO_REPOSITORY_ACCESS_SCOPE: RepositoryAccessScope = {
 
 export function resolveRepositoryAccessScope(input: {
   readonly role: DashboardRole | string | null | undefined;
-  readonly clerkUserId: string | null;
+  readonly userId?: string | null;
+  /** @deprecated Use userId instead */
+  readonly clerkUserId?: string | null;
 }): RepositoryAccessScope {
   const appRole = normalizeDashboardAppRole(input.role ?? undefined);
 
@@ -42,13 +44,14 @@ export function resolveRepositoryAccessScope(input: {
     return NO_REPOSITORY_ACCESS_SCOPE;
   }
 
-  if (input.clerkUserId === null) {
+  const userId = input.userId ?? input.clerkUserId ?? null;
+  if (userId === null) {
     // Unknown user — fail closed.
     return NO_REPOSITORY_ACCESS_SCOPE;
   }
 
   return {
-    restrictToClerkUserId: input.clerkUserId,
+    restrictToClerkUserId: userId,
     restrictToOwnPullRequestActivity: true
   };
 }

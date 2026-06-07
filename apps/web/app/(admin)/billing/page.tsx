@@ -1,4 +1,4 @@
-import { loadWebClerkConfig } from "../../../config/clerk";
+import { createWebClerkConfig } from "@firmcode/shared";
 import { BillingView } from "../../../components/dashboard/billing-view";
 import { AdminDashboardShell } from "../../../components/dashboard/admin-dashboard-shell";
 import { loadBillingState } from "../../../lib/dashboard-data";
@@ -18,7 +18,7 @@ export default async function BillingPage() {
 
 function tryReadBillingPortalUrl(): string | null {
   try {
-    return loadWebClerkConfig(process.env).billingPortalUrl;
+    return createWebClerkConfig(process.env).billingPortalUrl;
   } catch {
     return null;
   }

@@ -49,7 +49,7 @@ export function AdminDashboardSidebar({ activeItem }: AdminDashboardSidebarProps
                 })}
             </nav>
             <div className="absolute bottom-5 left-4 right-4 border-t border-border pt-4">
-                <p className="text-xs font-medium text-primary">Signed in with Clerk</p>
+                <p className="text-xs font-medium text-primary">Signed in</p>
                 <p className="mt-1 truncate text-xs text-secondary">
                     <DashboardWorkspaceLabel />
                 </p>

@@ -58,9 +58,9 @@ describe("OverviewView", () => {
     expect(getRecentReviewRunHref({ id: "run with spaces" })).toBe("/review-runs/run%20with%20spaces");
   });
 
-  it("keeps overview behind the Clerk-authenticated dashboard shell scaffold", () => {
+  it("keeps overview behind the authenticated dashboard shell scaffold", () => {
     const html = renderToString(
-      <DashboardShell activeItem="Overview">
+      <DashboardShell activeItem="Overview" role="admin">
         <OverviewView state={{ status: "populated", data: overviewData }} />
       </DashboardShell>
     );
