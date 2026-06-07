@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { ForbiddenException, Injectable } from "@nestjs/common";
-import type { DefaultClerkOrganizationConfig } from "@firmcode/shared";
+import type { DefaultClerkOrganizationConfig, DefaultWorkspaceConfig } from "@firmcode/shared";
 import type { DatabaseExecutor } from "../../infrastructure/database/migrations";
 import type { DashboardRole } from "../review-runs/dashboard-auth.store";
 import type { VerifiedToken } from "./token-verifier";
@@ -47,7 +47,7 @@ export class PostgresDashboardWorkspaceResolver implements DashboardWorkspaceRes
   constructor(
     private readonly database: DatabaseExecutor,
     private readonly uuidFactory: () => string = randomUUID,
-    private readonly defaultOrganization: DefaultClerkOrganizationConfig | null = null
+    private readonly defaultOrganization: DefaultWorkspaceConfig | DefaultClerkOrganizationConfig | null = null
   ) { }
 
   async resolve(input: {
@@ -96,7 +96,7 @@ export class PostgresDashboardWorkspaceResolver implements DashboardWorkspaceRes
         name: this.defaultOrganization.name,
         provider: input.token.provider
       });
-      const defaultRole = resolveConfiguredOrganizationRole("org:developer");
+      const defaultRole = resolveConfiguredOrganizationRole(readDefaultOrganizationRole(this.defaultOrganization));
       const membership = await this.ensureMembership({
         workspaceId,
         userId,
@@ -430,6 +430,12 @@ function normalizeFirmcodeRole(role: string | null): DashboardRole | null {
 
 function isElevatedRole(role: DashboardRole | null): boolean {
   return role === "owner" || role === "admin";
+}
+
+function readDefaultOrganizationRole(
+  organization: DefaultWorkspaceConfig | DefaultClerkOrganizationConfig
+): string {
+  return "role" in organization ? organization.role : "org:developer";
 }
 
 function toResolvedWorkspace(token: VerifiedToken, membership: MembershipRow): ResolvedDashboardWorkspace {
