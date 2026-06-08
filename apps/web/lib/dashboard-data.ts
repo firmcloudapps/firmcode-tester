@@ -7,6 +7,7 @@ import type {
   FindingsListResponse,
   GitHubOAuthStatusResponse,
   OverviewDashboardData,
+  PlatformAdminOverviewResponse,
   PullRequestDetailResponse,
   PullRequestListFilters,
   PullRequestListResponse,
@@ -24,6 +25,7 @@ import { buildOverviewDashboardData } from "./overview-data";
 import type { ViewState } from "./view-state";
 
 export interface AdminOverviewData {
+  overview: PlatformAdminOverviewResponse;
   settings: WorkspaceSettingsResponse;
   billing: WorkspaceBillingResponse | null;
 }
@@ -451,12 +453,13 @@ async function requestAuthenticatedJson<T>(path: string): Promise<T> {
 
 export async function loadAdminOverviewState(): Promise<ViewState<AdminOverviewData>> {
   try {
-    const [settings, billing] = await Promise.all([
+    const [overview, settings, billing] = await Promise.all([
+      requestAuthenticatedJson<PlatformAdminOverviewResponse>("/api/platform/overview"),
       requestAuthenticatedJson<WorkspaceSettingsResponse>("/api/settings"),
       requestAuthenticatedJson<WorkspaceBillingResponse>("/api/billing").catch(() => null)
     ]);
 
-    return { status: "populated", data: { settings, billing } };
+    return { status: "populated", data: { overview, settings, billing } };
   } catch (error) {
     return { status: "error", message: toErrorMessage(error) };
   }

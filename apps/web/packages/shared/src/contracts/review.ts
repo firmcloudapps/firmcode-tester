@@ -964,6 +964,16 @@ export interface WorkspaceBillingResponse {
   };
 }
 
+export interface PlatformAdminOverviewResponse {
+  metrics: {
+    totalRegisteredUsers: number;
+    totalConnectedRepositories: number;
+    totalRevenueUsdCents: number | null;
+    totalRevenueStatus: "available" | "unavailable";
+  };
+  generatedAt: string;
+}
+
 export type OverviewMetricId = "review_activity" | "security_findings" | "ci_failures" | "repositories_monitored";
 export type OverviewTone = "neutral" | "info" | "success" | "warning" | "critical";
 

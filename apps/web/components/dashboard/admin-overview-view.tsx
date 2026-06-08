@@ -16,7 +16,7 @@ export function AdminOverviewView({ state }: AdminOverviewViewProps) {
           <p className="text-sm font-medium text-accent">Platform</p>
           <h1 className="mt-1 text-2xl font-semibold tracking-normal text-primary">Admin Overview</h1>
         </div>
-        <p className="text-sm text-secondary">Platform configuration and subscription status</p>
+        <p className="text-sm text-secondary">Platform KPIs, configuration, and subscription status</p>
       </div>
       {state.status === "error" ? <AdminOverviewError message={state.message} /> : null}
       {state.status === "populated" ? <AdminOverviewDashboard data={state.data} /> : null}
@@ -28,12 +28,57 @@ export function AdminOverviewView({ state }: AdminOverviewViewProps) {
 function AdminOverviewDashboard({ data }: { data: AdminOverviewData }) {
   return (
     <div className="space-y-4">
+      <PlatformMetricsCards data={data} />
       <GitHubAppCard settings={data.settings} />
       <div className="grid gap-4 xl:grid-cols-2">
         <WorkspaceCard settings={data.settings} />
         <BillingCard billing={data.billing} />
       </div>
     </div>
+  );
+}
+
+function PlatformMetricsCards({ data }: { data: AdminOverviewData }) {
+  const cards = [
+    {
+      label: "Registered users",
+      value: data.overview.metrics.totalRegisteredUsers.toLocaleString(),
+      helper: "Total active and historical platform memberships"
+    },
+    {
+      label: "Connected repositories",
+      value: data.overview.metrics.totalConnectedRepositories.toLocaleString(),
+      helper: "Repositories synced through installed GitHub connections"
+    },
+    {
+      label: "Total revenue",
+      value:
+        data.overview.metrics.totalRevenueStatus === "available"
+          ? formatUsdCents(data.overview.metrics.totalRevenueUsdCents)
+          : "Unavailable",
+      helper:
+        data.overview.metrics.totalRevenueStatus === "available"
+          ? "Revenue currently available from backend billing data"
+          : "Revenue is not exposed by the current backend billing sources"
+    }
+  ];
+
+  return (
+    <section aria-label="Platform KPIs" className="space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-sm font-semibold text-primary">Platform metrics</h2>
+        <span className="text-xs text-secondary">Updated {formatDateTime(data.overview.generatedAt)}</span>
+      </div>
+      <div className="grid gap-4 md:grid-cols-3">
+        {cards.map((card) => (
+          <article key={card.label} className="rounded-lg border border-border bg-surface p-4">
+            <p className="text-sm text-secondary">{card.label}</p>
+            <p className="mt-2 text-3xl font-semibold text-primary">{card.value}</p>
+            <p className="mt-2 text-xs leading-5 text-secondary">{card.helper}</p>
+          </article>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -158,6 +203,17 @@ function BillingCard({ billing }: { billing: WorkspaceBillingResponse | null }) 
       </dl>
     </section>
   );
+}
+
+function formatUsdCents(value: number | null): string {
+  if (value === null) {
+    return "Unavailable";
+  }
+
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD"
+  }).format(value / 100);
 }
 
 function AdminOverviewError({ message }: { message: string }) {

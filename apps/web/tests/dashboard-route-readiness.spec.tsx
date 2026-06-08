@@ -34,6 +34,13 @@ describe("dashboard route readiness guard", () => {
     }
   });
 
+  it("does not register duplicate normalized Next routes", () => {
+    const actualRoutes = discoverNextRoutes();
+    const duplicates = actualRoutes.filter((route, index) => actualRoutes.indexOf(route) !== index);
+
+    expect(duplicates).toEqual([]);
+  });
+
   it("requires every active internal navigation or action definition to target an implemented route", () => {
     const activeInternalActions = DASHBOARD_ROUTE_ACTIONS.filter(
       (action) => action.status === "active" && action.destination === "internal"

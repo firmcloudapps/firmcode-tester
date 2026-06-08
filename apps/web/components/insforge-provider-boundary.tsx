@@ -9,12 +9,25 @@ interface InsForgeUser {
   emailVerified: boolean;
 }
 
+interface PublicAuthConfig {
+  requireEmailVerification: boolean;
+  verifyEmailMethod: "code" | "link";
+}
+
+export type AuthCompletionResult =
+  | { status: "signed_in" }
+  | { status: "needs_email_verification"; email: string; method: "code" | "link" };
+
 interface InsForgeAuthContextValue {
   user: InsForgeUser | null;
   isLoading: boolean;
   isSignedIn: boolean;
-  signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, name?: string) => Promise<void>;
+  authConfig: PublicAuthConfig | null;
+  signIn: (email: string, password: string) => Promise<AuthCompletionResult>;
+  signUp: (email: string, password: string, name?: string) => Promise<AuthCompletionResult>;
+  signInWithGoogle: () => Promise<void>;
+  verifyEmail: (email: string, otp: string, intent?: "sign-in" | "sign-up") => Promise<void>;
+  resendVerificationEmail: (email: string) => Promise<void>;
   signOut: () => Promise<void>;
   getToken: () => Promise<string | null>;
 }
@@ -45,14 +58,25 @@ export function InsForgeProviderBoundary({
 }: InsForgeProviderBoundaryProps) {
   const [user, setUser] = useState<InsForgeUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [authConfig, setAuthConfig] = useState<PublicAuthConfig | null>(null);
 
   useEffect(() => {
-    // Check for existing session on mount
-    const checkSession = async () => {
+    const initializeAuth = async () => {
       try {
-        const { data } = await insforge.auth.getCurrentUser();
+        const [{ data }, configResult] = await Promise.all([
+          insforge.auth.getCurrentUser(),
+          insforge.auth.getPublicAuthConfig().catch(() => ({ data: null, error: null }))
+        ]);
+
         if (data?.user) {
           setUser(data.user as InsForgeUser);
+        }
+
+        if (configResult.data) {
+          setAuthConfig({
+            requireEmailVerification: configResult.data.requireEmailVerification,
+            verifyEmailMethod: configResult.data.verifyEmailMethod
+          });
         }
       } catch (error) {
         console.error("Failed to get session:", error);
@@ -61,7 +85,7 @@ export function InsForgeProviderBoundary({
       }
     };
 
-    checkSession();
+    initializeAuth();
   }, []);
 
   const signIn = async (email: string, password: string) => {
@@ -74,10 +98,21 @@ export function InsForgeProviderBoundary({
       throw new Error(error.message);
     }
 
-    if (data) {
+    if (data?.user && data.accessToken) {
       setUser(data.user as InsForgeUser);
       window.location.href = afterSignInUrl;
+      return { status: "signed_in" } satisfies AuthCompletionResult;
     }
+
+    if (data?.user && (data.user.emailVerified === false || authConfig?.requireEmailVerification === true)) {
+      return {
+        status: "needs_email_verification",
+        email: data.user.email,
+        method: authConfig?.verifyEmailMethod ?? "code"
+      } satisfies AuthCompletionResult;
+    }
+
+    throw new Error("Sign-in did not complete successfully.");
   };
 
   const signUp = async (email: string, password: string, name?: string) => {
@@ -92,10 +127,65 @@ export function InsForgeProviderBoundary({
       throw new Error(error.message);
     }
 
-    // If user is immediately signed in (email verification disabled)
+    if (data?.user && data.accessToken) {
+      setUser(data.user as InsForgeUser);
+      window.location.href = afterSignUpUrl;
+      return { status: "signed_in" } satisfies AuthCompletionResult;
+    }
+
+    const verificationMethod = authConfig?.verifyEmailMethod ?? "code";
+    if (data?.requireEmailVerification || (data?.user && !data.accessToken)) {
+      return {
+        status: "needs_email_verification",
+        email,
+        method: verificationMethod
+      } satisfies AuthCompletionResult;
+    }
+
     if (data?.user) {
       setUser(data.user as InsForgeUser);
       window.location.href = afterSignUpUrl;
+      return { status: "signed_in" } satisfies AuthCompletionResult;
+    }
+
+    throw new Error("Sign-up did not complete successfully.");
+  };
+
+  const signInWithGoogle = async () => {
+    const redirectTo = new URL(afterSignInUrl, window.location.origin).toString();
+    const { error } = await insforge.auth.signInWithOAuth("google", { redirectTo });
+
+    if (error) {
+      throw new Error(error.message);
+    }
+  };
+
+  const verifyEmail = async (email: string, otp: string, intent: "sign-in" | "sign-up" = "sign-up") => {
+    const { data, error } = await insforge.auth.verifyEmail({
+      email,
+      otp
+    });
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    if (!data?.user) {
+      throw new Error("Verification did not return an authenticated session.");
+    }
+
+    setUser(data.user as InsForgeUser);
+    window.location.href = intent === "sign-in" ? afterSignInUrl : afterSignUpUrl;
+  };
+
+  const resendVerificationEmail = async (email: string) => {
+    const { error } = await insforge.auth.resendVerificationEmail({
+      email,
+      redirectTo: window.location.origin + signInUrl
+    });
+
+    if (error) {
+      throw new Error(error.message);
     }
   };
 
@@ -106,8 +196,7 @@ export function InsForgeProviderBoundary({
   };
 
   const getToken = async (): Promise<string | null> => {
-    // In InsForge, the SDK handles tokens via cookies
-    // This is a placeholder - the actual token is managed by the SDK
+    // In InsForge, the SDK handles tokens via cookies.
     return null;
   };
 
@@ -115,8 +204,12 @@ export function InsForgeProviderBoundary({
     user,
     isLoading,
     isSignedIn: !!user,
+    authConfig,
     signIn,
     signUp,
+    signInWithGoogle,
+    verifyEmail,
+    resendVerificationEmail,
     signOut,
     getToken
   };

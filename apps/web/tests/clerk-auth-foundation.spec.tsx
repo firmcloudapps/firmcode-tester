@@ -25,8 +25,10 @@ describe("auth foundation compatibility", () => {
 
     expect(signInHtml).toContain("Sign in to Firmcode");
     expect(signInHtml).not.toContain('data-clerk-authenticated="required"');
+    expect(signInHtml).toContain("Continue with Google");
     expect(signUpHtml).toContain("Create your Firmcode workspace");
     expect(signUpHtml).toContain("Create account");
+    expect(signUpHtml).toContain("Sign up with Google");
   });
 
   it("renders dashboard account controls without restoring Clerk organization switching", () => {

@@ -34,14 +34,14 @@ export async function resolveRoleBasedDashboardRedirect({
     }
 
     if (!response.ok) {
-      return new URL("/dashboard/developer", requestBaseUrl);
+      return new URL("/dashboard", requestBaseUrl);
     }
 
     const settings = (await response.json()) as Partial<WorkspaceSettingsResponse>;
 
     return new URL(landingPathForDashboardRole(settings.workspace?.role), requestBaseUrl);
   } catch {
-    return new URL("/dashboard/developer", requestBaseUrl);
+    return new URL("/dashboard", requestBaseUrl);
   }
 }
 
