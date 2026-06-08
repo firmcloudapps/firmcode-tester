@@ -21,11 +21,12 @@ describe("dashboard navigation", () => {
     expect(html).not.toContain("GitHub App connection is not wired");
   });
 
-  it("routes the settings GitHub App action to the implemented installation workspace for admins", () => {
+  it("keeps the settings GitHub App action disabled for Admins after the platform-role split", () => {
     const html = renderToString(<SettingsView state={{ status: "populated", data: settings }} activeTab="github-app" />);
 
-    expect(html).toContain('href="/github/installations"');
-    expect(html).toContain(">Connect GitHub App</a>");
+    expect(html).toContain("Connect GitHub App");
+    expect(html).toContain('disabled=""');
+    expect(html).toContain("Developer or Admin required to connect the GitHub App.");
   });
 
   it("routes repository Configure actions to the implemented repository detail page", () => {
@@ -36,15 +37,15 @@ describe("dashboard navigation", () => {
     expect(html).not.toContain("Repository detail configuration is planned");
   });
 
-  it("omits Rules / Policies from dashboard navigation", () => {
+  it("includes Rules navigation now that the route exists", () => {
     const html = renderToString(
       <DashboardShell activeItem="Overview">
         <main>Dashboard body</main>
       </DashboardShell>
     );
 
-    expect(html).not.toContain('href="/rules"');
-    expect(html).not.toContain("Rules / Policies");
+    expect(html).toContain('href="/rules"');
+    expect(html).toContain(">Rules</a>");
   });
 
   it("enables Pull Requests sidebar navigation once the route exists", () => {

@@ -57,7 +57,7 @@ describe("SettingsView", () => {
     expect(notifications).toContain("Slack notifications");
   });
 
-  it("keeps settings behind the Clerk-authenticated shell scaffold", () => {
+  it("keeps settings behind the authenticated shell scaffold", () => {
     const html = renderToString(
       <DashboardShell activeItem="Settings">
         <SettingsView state={{ status: "populated", data: adminSettings }} activeTab="general" />
@@ -65,10 +65,10 @@ describe("SettingsView", () => {
     );
 
     expect(html).toContain('data-clerk-authenticated="required"');
-    expect(html).toContain('href="/settings" aria-current="page"');
+    expect(html).toContain('href="/settings?tab=general" aria-current="page"');
   });
 
-  it("enables GitHub setup for Developers while keeping Admin-only settings disabled", () => {
+  it("keeps GitHub setup read-only for Admins and sensitive settings read-only for Developers", () => {
     const adminHtml = renderToString(
       <SettingsView
         state={{ status: "populated", data: adminSettings }}
@@ -85,10 +85,12 @@ describe("SettingsView", () => {
     );
     const developerMembers = renderToString(<SettingsView state={{ status: "populated", data: developerSettings }} activeTab="members" />);
 
-    expect(adminHtml).toContain('href="https://github.com/apps/firmcode/installations/new"');
-    expect(adminHtml).toContain('data-dashboard-destination="external"');
+    expect(adminHtml).toContain("Connect GitHub App");
+    expect(adminHtml).toContain("disabled=\"\"");
+    expect(adminHtml).toContain("Developer or Admin required to connect the GitHub App.");
     expect(adminHtml).toContain("Sensitive settings enabled");
     expect(developerHtml).toContain('href="https://github.com/apps/firmcode/installations/new"');
+    expect(developerHtml).toContain('data-dashboard-destination="external"');
     expect(developerHtml).toContain("Read-only sensitive settings");
     expect(developerMembers).toContain("Open Clerk members");
     expect(developerMembers).toContain("disabled=\"\"");

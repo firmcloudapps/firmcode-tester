@@ -21,23 +21,37 @@ export const FULL_REPOSITORY_ACCESS_SCOPE: RepositoryAccessScope = {
   restrictToOwnPullRequestActivity: false
 };
 
+/**
+ * Zero-access scope used for the platform admin role.
+ * Admin is the platform operator and must not read any customer code data.
+ * The empty-string clerk_user_id matches no rows in any access table.
+ */
+export const NO_REPOSITORY_ACCESS_SCOPE: RepositoryAccessScope = {
+  restrictToClerkUserId: "",
+  restrictToOwnPullRequestActivity: true
+};
+
 export function resolveRepositoryAccessScope(input: {
   readonly role: DashboardRole | string | null | undefined;
-  readonly clerkUserId: string | null;
+  readonly userId?: string | null;
+  /** @deprecated Use userId instead */
+  readonly clerkUserId?: string | null;
 }): RepositoryAccessScope {
   const appRole = normalizeDashboardAppRole(input.role ?? undefined);
 
-  if (appRole === "admin" || input.clerkUserId === null) {
-    // Admins/owners see everything. When we cannot identify a user we fail closed
-    // by returning full visibility only for admins; callers must pass a clerkUserId
-    // for non-admin roles (guarded by the dashboard auth guard).
-    return appRole === "admin"
-      ? FULL_REPOSITORY_ACCESS_SCOPE
-      : { restrictToClerkUserId: "", restrictToOwnPullRequestActivity: true };
+  if (appRole === "admin") {
+    // Platform owner: no access to customer code data.
+    return NO_REPOSITORY_ACCESS_SCOPE;
+  }
+
+  const userId = input.userId ?? input.clerkUserId ?? null;
+  if (userId === null) {
+    // Unknown user — fail closed.
+    return NO_REPOSITORY_ACCESS_SCOPE;
   }
 
   return {
-    restrictToClerkUserId: input.clerkUserId,
+    restrictToClerkUserId: userId,
     restrictToOwnPullRequestActivity: true
   };
 }

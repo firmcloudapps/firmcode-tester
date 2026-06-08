@@ -19,13 +19,18 @@ export const DASHBOARD_CAPABILITIES = [
 export type DashboardCapability = (typeof DASHBOARD_CAPABILITIES)[number];
 
 export const DASHBOARD_ROLE_CAPABILITY_MATRIX: Readonly<Record<DashboardAppRole, readonly DashboardCapability[]>> = {
-  admin: DASHBOARD_CAPABILITIES,
+  admin: [
+    "manage_billing",
+    "manage_github_installations",
+    "manage_sensitive_settings",
+    "manage_review_policies"
+  ],
   developer: [
     "retry_review_run",
     "trigger_codebase_scan",
     "manage_codebase_scan_findings",
     "manage_repository_configuration",
-    "manage_github_installations"
+    "access_raw_artifacts"
   ]
 } as const;
 

@@ -22,10 +22,22 @@ export class ConfigValidationError extends Error {
   }
 }
 
+export type DatabaseProvider = "neon" | "insforge";
+
 export interface DatabaseConfig {
+  provider: DatabaseProvider;
   url: string;
   ssl: boolean;
   redactedUrl: string;
+  // InsForge-specific config when provider is 'insforge'
+  insforgeBaseUrl?: string;
+  insforgeServiceKey?: string;
+}
+
+export interface InsForgeConfig {
+  baseUrl: string;
+  anonKey?: string;
+  serviceKey?: string;
 }
 
 export interface QueueConfig {
@@ -81,6 +93,25 @@ export interface GitHubAppConfig {
   toJSON(): RedactedGitHubAppConfig;
 }
 
+export type AuthProvider = "clerk" | "insforge";
+export type StorageProvider = "database" | "insforge";
+
+export interface AuthConfig {
+  provider: AuthProvider;
+  insforge: InsForgeConfig | null;
+  defaultWorkspace: DefaultWorkspaceConfig;
+}
+
+export interface DefaultWorkspaceConfig {
+  id: string;
+  name: string;
+}
+
+export interface StorageConfig {
+  provider: StorageProvider;
+  insforgeBucket?: string;
+}
+
 export interface ApiRuntimeConfig {
   nodeEnv: RuntimeEnvironment;
   port: number;
@@ -89,10 +120,11 @@ export interface ApiRuntimeConfig {
   corsAllowedOrigins: string[];
   database: DatabaseConfig;
   queue: QueueConfig;
-  clerk: ClerkApiConfig;
+  auth: AuthConfig;
   github: GitHubAppConfig | null;
   review: ReviewConfig;
   codebaseScan: CodebaseScanConfig;
+  storage: StorageConfig;
 }
 
 export interface ReviewConfig {
@@ -125,15 +157,16 @@ export function createApiRuntimeConfig(env: EnvironmentVariables): ApiRuntimeCon
   const nodeEnv = readRuntimeEnvironment(env, issues);
   const database = readDatabaseConfig(env, nodeEnv, issues);
   const queue = readQueueConfig(env, issues);
-  const clerk = readClerkApiConfig(env, nodeEnv, issues);
+  const auth = readAuthConfig(env, nodeEnv, issues);
   const github = readGitHubAppConfig(env, nodeEnv, issues);
   const review = readReviewConfig(env, issues);
   const codebaseScan = readCodebaseScanConfig(env, issues);
+  const storage = readStorageConfig(env, issues);
   const port = readPort(env.PORT, 3001, issues);
   const publicAppUrl = readOptionalHttpUrl(env, "APP_URL", issues);
   const publicApiUrl = readOptionalHttpUrl(env, "API_URL", issues);
 
-  if (issues.length > 0 || database === null || queue === null || clerk === null) {
+  if (issues.length > 0 || database === null || queue === null || auth === null) {
     throw new ConfigValidationError("API runtime", issues);
   }
 
@@ -145,10 +178,11 @@ export function createApiRuntimeConfig(env: EnvironmentVariables): ApiRuntimeCon
     corsAllowedOrigins: readList(env.CORS_ALLOWED_ORIGINS),
     database,
     queue,
-    clerk,
+    auth,
     github,
     review,
-    codebaseScan
+    codebaseScan,
+    storage
   };
 }
 
@@ -257,28 +291,106 @@ function readRuntimeEnvironment(env: EnvironmentVariables, issues: ConfigValidat
   return "development";
 }
 
+function readDatabaseProvider(env: EnvironmentVariables): DatabaseProvider {
+  const value = readOptional(env, "DATABASE_PROVIDER")?.toLowerCase();
+  return value === "insforge" ? "insforge" : "neon";
+}
+
 function readDatabaseConfig(
   env: EnvironmentVariables,
   nodeEnv: RuntimeEnvironment,
   issues: ConfigValidationIssue[]
 ): DatabaseConfig | null {
-  const databaseUrl = readRequired(env, "DATABASE_URL", issues);
+  const provider = readDatabaseProvider(env);
+
+  // Select URL based on provider
+  const databaseUrl = provider === "insforge"
+    ? readRequired(env, "INSFORGE_DATABASE_URL", issues) ?? readRequired(env, "DATABASE_URL", issues)
+    : readRequired(env, "DATABASE_URL", issues);
 
   if (databaseUrl === null) {
     return null;
   }
 
   const url = readPostgresUrl(databaseUrl, issues);
-  const ssl = readDatabaseSsl(env, nodeEnv, issues);
+  const ssl = readDatabaseSsl(env, nodeEnv, issues, provider);
 
   if (url === null || ssl === null) {
     return null;
   }
 
-  return {
+  const config: DatabaseConfig = {
+    provider,
     url: databaseUrl,
     ssl,
     redactedUrl: redactDatabaseUrl(databaseUrl)
+  };
+
+  // Add InsForge-specific config when using InsForge provider
+  if (provider === "insforge") {
+    config.insforgeBaseUrl = readOptional(env, "INSFORGE_BASE_URL") ?? "https://h35yzuga.eu-central.insforge.app";
+    config.insforgeServiceKey = readOptional(env, "INSFORGE_SERVICE_KEY") ?? undefined;
+  }
+
+  return config;
+}
+
+function readAuthProvider(env: EnvironmentVariables): AuthProvider {
+  const value = readOptional(env, "AUTH_PROVIDER")?.toLowerCase();
+  return value === "clerk" ? "clerk" : "insforge";
+}
+
+function readAuthConfig(
+  env: EnvironmentVariables,
+  _nodeEnv: RuntimeEnvironment,
+  _issues: ConfigValidationIssue[]
+): AuthConfig | null {
+  const provider = readAuthProvider(env);
+  const insforge = readInsForgeConfig(env, _issues);
+
+  // For InsForge auth, ensure base URL is set
+  if (insforge === null) {
+    return null;
+  }
+
+  return {
+    provider,
+    insforge,
+    defaultWorkspace: readDefaultWorkspaceConfig(env, provider)
+  };
+}
+
+function readInsForgeConfig(env: EnvironmentVariables, issues: ConfigValidationIssue[]): InsForgeConfig | null {
+  const baseUrl = readOptional(env, "INSFORGE_BASE_URL") ?? "https://h35yzuga.eu-central.insforge.app";
+
+  return {
+    baseUrl,
+    anonKey: readOptional(env, "INSFORGE_ANON_KEY") ?? undefined,
+    serviceKey: readOptional(env, "INSFORGE_SERVICE_KEY") ?? undefined
+  };
+}
+
+function readDefaultWorkspaceConfig(env: EnvironmentVariables, authProvider: AuthProvider): DefaultWorkspaceConfig {
+  if (authProvider === "insforge") {
+    return {
+      id: readOptional(env, "FIRMCODE_DEFAULT_WORKSPACE_ID") ?? "",
+      name: readOptional(env, "FIRMCODE_DEFAULT_WORKSPACE_NAME") ?? "Firmcode AI"
+    };
+  }
+
+  // Legacy Clerk defaults
+  return {
+    id: readOptional(env, "FIRMCODE_DEFAULT_CLERK_ORGANIZATION_ID") ?? DEFAULT_CLERK_ORGANIZATION_ID,
+    name: readOptional(env, "FIRMCODE_DEFAULT_CLERK_ORGANIZATION_NAME") ?? DEFAULT_CLERK_ORGANIZATION_NAME
+  };
+}
+
+function readStorageConfig(env: EnvironmentVariables, issues: ConfigValidationIssue[]): StorageConfig {
+  const provider: StorageProvider = readOptional(env, "STORAGE_PROVIDER")?.toLowerCase() === "insforge" ? "insforge" : "database";
+
+  return {
+    provider,
+    insforgeBucket: provider === "insforge" ? (readOptional(env, "INSFORGE_STORAGE_BUCKET") ?? "review-artifacts") : undefined
   };
 }
 
@@ -692,11 +804,17 @@ function readRedisUrl(value: string, issues: ConfigValidationIssue[]): URL | nul
 function readDatabaseSsl(
   env: EnvironmentVariables,
   nodeEnv: RuntimeEnvironment,
-  issues: ConfigValidationIssue[]
+  issues: ConfigValidationIssue[],
+  provider: DatabaseProvider = "neon"
 ): boolean | null {
   const rawValue = normalizeEnvironmentValue(env.DATABASE_SSL)?.toLowerCase();
 
   if (!rawValue) {
+    // InsForge requires SSL in all environments
+    if (provider === "insforge") {
+      return true;
+    }
+    // NeonDB requires SSL in production
     if (nodeEnv === "production") {
       issues.push({
         variable: "DATABASE_SSL",
@@ -704,7 +822,6 @@ function readDatabaseSsl(
       });
       return null;
     }
-
     return false;
   }
 
@@ -718,7 +835,8 @@ function readDatabaseSsl(
     return null;
   }
 
-  if (nodeEnv === "production" && !parsed) {
+  // NeonDB requires SSL in production
+  if (provider === "neon" && nodeEnv === "production" && !parsed) {
     issues.push({
       variable: "DATABASE_SSL",
       message: "must be true in production for NeonDB"

@@ -6,6 +6,7 @@ import { CodebaseScansModule } from "./codebase-scans/codebase-scans.module";
 import { GitHubDashboardModule } from "./github/github.module";
 import { HealthModule } from "./health/health.module";
 import { PullRequestsModule } from "./pull-requests/pull-requests.module";
+import { PlatformOverviewModule } from "./platform-overview/platform-overview.module";
 import { RepositoriesModule } from "./repositories/repositories.module";
 import { ReviewRunsModule } from "./review-runs/review-runs.module";
 import { RulesModule } from "./rules/rules.module";
@@ -21,6 +22,7 @@ import { GitHubWebhookModule } from "./webhooks/github/github-webhook.module";
     GitHubWebhookModule,
     CodebaseScansModule,
     GitHubDashboardModule,
+    PlatformOverviewModule,
     CiFailuresModule,
     PullRequestsModule,
     RepositoriesModule,

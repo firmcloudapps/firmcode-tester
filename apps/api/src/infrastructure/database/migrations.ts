@@ -10,6 +10,7 @@ import { codebaseScanDashboardConfigurationMigration } from "./migrations/009_co
 import { workspaceMembershipAuditMigration } from "./migrations/010_workspace_membership_audit";
 import { reviewPolicyWorkspaceControlsMigration } from "./migrations/011_review_policy_workspace_controls";
 import { repositoryAccessScopeMigration } from "./migrations/012_repository_access_scope";
+import { generalizeIdentityColumnsMigration } from "./migrations/013_generalize_identity_columns";
 
 export interface DatabaseQueryResult<Row = unknown> {
   readonly rows: Row[];
@@ -37,7 +38,8 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigration[] = [
   codebaseScanDashboardConfigurationMigration,
   workspaceMembershipAuditMigration,
   reviewPolicyWorkspaceControlsMigration,
-  repositoryAccessScopeMigration
+  repositoryAccessScopeMigration,
+  generalizeIdentityColumnsMigration
 ];
 
 interface AppliedMigrationRow {

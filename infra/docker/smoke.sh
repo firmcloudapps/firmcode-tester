@@ -1,7 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ -f .env ]]; then
+load_env_file() {
+  local file_path="$1"
+
+  if [[ ! -f "$file_path" ]]; then
+    return
+  fi
+
   while IFS='=' read -r key value; do
     case "$key" in
       DATABASE_URL | DATABASE_SSL)
@@ -10,8 +16,11 @@ if [[ -f .env ]]; then
         fi
         ;;
     esac
-  done <.env
-fi
+  done <"$file_path"
+}
+
+load_env_file .env.local
+load_env_file .env
 
 : "${DATABASE_URL:?Set DATABASE_URL to your NeonDB connection string before running Docker smoke checks}"
 export DATABASE_SSL="${DATABASE_SSL:-true}"

@@ -1,5 +1,6 @@
 import type { FindingsListResponse } from "@firmcode/shared";
 import {
+  loadAdminOverviewState,
   loadBillingState,
   loadCiFailureDetailState,
   loadCiFailuresState,
@@ -307,6 +308,46 @@ describe("dashboard findings data loader", () => {
     expect(headers.get("authorization")).toBe("Bearer session-token");
     expect(headers.get("x-firmcode-clerk-billing-capability")).toBeNull();
   });
+
+  it("loads admin overview KPIs from the platform endpoint alongside settings and billing", async () => {
+    process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
+    process.env.FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN = "session-token";
+    process.env.FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID = "workspace-1";
+    const fetcher = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
+      const pathname = new URL(String(input)).pathname;
+
+      if (pathname === "/api/platform/overview") {
+        return jsonResponse(platformOverviewResponse);
+      }
+
+      if (pathname === "/api/billing") {
+        return jsonResponse(billingResponse);
+      }
+
+      return jsonResponse(settingsResponse);
+    });
+
+    vi.stubGlobal("fetch", fetcher);
+
+    await expect(loadAdminOverviewState()).resolves.toMatchObject({
+      status: "populated",
+      data: {
+        overview: {
+          metrics: {
+            totalRegisteredUsers: 42,
+            totalConnectedRepositories: 18,
+            totalRevenueStatus: "unavailable"
+          }
+        },
+        settings: {
+          workspace: { role: "admin" }
+        }
+      }
+    });
+
+    expect(fetcher).toHaveBeenCalledTimes(3);
+    expect(new URL(String(fetcher.mock.calls[0]?.[0])).pathname).toBe("/api/platform/overview");
+  });
 });
 
 const findingsResponse: FindingsListResponse = {
@@ -578,6 +619,16 @@ const billingResponse = {
     repositoriesMonitored: null,
     seats: null
   }
+};
+
+const platformOverviewResponse = {
+  metrics: {
+    totalRegisteredUsers: 42,
+    totalConnectedRepositories: 18,
+    totalRevenueUsdCents: null,
+    totalRevenueStatus: "unavailable"
+  },
+  generatedAt: "2026-05-22T11:00:00.000Z"
 };
 
 function jsonResponse(body: unknown, status = 200): Response {

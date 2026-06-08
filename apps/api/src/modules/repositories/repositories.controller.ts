@@ -206,12 +206,16 @@ function hasMembershipCapability(
 ): boolean {
   return hasDashboardCapability(
     {
+      userId: membership.userId,
+      orgId: null,
+      provider: "insforge",
       workspaceId: membership.workspaceId,
       clerkUserId: membership.clerkUserId,
       clerkOrgId: null,
       sessionId: null,
       role: membership.role,
       capabilities: [],
+      billingCapabilities: [],
       clerkCapabilities: []
     },
     capability

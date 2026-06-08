@@ -79,7 +79,7 @@ async function readClerkToken(env: DashboardProxyEnvironment): Promise<string | 
 }
 
 function createUnauthenticatedDashboardResponse(): Response {
-  return new Response(JSON.stringify({ message: "A signed-in Clerk session is required." }), {
+  return new Response(JSON.stringify({ message: "A signed-in session is required." }), {
     status: 401,
     headers: {
       "content-type": "application/json"

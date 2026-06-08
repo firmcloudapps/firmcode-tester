@@ -34,6 +34,13 @@ describe("dashboard route readiness guard", () => {
     }
   });
 
+  it("does not register duplicate normalized Next routes", () => {
+    const actualRoutes = discoverNextRoutes();
+    const duplicates = actualRoutes.filter((route, index) => actualRoutes.indexOf(route) !== index);
+
+    expect(duplicates).toEqual([]);
+  });
+
   it("requires every active internal navigation or action definition to target an implemented route", () => {
     const activeInternalActions = DASHBOARD_ROUTE_ACTIONS.filter(
       (action) => action.status === "active" && action.destination === "internal"
@@ -159,7 +166,8 @@ describe("dashboard route readiness guard", () => {
 
     expect(settingsHtml).toContain("Workspace API keys are planned and not enabled in the MVP.");
     expect(settingsHtml).toContain("disabled=\"\"");
-    expect(githubHtml).toContain('href="/repositories/repo-1?tab=configuration"');
+    expect(githubHtml).toContain("Configure");
+    expect(githubHtml).toContain("You do not have permission.");
     expect(githubHtml).toContain("Manual review runs are planned");
     expect(billingHtml).toContain("Admin or Clerk billing permission is required to manage subscriptions.");
     expect(billingHtml).toContain("disabled=\"\"");
@@ -203,9 +211,14 @@ function discoverNextRoutes(): string[] {
       }
 
       const routeDirectory = relative(appDir, directory);
-      routes.push(routeDirectory === "" ? "/" : `/${routeDirectory}`);
+      const route = routeDirectory === "" ? "/" : `/${routeDirectory}`;
+      routes.push(normalizeRoutePattern(route));
     }
   }
+}
+
+function normalizeRoutePattern(route: string): string {
+  return route.replace(/\/\([^/]+\)/g, "");
 }
 
 const repositoryList: RepositoryListResponse = {

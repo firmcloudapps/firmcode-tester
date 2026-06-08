@@ -21,13 +21,20 @@ import {
 } from "./repository-access-scope";
 
 export interface DashboardRequestContext {
-  readonly clerkUserId: string;
-  readonly clerkOrgId: string | null;
+  readonly userId: string;
+  readonly orgId: string | null;
   readonly sessionId: string | null;
   readonly workspaceId: string;
   readonly role: DashboardRole;
   readonly capabilities: readonly DashboardCapability[];
-  readonly clerkCapabilities: readonly string[];
+  readonly billingCapabilities: readonly string[];
+  readonly provider: string;
+  /** @deprecated Use userId instead. */
+  readonly clerkUserId?: string;
+  /** @deprecated Use orgId instead. */
+  readonly clerkOrgId?: string | null;
+  /** @deprecated Use billingCapabilities instead. */
+  readonly clerkCapabilities?: readonly string[];
 }
 
 export interface DashboardAuthenticatedRequest {
@@ -54,7 +61,7 @@ export function isDashboardRequestContext(value: DashboardAuthParam): value is D
     typeof value === "object" &&
     !Array.isArray(value) &&
     "workspaceId" in value &&
-    "clerkUserId" in value &&
+    "userId" in value &&
     "role" in value
   );
 }
@@ -69,23 +76,32 @@ export function requireDashboardRequestContext(value: DashboardAuthParam): Dashb
 
 export function toDashboardServiceAuth(auth: DashboardAuthParam): {
   readonly workspaceId: string;
+  readonly userId: string;
   readonly clerkUserId: string;
 };
 export function toDashboardServiceAuth(auth: DashboardAuthParam, legacyUserIdHeader: string | string[] | undefined): {
   readonly workspaceId: string | null;
+  readonly userId: string | null;
   readonly clerkUserId: string | null;
 };
 export function toDashboardServiceAuth(auth: DashboardAuthParam, legacyUserIdHeader?: string | string[] | undefined): {
   readonly workspaceId: string | null;
+  readonly userId: string | null;
   readonly clerkUserId: string | null;
 } {
   if (!isDashboardRequestContext(auth)) {
-    return readTestOnlyLegacyServiceAuth(auth, legacyUserIdHeader);
+    const legacy = readTestOnlyLegacyServiceAuth(auth, legacyUserIdHeader);
+    return {
+      workspaceId: legacy.workspaceId,
+      userId: legacy.userId,
+      clerkUserId: legacy.userId
+    };
   }
 
   return {
     workspaceId: auth.workspaceId,
-    clerkUserId: auth.clerkUserId
+    userId: auth.userId,
+    clerkUserId: auth.clerkUserId ?? auth.userId
   };
 }
 
@@ -94,11 +110,11 @@ export function resolveRepositoryAccessScopeFromAuth(auth: DashboardAuthParam): 
     return FULL_REPOSITORY_ACCESS_SCOPE;
   }
 
-  return resolveRepositoryAccessScope({ role: auth.role, clerkUserId: auth.clerkUserId });
+  return resolveRepositoryAccessScope({ role: auth.role, userId: auth.userId });
 }
 
 export function resolveRepositoryAccessScopeFromMembership(membership: DashboardMembership): RepositoryAccessScope {
-  return resolveRepositoryAccessScope({ role: membership.role, clerkUserId: membership.clerkUserId });
+  return resolveRepositoryAccessScope({ role: membership.role, userId: membership.userId });
 }
 
 export function hasDashboardCapability(context: DashboardRequestContext, capability: DashboardCapability): boolean {
@@ -144,13 +160,13 @@ export async function resolveDashboardMembership(
   if (!isDashboardRequestContext(auth)) {
     const legacy = readTestOnlyLegacyServiceAuth(auth, _legacyUserIdHeader);
 
-    if (legacy.workspaceId === null || legacy.clerkUserId === null) {
+    if (legacy.workspaceId === null || legacy.userId === null) {
       throw new UnauthorizedException("Dashboard authentication is required");
     }
 
     const membership = await _dashboardAuthStore.findActiveMembership({
       workspaceId: legacy.workspaceId,
-      clerkUserId: legacy.clerkUserId
+      userId: legacy.userId
     });
 
     if (membership === null) {
@@ -162,8 +178,9 @@ export async function resolveDashboardMembership(
 
   return {
     workspaceId: auth.workspaceId,
-    clerkUserId: auth.clerkUserId,
-    role: auth.role
+    userId: auth.userId,
+    role: auth.role,
+    clerkUserId: auth.clerkUserId ?? auth.userId
   };
 }
 
@@ -172,7 +189,7 @@ function readTestOnlyLegacyServiceAuth(
   legacyUserIdHeader: string | string[] | undefined
 ): {
   readonly workspaceId: string | null;
-  readonly clerkUserId: string | null;
+  readonly userId: string | null;
 } {
   if (process.env.NODE_ENV !== "test") {
     throw new UnauthorizedException("Dashboard authentication is required");
@@ -182,7 +199,7 @@ function readTestOnlyLegacyServiceAuth(
 
   return {
     workspaceId: readSingleValue(legacyWorkspaceId) ?? null,
-    clerkUserId: readSingleValue(legacyUserIdHeader) ?? null
+    userId: readSingleValue(legacyUserIdHeader) ?? null
   };
 }
 
