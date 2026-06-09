@@ -1,6 +1,6 @@
 # Local Development
 
-Firmcode should be developed Docker-first for API and worker runtime behavior. Docker Compose is the canonical local integration path for the API, worker, and Redis because the API and worker will run as Docker containers on Coolify, while the web dashboard runs independently with Next.js dev locally and deploys to Vercel. Host-native commands can exist for fast inner-loop work, but every API or worker feature should be validated in the local Compose path before it is considered done.
+Firmcode should be developed Docker-first. Docker Compose is the canonical local integration path for the web dashboard, API, worker, and Redis so the InsForge auth flow, API calls, queues, and worker runtime are validated together. Host-native commands can exist for fast inner-loop checks, but local app verification should use the Compose stack before work is considered done.
 
 ## Prerequisites
 
@@ -23,11 +23,10 @@ Firmcode should be developed Docker-first for API and worker runtime behavior. D
 5. Create GitHub App with required permissions and webhook secret.
 6. Set `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, and `GITHUB_WEBHOOK_SECRET`.
 7. Set LLM provider/model variables.
-8. Start API, worker, and Redis with local Docker Compose.
+8. Start web, API, worker, and Redis with local Docker Compose.
 9. Run migrations.
-10. Start the web dashboard independently with Next.js dev.
-11. Sign in through InsForge, confirm workspace creation/mapping, then connect GitHub OAuth.
-12. Use webhook tunnel for GitHub App webhook URL.
+10. Sign in through InsForge, confirm workspace creation/mapping, then connect GitHub OAuth.
+11. Use webhook tunnel for GitHub App webhook URL.
 
 ## InsForge Local Authentication Setup
 
@@ -40,6 +39,8 @@ Create an InsForge development project and configure:
 - After sign-up URL: `http://localhost:3000/auth/redirect`
 - Allowed redirect origin: `http://localhost:3000`
 - Google OAuth configured in InsForge if you want to use the Google button locally.
+
+Use `http://localhost:3000` for local browser auth. The OAuth start route canonicalizes `127.0.0.1` and `0.0.0.0` back to `localhost` before creating the PKCE verifier because the verifier cookie is host-bound.
 
 Local `.env` values should include:
 
@@ -67,9 +68,9 @@ The expected local auth flow is:
 6. `/auth/redirect` sends Admins to `/dashboard/admin` and Developers to `/dashboard/developer`.
 7. Web server requests to the API include an InsForge bearer token.
 8. API dashboard endpoints reject requests without a valid InsForge token.
+9. Connect GitHub OAuth from `/dashboard/developer` or `/github/installations` before using GitHub-backed workflows.
 
 Configured default or personal workspace signups resolve to Developer by default. For local Admin testing, update the database-backed `workspace_memberships.role` row after the user has signed in and `user_profiles`/membership rows have been created.
-9. Connect GitHub OAuth from `/dashboard/developer` or `/github/installations` before using GitHub-backed workflows.
 
 Do not use dashboard user or workspace environment shims for normal local development. Web-to-API calls should use InsForge sessions. `FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN`, its deprecated `FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN` alias, and `FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID` are reserved for isolated web unit tests only.
 
@@ -95,13 +96,14 @@ bash infra/docker/smoke.sh
 
 The Compose stack should include:
 
+- `web`
 - `api`
 - `worker`
 - `redis`
 
-The API and worker containers should use the same production entrypoints planned for Coolify wherever practical. The web dashboard runs independently with `npm run dev --workspace @firmcode/web` for local development and deploys to Vercel in production.
+The API and worker containers should use the same production entrypoints planned for Coolify wherever practical. The web dashboard runs in Compose locally and deploys to Vercel in production.
 
-Do not add PostgreSQL or the Next.js web app to either backend Compose stack. NeonDB and Vercel own those roles.
+Do not add PostgreSQL to either backend Compose stack. NeonDB owns the database role locally and in production-like deployments.
 
 Before merging implementation work, verify:
 
@@ -117,20 +119,22 @@ Before merging implementation work, verify:
 - Worker image includes Semgrep CLI and Tree-sitter runtime dependencies.
 - API can reach Redis and NeonDB from inside the container network.
 - Worker can reach Redis and NeonDB from inside the container network.
-- Local Next.js dev can reach the API through `NEXT_PUBLIC_API_URL`.
+- Local Docker web can reach the API through container DNS with `API_URL=http://api:3001`.
+- Browser dashboard calls use `NEXT_PUBLIC_API_URL=http://localhost:3001`.
 - API CORS accepts local web origin and planned Vercel origins.
 - Health/readiness checks pass inside containers.
 
-Compose uses the host-provided NeonDB `DATABASE_URL` and `REDIS_URL=redis://redis:6379` inside API and worker containers. The web dashboard uses `NEXT_PUBLIC_API_URL=http://localhost:3001` when run locally.
+Compose uses the host-provided NeonDB `DATABASE_URL`, `REDIS_URL=redis://redis:6379` inside API and worker containers, and `API_URL=http://api:3001` inside the web container. The browser-facing dashboard bundle uses `NEXT_PUBLIC_API_URL=http://localhost:3001` when run locally.
 
 If a host port is already occupied, override only the host binding while leaving container DNS and ports unchanged:
 
 ```bash
 API_PORT=3301 docker compose up --build api
+WEB_PORT=3300 docker compose up --build web
 REDIS_PORT=56379 docker compose up redis
 ```
 
-Run the web dashboard locally outside Docker:
+For fast isolated web checks outside the canonical Docker runtime:
 
 ```bash
 npm run dev --workspace @firmcode/web
@@ -228,6 +232,7 @@ docker compose run --rm worker pytest
 
 - If webhook verification fails, confirm raw body handling and `GITHUB_WEBHOOK_SECRET`.
 - If InsForge auth fails in the web app, confirm `NEXT_PUBLIC_INSFORGE_BASE_URL`, `NEXT_PUBLIC_INSFORGE_URL`, `NEXT_PUBLIC_INSFORGE_ANON_KEY`, after-auth URLs, and allowed redirect URLs.
+- If Google OAuth returns `oauth_missing_verifier`, start from `http://localhost:3000/sign-in`; local aliases are redirected to `localhost` before the PKCE verifier cookie is set.
 - If `/auth/redirect` sends a signed-in user back to `/sign-in`, confirm the web server runtime has `INSFORGE_BASE_URL` and `INSFORGE_ANON_KEY`, and confirm the browser has a fresh `insforge_access_token` cookie from the Next.js auth routes.
 - If protected API calls return `401`, confirm the web route handler is sending `Authorization: Bearer <InsForge access token>` and the API is running with `AUTH_PROVIDER=insforge`.
 - If protected API calls return `403`, confirm the InsForge user is mapped to an active workspace membership with the required role.

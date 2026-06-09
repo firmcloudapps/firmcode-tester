@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   createInsForgeAuthRouteClient,
+  getDashboardBaseUrl,
   jsonAuthError,
   readStringField,
   setSessionCookies
@@ -32,6 +33,6 @@ export async function POST(request: Request): Promise<Response> {
   setSessionCookies(response, {
     accessToken: data.accessToken,
     refreshToken: data.refreshToken
-  });
+  }, getDashboardBaseUrl());
   return response;
 }

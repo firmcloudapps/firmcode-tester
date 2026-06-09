@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { insforge } from "../lib/insforge";
+import { fetchInsForgeCurrentUser, fetchInsForgePublicAuthConfig } from "../lib/insforge";
 
 const ACCESS_TOKEN_COOKIE = "insforge_access_token";
 
@@ -65,19 +65,20 @@ export function InsForgeProviderBoundary({
   useEffect(() => {
     const initializeAuth = async () => {
       try {
-        const [{ data }, configResult] = await Promise.all([
-          insforge.auth.getCurrentUser(),
-          insforge.auth.getPublicAuthConfig().catch(() => ({ data: null, error: null }))
+        const accessToken = readCookie(ACCESS_TOKEN_COOKIE);
+        const [currentUser, publicAuthConfig] = await Promise.all([
+          accessToken === null ? Promise.resolve(null) : fetchInsForgeCurrentUser(accessToken),
+          fetchInsForgePublicAuthConfig().catch(() => null)
         ]);
 
-        if (data?.user) {
-          setUser(data.user as InsForgeUser);
+        if (currentUser) {
+          setUser(currentUser as InsForgeUser);
         }
 
-        if (configResult.data) {
+        if (publicAuthConfig) {
           setAuthConfig({
-            requireEmailVerification: configResult.data.requireEmailVerification,
-            verifyEmailMethod: configResult.data.verifyEmailMethod
+            requireEmailVerification: publicAuthConfig.requireEmailVerification === true,
+            verifyEmailMethod: publicAuthConfig.verifyEmailMethod === "link" ? "link" : "code"
           });
         }
       } catch (error) {
@@ -166,7 +167,6 @@ export function InsForgeProviderBoundary({
       method: "POST",
       credentials: "same-origin"
     });
-    insforge.setAccessToken(null);
     setUser(null);
     window.location.href = signInUrl;
   };

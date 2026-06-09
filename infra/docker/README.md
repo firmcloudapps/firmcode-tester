@@ -1,11 +1,12 @@
 # Firmcode Docker Runtime
 
-Firmcode uses Docker-first local development for the NestJS API and Python worker so they run close to their Coolify container shape. The Next.js dashboard runs independently with `next dev` locally and deploys to Vercel in production.
+Firmcode uses Docker-first local development for the Next.js dashboard, NestJS API, Python worker, and Redis so InsForge auth, API calls, queues, and worker behavior are verified together. The dashboard still deploys to Vercel in production, but local app runtime is Compose.
 
 ## Files
 
-- `../../docker-compose.yml` defines the local `api`, `worker`, and `redis` stack.
+- `../../docker-compose.yml` defines the local `web`, `api`, `worker`, and `redis` stack.
 - `../../docker-compose.prod.yml` defines the production/Coolify `api`, `worker`, and internal `redis` stack that pulls prebuilt API and worker images from Docker Hub.
+- `web.Dockerfile` builds the local Next.js dashboard image and injects the InsForge public URL and anon key during `next build`.
 - `api.Dockerfile` builds the local NestJS API image, applies pending database migrations, and runs `npm run start:migrated --workspace @firmcode/api`.
 - `worker.Dockerfile` builds the local Python worker image with Semgrep CLI and Tree-sitter runtime dependency.
 - `api.prod.Dockerfile` builds the production NestJS API image without copying `apps/web`; GitHub Actions publishes it.
@@ -39,6 +40,7 @@ DATABASE_URL="postgresql://..." docker compose up --build
 If a host port is already in use, override it without changing container networking:
 
 ```bash
+WEB_PORT=3300 docker compose up --build web
 API_PORT=3301 docker compose up --build api
 ```
 

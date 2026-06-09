@@ -1,5 +1,6 @@
 import {
   createInsForgeAuthRouteClient,
+  getDashboardBaseUrl,
   jsonAuthError,
   readStringField
 } from "../../../../lib/insforge-route-auth";
@@ -15,9 +16,10 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const client = createInsForgeAuthRouteClient();
+  const dashboardBaseUrl = getDashboardBaseUrl();
   const { data, error } = await client.auth.resendVerificationEmail({
     email,
-    redirectTo: new URL("/sign-in", request.url).toString()
+    redirectTo: new URL("/sign-in", dashboardBaseUrl).toString()
   });
 
   if (error !== null) {

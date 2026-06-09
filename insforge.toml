@@ -1,0 +1,31 @@
+[auth]
+allowed_redirect_urls = [
+  "http://localhost:3000/api/auth/callback",
+  "http://localhost:3000/auth/redirect",
+  "http://localhost:3000/sign-in",
+  "http://localhost:3000/sign-up",
+  "https://firmcode.firmoncloud.com/api/auth/callback",
+  "https://firmcode.firmoncloud.com/auth/redirect",
+  "https://firmcode.firmoncloud.com/sign-in",
+  "https://firmcode.firmoncloud.com/sign-up",
+]
+require_email_verification = true
+verify_email_method = "code"
+reset_password_method = "code"
+disable_signup = false
+
+[auth.password]
+min_length = 6
+require_number = false
+require_lowercase = false
+require_uppercase = false
+require_special_char = false
+
+[auth.smtp]
+enabled = false
+host = ""
+port = 465
+username = ""
+sender_email = ""
+sender_name = ""
+min_interval_seconds = 60

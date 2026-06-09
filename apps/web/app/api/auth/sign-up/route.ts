@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   createInsForgeAuthRouteClient,
+  getDashboardBaseUrl,
   jsonAuthError,
   readStringField,
   setSessionCookies
@@ -19,11 +20,12 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const client = createInsForgeAuthRouteClient();
+  const dashboardBaseUrl = getDashboardBaseUrl();
   const { data, error } = await client.auth.signUp({
     email,
     password,
     name,
-    redirectTo: new URL("/sign-in", request.url).toString()
+    redirectTo: new URL("/sign-in", dashboardBaseUrl).toString()
   });
 
   if (error !== null) {
@@ -35,7 +37,7 @@ export async function POST(request: Request): Promise<Response> {
     setSessionCookies(response, {
       accessToken: data.accessToken,
       refreshToken: data.refreshToken
-    });
+    }, dashboardBaseUrl);
     return response;
   }
 

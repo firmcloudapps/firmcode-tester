@@ -12,6 +12,52 @@ services:
       timeout: 5s
       retries: 10
 
+  web:
+    build:
+      context: .
+      dockerfile: infra/docker/web.Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${WEB_NEXT_PUBLIC_API_URL:-http://localhost:3001}
+        NEXT_PUBLIC_DASHBOARD_URL: ${WEB_NEXT_PUBLIC_DASHBOARD_URL:-http://localhost:3000}
+        NEXT_PUBLIC_AUTH_PROVIDER: ${NEXT_PUBLIC_AUTH_PROVIDER:-insforge}
+        NEXT_PUBLIC_INSFORGE_BASE_URL: ${NEXT_PUBLIC_INSFORGE_BASE_URL:-${INSFORGE_BASE_URL:-https://h35yzuga.eu-central.insforge.app}}
+        NEXT_PUBLIC_INSFORGE_URL: ${NEXT_PUBLIC_INSFORGE_URL:-${INSFORGE_BASE_URL:-https://h35yzuga.eu-central.insforge.app}}
+        NEXT_PUBLIC_INSFORGE_ANON_KEY: ${NEXT_PUBLIC_INSFORGE_ANON_KEY:-${INSFORGE_ANON_KEY:-}}
+        INSFORGE_BASE_URL: ${INSFORGE_BASE_URL:-https://h35yzuga.eu-central.insforge.app}
+        INSFORGE_ANON_KEY: ${INSFORGE_ANON_KEY:-}
+    env_file:
+      - .env.local
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOSTNAME: 0.0.0.0
+      APP_URL: ${WEB_APP_URL:-http://localhost:3000}
+      API_URL: http://api:3001
+      NEXT_PUBLIC_API_URL: ${WEB_NEXT_PUBLIC_API_URL:-http://localhost:3001}
+      NEXT_PUBLIC_DASHBOARD_URL: ${WEB_NEXT_PUBLIC_DASHBOARD_URL:-http://localhost:3000}
+      NEXT_PUBLIC_AUTH_PROVIDER: ${NEXT_PUBLIC_AUTH_PROVIDER:-insforge}
+      NEXT_PUBLIC_INSFORGE_BASE_URL: ${NEXT_PUBLIC_INSFORGE_BASE_URL:-${INSFORGE_BASE_URL:-https://h35yzuga.eu-central.insforge.app}}
+      NEXT_PUBLIC_INSFORGE_URL: ${NEXT_PUBLIC_INSFORGE_URL:-${INSFORGE_BASE_URL:-https://h35yzuga.eu-central.insforge.app}}
+      NEXT_PUBLIC_INSFORGE_ANON_KEY: ${NEXT_PUBLIC_INSFORGE_ANON_KEY:-${INSFORGE_ANON_KEY:-}}
+      INSFORGE_BASE_URL: ${INSFORGE_BASE_URL:-https://h35yzuga.eu-central.insforge.app}
+      INSFORGE_ANON_KEY: ${INSFORGE_ANON_KEY:-}
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:3000/sign-in').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   api:
     build:
       context: .

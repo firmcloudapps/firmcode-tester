@@ -41,6 +41,18 @@ describe("web InsForge auth config", () => {
     });
   });
 
+  it("normalizes copied InsForge env assignment values", () => {
+    expect(
+      loadWebInsForgeAuthRenderConfig({
+        NEXT_PUBLIC_INSFORGE_BASE_URL: "NEXT_PUBLIC_INSFORGE_BASE_URL = https://firmcode.eu-central.insforge.app",
+        NEXT_PUBLIC_INSFORGE_ANON_KEY: "ANON_KEY = anon_test_key"
+      })
+    ).toMatchObject({
+      baseUrl: "https://firmcode.eu-central.insforge.app",
+      anonKey: "anon_test_key"
+    });
+  });
+
   it("accepts explicit public auth routes", () => {
     const config = loadWebInsForgeAuthRenderConfig({
       NEXT_PUBLIC_INSFORGE_BASE_URL: "https://firmcode.eu-central.insforge.app",
