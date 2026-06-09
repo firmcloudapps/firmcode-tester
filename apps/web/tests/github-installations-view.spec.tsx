@@ -216,10 +216,10 @@ describe("GitHubInstallationsView", () => {
     expect(html).toContain('href="/github/installations"');
   });
 
-  it("renders unauthorized installation and sync states for non-MVP roles", () => {
+  it("renders developer installation and sync states", () => {
     const html = renderToString(
       <GitHubInstallationsView
-        state={{ status: "populated", data: syncData(viewerSettings, true) }}
+        state={{ status: "populated", data: syncData(readOnlyDeveloperSettings, true) }}
         installConfig={{
           status: "configured",
           installUrl: "https://github.com/apps/firmcode/installations/new",
@@ -228,13 +228,13 @@ describe("GitHubInstallationsView", () => {
       />
     );
 
-    expect(html).toContain("Unavailable");
-    expect(html).toContain("You do not have permission to sync GitHub installations.");
+    expect(html).toContain("GitHub connected");
+    expect(html).toContain("Sync GitHub");
+    expect(html).toContain("Configure");
     expect(html).not.toContain('href="https://github.com/apps/firmcode/installations/new"');
-    expect(html).not.toContain('?tab=configuration"');
   });
 
-  it("keeps the route inside the Clerk-authenticated dashboard shell", () => {
+  it("keeps the route inside the authenticated dashboard shell", () => {
     const html = renderToString(
       <DashboardShell activeItem="PR Review">
         <GitHubInstallationsView
@@ -248,7 +248,7 @@ describe("GitHubInstallationsView", () => {
       </DashboardShell>
     );
 
-    expect(html).toContain('data-clerk-authenticated="required"');
+    expect(html).toContain('data-authenticated="required"');
     expect(html).toContain('href="/dashboard/developer" aria-current="page"');
   });
 });
@@ -257,13 +257,13 @@ const developerSettings: WorkspaceSettingsResponse = {
   workspace: {
     id: "00000000-0000-4000-8000-000000000101",
     name: "Firmcode",
-    clerkOrgId: "org_firmcode",
+    identityWorkspaceId: "org_firmcode",
     role: "developer",
     canManageSensitiveSettings: false
   },
-  clerk: {
+  identity: {
     userProfileUrl: "/user-profile",
-    organizationProfileUrl: "/organization-profile",
+    workspaceProfileUrl: "/organization-profile",
     memberManagementUrl: "/organization-profile/members"
   },
   githubApp: {
@@ -323,11 +323,11 @@ const adminSettings: WorkspaceSettingsResponse = {
   }
 };
 
-const viewerSettings: WorkspaceSettingsResponse = {
+const readOnlyDeveloperSettings: WorkspaceSettingsResponse = {
   ...developerSettings,
   workspace: {
     ...developerSettings.workspace,
-    role: "viewer",
+    role: "developer",
     canManageSensitiveSettings: false
   }
 };

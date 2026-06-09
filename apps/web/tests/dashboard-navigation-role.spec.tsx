@@ -4,12 +4,11 @@ import { DashboardShell } from "../components/dashboard/dashboard-shell";
 import { isAdminDashboardRole, navItemsForRole } from "../lib/dashboard-navigation";
 
 describe("role-based dashboard navigation", () => {
-  it("treats admin and owner as admin roles", () => {
+  it("treats only admin as the admin role", () => {
     expect(isAdminDashboardRole("admin")).toBe(true);
-    expect(isAdminDashboardRole("owner")).toBe(true);
     expect(isAdminDashboardRole("ADMIN")).toBe(true);
     expect(isAdminDashboardRole("developer")).toBe(false);
-    expect(isAdminDashboardRole("viewer")).toBe(false);
+    expect(isAdminDashboardRole("unknown")).toBe(false);
     expect(isAdminDashboardRole(null)).toBe(false);
     expect(isAdminDashboardRole(undefined)).toBe(false);
   });

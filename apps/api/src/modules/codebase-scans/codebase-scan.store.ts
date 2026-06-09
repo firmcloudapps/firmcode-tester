@@ -116,7 +116,7 @@ export interface UpdateCodebaseScanFindingStatusInput {
   readonly findingId: string;
   readonly workspaceId: string;
   readonly accessScope?: RepositoryAccessScope;
-  readonly actorClerkUserId: string;
+  readonly actorUserId: string;
   readonly update: UpdateCodebaseScanFindingStatusRequest;
 }
 
@@ -790,7 +790,7 @@ INSERT INTO codebase_scan_finding_status_events (
         input.findingId,
         row.status,
         nextStatus,
-        input.actorClerkUserId,
+        input.actorUserId,
         input.update.reason ?? null
       ]
     );

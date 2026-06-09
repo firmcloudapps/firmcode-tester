@@ -356,7 +356,7 @@ def _payload() -> CodebaseScanJobInput:
         commit_sha=None,
         trigger="scheduled",
         correlation_id="correlation-1",
-        requested_by_clerk_user_id=None,
+        requested_by_user_id=None,
     )
 
 

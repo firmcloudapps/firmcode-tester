@@ -54,7 +54,7 @@ describe("dashboard route readiness guard", () => {
     }
   });
 
-  it("keeps external Clerk and GitHub actions explicit and validates them separately", () => {
+  it("keeps external InsForge and GitHub actions explicit and validates them separately", () => {
     const externalActions = DASHBOARD_ROUTE_ACTIONS.filter((action) => action.destination === "external");
 
     expect(externalActions.length).toBeGreaterThan(0);
@@ -106,7 +106,7 @@ describe("dashboard route readiness guard", () => {
       renderToString(
         <BillingView
           state={{ status: "populated", data: billing }}
-          billingPortalUrl="https://accounts.clerk.example/billing"
+          billingPortalUrl="https://accounts.identity.example/billing"
         />
       ),
       renderToString(
@@ -133,21 +133,21 @@ describe("dashboard route readiness guard", () => {
         expect(anchor.tag).not.toContain('data-dashboard-destination="external"');
       } else {
         expect(anchor.tag, `${anchor.href} must be explicitly marked external`).toContain('data-dashboard-destination="external"');
-        expect(anchor.tag, `${anchor.href} must identify Clerk or GitHub`).toMatch(/data-dashboard-provider="(clerk|github)"/);
+        expect(anchor.tag, `${anchor.href} must identify InsForge or GitHub`).toMatch(/data-dashboard-provider="(identity|github)"/);
       }
     }
   });
 
-  it("disables planned Clerk settings actions when Clerk URLs are not external route-ready destinations", () => {
-    const generalHtml = renderToString(<SettingsView state={{ status: "populated", data: internalClerkSettings }} activeTab="general" />);
-    const membersHtml = renderToString(<SettingsView state={{ status: "populated", data: internalClerkSettings }} activeTab="members" />);
+  it("disables planned InsForge settings actions when InsForge URLs are not external route-ready destinations", () => {
+    const generalHtml = renderToString(<SettingsView state={{ status: "populated", data: internalIdentitySettings }} activeTab="general" />);
+    const membersHtml = renderToString(<SettingsView state={{ status: "populated", data: internalIdentitySettings }} activeTab="members" />);
 
     expect(generalHtml).not.toContain('href="/user-profile"');
     expect(generalHtml).not.toContain('href="/organization-profile"');
-    expect(generalHtml).toContain("Open Clerk profile is planned until its internal destination is route-ready.");
-    expect(generalHtml).toContain("Open Clerk organization is planned until its internal destination is route-ready.");
+    expect(generalHtml).toContain("Open profile is planned until its internal destination is route-ready.");
+    expect(generalHtml).toContain("Open workspace is planned until its internal destination is route-ready.");
     expect(membersHtml).not.toContain('href="/organization-profile/members"');
-    expect(membersHtml).toContain("Open Clerk members is planned until its internal destination is route-ready.");
+    expect(membersHtml).toContain("Open members is planned until its internal destination is route-ready.");
   });
 
   it("keeps disabled planned controls rendered as disabled buttons with titles", () => {
@@ -169,7 +169,7 @@ describe("dashboard route readiness guard", () => {
     expect(githubHtml).toContain("Configure");
     expect(githubHtml).toContain("You do not have permission.");
     expect(githubHtml).toContain("Manual review runs are planned");
-    expect(billingHtml).toContain("Admin or Clerk billing permission is required to manage subscriptions.");
+    expect(billingHtml).toContain("Admin permission is required to manage subscriptions.");
     expect(billingHtml).toContain("disabled=\"\"");
   });
 });
@@ -332,14 +332,14 @@ const externalSettings: WorkspaceSettingsResponse = {
   workspace: {
     id: "workspace-1",
     name: "Firmcode",
-    clerkOrgId: "org_firmcode",
+    identityWorkspaceId: "org_firmcode",
     role: "admin",
     canManageSensitiveSettings: true
   },
-  clerk: {
-    userProfileUrl: "https://accounts.clerk.example/user",
-    organizationProfileUrl: "https://accounts.clerk.example/organization",
-    memberManagementUrl: "https://accounts.clerk.example/members"
+  identity: {
+    userProfileUrl: "https://accounts.identity.example/user",
+    workspaceProfileUrl: "https://accounts.identity.example/organization",
+    memberManagementUrl: "https://accounts.identity.example/members"
   },
   githubApp: {
     installUrl: "/github/installations",
@@ -377,11 +377,11 @@ const externalSettings: WorkspaceSettingsResponse = {
   }
 };
 
-const internalClerkSettings: WorkspaceSettingsResponse = {
+const internalIdentitySettings: WorkspaceSettingsResponse = {
   ...externalSettings,
-  clerk: {
+  identity: {
     userProfileUrl: "/user-profile",
-    organizationProfileUrl: "/organization-profile",
+    workspaceProfileUrl: "/organization-profile",
     memberManagementUrl: "/organization-profile/members"
   }
 };
@@ -391,11 +391,11 @@ const billing: WorkspaceBillingResponse = {
     id: "workspace-1",
     role: "admin",
     canManageBilling: true,
-    source: "clerk"
+    source: "insforge"
   },
   plan: {
-    name: "Clerk managed",
-    status: "managed_by_clerk"
+    name: "InsForge managed",
+    status: "active"
   },
   usage: {
     reviewRunsThisMonth: null,

@@ -2,7 +2,7 @@ import React from "react";
 import { redirect } from "next/navigation";
 import { AuthPage } from "../../../components/auth/auth-page";
 import { ROLE_BASED_AUTH_REDIRECT_PATH } from "../../../lib/auth-redirect";
-import { getServerDashboardAuthSession } from "../../../lib/clerk-auth";
+import { getServerDashboardAuthSession } from "../../../lib/dashboard-auth";
 
 export const dynamic = "force-dynamic";
 

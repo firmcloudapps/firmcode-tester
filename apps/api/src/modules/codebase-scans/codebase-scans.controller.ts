@@ -129,7 +129,7 @@ export class CodebaseScansController {
       findingId: id,
       workspaceId: membership.workspaceId,
       accessScope: resolveRepositoryAccessScopeFromMembership(membership),
-      actorClerkUserId: membership.clerkUserId,
+      actorUserId: membership.userId,
       update: parseUpdateCodebaseFindingStatusRequest(body)
     });
 

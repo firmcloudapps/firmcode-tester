@@ -42,13 +42,13 @@ const settings = {
   workspace: {
     id: "workspace-1",
     name: "Firmcode",
-    clerkOrgId: "org_firmcode",
+    identityWorkspaceId: "org_firmcode",
     role: "admin" as const,
     canManageSensitiveSettings: true
   },
-  clerk: {
+  identity: {
     userProfileUrl: "/user-profile",
-    organizationProfileUrl: "/organization-profile",
+    workspaceProfileUrl: "/organization-profile",
     memberManagementUrl: "/organization-profile/members"
   },
   githubApp: {
@@ -92,11 +92,11 @@ const billing = {
     id: "workspace-1",
     role: "admin" as const,
     canManageBilling: true,
-    source: "clerk" as const
+    source: "insforge" as const
   },
   plan: {
-    name: "Clerk managed",
-    status: "managed_by_clerk" as const
+    name: "InsForge managed",
+    status: "active" as const
   },
   usage: {
     reviewRunsThisMonth: null,

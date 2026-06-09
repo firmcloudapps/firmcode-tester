@@ -100,7 +100,7 @@ def test_codebase_scan_job_payload_accepts_nullable_scan_run_and_commit_sha() ->
             "commitSha": None,
             "trigger": "scheduled",
             "correlationId": "correlation-1",
-            "requestedByClerkUserId": None,
+            "requestedByUserId": None,
         }
     )
 
@@ -121,7 +121,7 @@ def test_codebase_scan_job_payload_rejects_missing_correlation_id() -> None:
                 "defaultBranch": "main",
                 "commitSha": None,
                 "trigger": "manual",
-                "requestedByClerkUserId": "user-1",
+                "requestedByUserId": "user-1",
             }
         )
 
@@ -232,5 +232,5 @@ def _codebase_scan_payload(scan_run_id: str | None, trigger: str = "scheduled") 
         commit_sha=None,
         trigger=trigger,
         correlation_id="correlation-1",
-        requested_by_clerk_user_id=None,
+        requested_by_user_id=None,
     )

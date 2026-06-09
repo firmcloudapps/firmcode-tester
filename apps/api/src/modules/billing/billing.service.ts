@@ -10,7 +10,7 @@ import { BILLING_USAGE_STORE, EmptyBillingUsageStore, type BillingUsageStore } f
 export interface WorkspaceBillingRequestContext {
   readonly workspaceId: string | null;
   readonly userId: string | null;
-  readonly hasClerkBillingCapability: boolean;
+  readonly hasBillingCapability: boolean;
 }
 
 @Injectable()
@@ -35,7 +35,7 @@ export class BillingService {
     }
 
     const canManage = roleHasDashboardCapability(membership.role, "manage_billing", {
-      hasClerkBillingCapability: input.hasClerkBillingCapability
+      hasBillingCapability: input.hasBillingCapability
     });
 
     if (!canManage) {

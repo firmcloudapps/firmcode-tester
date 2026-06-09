@@ -7,7 +7,7 @@ export {
   DASHBOARD_APP_ROLES,
   DASHBOARD_CAPABILITIES,
   DASHBOARD_ROLE_CAPABILITY_MATRIX,
-  hasClerkManagedBillingCapability,
+  hasManagedBillingCapability,
   normalizeDashboardAppRole,
   roleHasDashboardCapability,
   type DashboardAppRole,
@@ -19,30 +19,25 @@ export interface DashboardMembership {
   workspaceId: string;
   userId: string;
   role: DashboardRole;
-  /** @deprecated Use userId instead. */
-  clerkUserId: string;
 }
 
 export interface DashboardAuthStore {
   findActiveMembership(input: {
     workspaceId: string;
-    userId?: string | null;
-    clerkUserId?: string | null;
+    userId: string | null;
   }): Promise<DashboardMembership | null>;
 }
 
 interface DashboardMembershipRow {
   readonly workspace_id: string;
   readonly user_id: string;
-  readonly clerk_user_id: string | null;
   readonly role: DashboardRole;
 }
 
 export class EmptyDashboardAuthStore implements DashboardAuthStore {
   async findActiveMembership(_input: {
     workspaceId: string;
-    userId?: string | null;
-    clerkUserId?: string | null;
+    userId: string | null;
   }): Promise<DashboardMembership | null> {
     return null;
   }
@@ -53,12 +48,9 @@ export class PostgresDashboardAuthStore implements DashboardAuthStore {
 
   async findActiveMembership(input: {
     workspaceId: string;
-    userId?: string | null;
-    clerkUserId?: string | null;
+    userId: string | null;
   }): Promise<DashboardMembership | null> {
-    const userId = input.userId ?? input.clerkUserId ?? null;
-
-    if (userId === null) {
+    if (input.userId === null) {
       return null;
     }
 
@@ -67,14 +59,13 @@ export class PostgresDashboardAuthStore implements DashboardAuthStore {
 SELECT
   workspace_id,
   COALESCE(user_id, clerk_user_id) AS user_id,
-  COALESCE(clerk_user_id, user_id) AS clerk_user_id,
   role
 FROM workspace_memberships
 WHERE workspace_id = $1
   AND (user_id = $2 OR clerk_user_id = $2)
   AND active = true
 `,
-      [input.workspaceId, userId]
+      [input.workspaceId, input.userId]
     );
     const row = result.rows[0];
 
@@ -85,8 +76,7 @@ WHERE workspace_id = $1
     return {
       workspaceId: row.workspace_id,
       userId: row.user_id,
-      role: row.role,
-      clerkUserId: row.clerk_user_id ?? row.user_id
+      role: row.role
     };
   }
 }

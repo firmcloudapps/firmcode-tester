@@ -462,7 +462,7 @@ describe("PostgresCodebaseScanStore", () => {
     const updated = await store.updateFindingStatus({
       findingId: FIRST_FINDING_ID,
       workspaceId: WORKSPACE_ID,
-      actorClerkUserId: "user_owner",
+      actorUserId: "user_owner",
       update: {
         status: "false_positive",
         reason: "Confirmed generated fixture."

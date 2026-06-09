@@ -103,13 +103,13 @@ const settings = {
   workspace: {
     id: "workspace-1",
     name: "Firmcode",
-    clerkOrgId: "org_firmcode",
+    identityWorkspaceId: "org_firmcode",
     role: "admin" as const,
     canManageSensitiveSettings: true
   },
-  clerk: {
+  identity: {
     userProfileUrl: "/user-profile",
-    organizationProfileUrl: "/organization-profile",
+    workspaceProfileUrl: "/organization-profile",
     memberManagementUrl: "/organization-profile/members"
   },
   githubApp: {

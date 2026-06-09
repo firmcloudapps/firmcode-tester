@@ -4,18 +4,18 @@ import { loadPullRequestDetailState, loadPullRequestsState } from "../lib/dashbo
 describe("dashboard pull request data loader", () => {
   const originalApiUrl = process.env.NEXT_PUBLIC_API_URL;
   const originalTestWorkspaceId = process.env.FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID;
-  const originalTestToken = process.env.FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN;
+  const originalTestToken = process.env.FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN;
 
   afterEach(() => {
     process.env.NEXT_PUBLIC_API_URL = originalApiUrl;
     restoreEnv("FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID", originalTestWorkspaceId);
-    restoreEnv("FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN", originalTestToken);
+    restoreEnv("FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN", originalTestToken);
     vi.unstubAllGlobals();
   });
 
   it("maps pull request filters into the authenticated API query string", async () => {
     process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
-    process.env.FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN = "session-token";
+    process.env.FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN = "session-token";
     process.env.FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID = "workspace-1";
     const fetcher = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => jsonResponse(pullRequests));
 
@@ -56,7 +56,7 @@ describe("dashboard pull request data loader", () => {
 
   it("loads pull request detail with auth headers and maps 404 to empty", async () => {
     process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
-    process.env.FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN = "session-token";
+    process.env.FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN = "session-token";
     process.env.FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID = "workspace-1";
     const fetcher = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
       const pathname = new URL(String(input)).pathname;

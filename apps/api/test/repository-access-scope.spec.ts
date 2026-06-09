@@ -32,11 +32,11 @@ describe("repository access scope", () => {
     await seedWorkspaceWithRepositories(pool, {
       workspaceId: WORKSPACE_ID,
       repoIds: [REPOSITORY_A_ID, REPOSITORY_B_ID],
-      memberships: [{ clerkUserId: "admin-1", role: "admin" }]
+      memberships: [{ userId: "admin-1", role: "admin" }]
     });
 
     const store = new PostgresRepositoriesStore(pool);
-    const adminScope = resolveRepositoryAccessScope({ role: "admin", clerkUserId: "admin-1" });
+    const adminScope = resolveRepositoryAccessScope({ role: "admin", userId: "admin-1" });
     const result = await store.listRepositories({ workspaceId: WORKSPACE_ID, accessScope: adminScope });
 
     expect(result.repositories).toHaveLength(2);
@@ -48,8 +48,8 @@ describe("repository access scope", () => {
       workspaceId: WORKSPACE_ID,
       repoIds: [REPOSITORY_A_ID, REPOSITORY_B_ID],
       memberships: [
-        { clerkUserId: "dev-1", role: "developer" },
-        { clerkUserId: "admin-1", role: "admin" }
+        { userId: "dev-1", role: "developer" },
+        { userId: "admin-1", role: "admin" }
       ]
     });
     // Dev gets access only to repo-a
@@ -60,7 +60,7 @@ describe("repository access scope", () => {
     );
 
     const store = new PostgresRepositoriesStore(pool);
-    const devScope = resolveRepositoryAccessScope({ role: "developer", clerkUserId: "dev-1" });
+    const devScope = resolveRepositoryAccessScope({ role: "developer", userId: "dev-1" });
     const result = await store.listRepositories({ workspaceId: WORKSPACE_ID, accessScope: devScope });
 
     expect(result.repositories).toHaveLength(1);
@@ -71,11 +71,11 @@ describe("repository access scope", () => {
     await seedWorkspaceWithRepositories(pool, {
       workspaceId: WORKSPACE_ID,
       repoIds: [REPOSITORY_A_ID, REPOSITORY_B_ID],
-      memberships: [{ clerkUserId: "dev-1", role: "developer" }]
+      memberships: [{ userId: "dev-1", role: "developer" }]
     });
 
     const store = new PostgresRepositoriesStore(pool);
-    const devScope = resolveRepositoryAccessScope({ role: "developer", clerkUserId: "dev-1" });
+    const devScope = resolveRepositoryAccessScope({ role: "developer", userId: "dev-1" });
     const detail = await store.getRepositoryDetail({
       repositoryId: REPOSITORY_A_ID,
       workspaceId: WORKSPACE_ID,
@@ -91,14 +91,14 @@ describe("repository access scope", () => {
       workspaceId: WORKSPACE_ID,
       repoIds: [],
       memberships: [
-        { clerkUserId: "dev-1", role: "developer" }
+        { userId: "dev-1", role: "developer" }
       ]
     });
 
     const githubStore = new PostgresGitHubDashboardStore(pool, () => REPOSITORY_NEW_ID);
     await githubStore.upsertInstallationRepository({
       installationUuid: INSTALLATION_ID,
-      grantAccessToClerkUserId: "dev-1",
+      grantAccessToUserId: "dev-1",
       repository: {
         githubRepositoryId: 999,
         owner: "openclaw",
@@ -110,7 +110,7 @@ describe("repository access scope", () => {
     });
 
     const store = new PostgresRepositoriesStore(pool);
-    const devScope = resolveRepositoryAccessScope({ role: "developer", clerkUserId: "dev-1" });
+    const devScope = resolveRepositoryAccessScope({ role: "developer", userId: "dev-1" });
     const result = await store.listRepositories({ workspaceId: WORKSPACE_ID, accessScope: devScope });
 
     expect(result.repositories).toHaveLength(1);
@@ -129,7 +129,7 @@ async function seedWorkspaceWithRepositories(
   input: {
     workspaceId: string;
     repoIds: readonly string[];
-    memberships: readonly { clerkUserId: string; role: string }[];
+    memberships: readonly { userId: string; role: string }[];
   }
 ): Promise<void> {
   await pool.query(
@@ -162,12 +162,12 @@ async function seedWorkspaceWithRepositories(
       `INSERT INTO user_profiles (id, identity_provider, provider_user_id)
        VALUES ($1, 'insforge', $1)
        ON CONFLICT (id) DO NOTHING`,
-      [membership.clerkUserId]
+      [membership.userId]
     );
     await pool.query(
       `INSERT INTO workspace_memberships (workspace_id, clerk_user_id, user_id, role, active)
        VALUES ($1, $2, $2, $3, true)`,
-      [input.workspaceId, membership.clerkUserId, membership.role]
+      [input.workspaceId, membership.userId, membership.role]
     );
   }
 }

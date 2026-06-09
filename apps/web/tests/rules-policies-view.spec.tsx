@@ -252,7 +252,7 @@ function policy(overrides: Partial<ReviewPolicy> = {}): ReviewPolicy {
       billingChangesRequireAdmin: true,
       supportSafetyOverridesEnabled: false
     },
-    updatedByClerkUserId: "user_admin",
+    updatedByUserId: "user_admin",
     createdAt: "2026-05-23T10:00:00.000Z",
     updatedAt: "2026-05-23T10:10:00.000Z",
     ...overrides

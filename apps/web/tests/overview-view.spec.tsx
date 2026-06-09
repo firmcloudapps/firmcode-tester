@@ -65,7 +65,7 @@ describe("OverviewView", () => {
       </DashboardShell>
     );
 
-    expect(html).toContain('data-clerk-authenticated="required"');
+    expect(html).toContain('data-authenticated="required"');
     expect(html).toContain('aria-current="page"');
   });
 });

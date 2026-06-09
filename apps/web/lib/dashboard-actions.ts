@@ -181,11 +181,11 @@ export async function updateReviewPolicy(
 }
 
 export async function updateWorkspaceMemberRole(
-  clerkUserId: string,
+  userId: string,
   role: "admin" | "developer",
   fetcher: DashboardMutationFetcher = fetch
 ): Promise<WorkspaceSettingsMember> {
-  const response = await fetcher(`/api/settings/members/${encodeURIComponent(clerkUserId)}/role`, {
+  const response = await fetcher(`/api/settings/members/${encodeURIComponent(userId)}/role`, {
     method: "PATCH",
     headers: {
       accept: "application/json",
@@ -198,11 +198,11 @@ export async function updateWorkspaceMemberRole(
 }
 
 export async function updateWorkspaceMemberStatus(
-  clerkUserId: string,
+  userId: string,
   active: boolean,
   fetcher: DashboardMutationFetcher = fetch
 ): Promise<WorkspaceSettingsMember> {
-  const response = await fetcher(`/api/settings/members/${encodeURIComponent(clerkUserId)}/status`, {
+  const response = await fetcher(`/api/settings/members/${encodeURIComponent(userId)}/status`, {
     method: "PATCH",
     headers: {
       accept: "application/json",

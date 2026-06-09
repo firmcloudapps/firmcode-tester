@@ -132,7 +132,7 @@ describe("dashboard API controllers", () => {
   it("uses the verified dashboard auth context for repository detail even if a legacy user value is spoofed", async () => {
     const detail = await repositoriesController.getRepositoryDetail(
       "00000000-0000-4000-8000-000000000002",
-      dashboardAuth({ clerkUserId: DEVELOPER_USER_ID, workspaceId: WORKSPACE_ID }),
+      dashboardAuth({ userId: DEVELOPER_USER_ID, workspaceId: WORKSPACE_ID }),
       "user_attacker"
     );
 
@@ -378,14 +378,11 @@ function dashboardAuth(
     workspaceId: WORKSPACE_ID,
     userId: DEVELOPER_USER_ID,
     orgId: "org_firmcode",
-    clerkUserId: DEVELOPER_USER_ID,
-    clerkOrgId: "org_firmcode",
     sessionId: "sess_test",
     role: "developer",
     capabilities: ["retry_review_run", "trigger_codebase_scan", "manage_codebase_scan_findings"],
     billingCapabilities: [],
     provider: "insforge",
-    clerkCapabilities: [],
     ...overrides
   };
 }

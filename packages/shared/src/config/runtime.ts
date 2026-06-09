@@ -53,28 +53,6 @@ export interface DatabaseConnectionSmokeCheck {
   redactedUrl: string;
 }
 
-export interface ClerkWebConfig {
-  publishableKey: string;
-  signInUrl: string;
-  signUpUrl: string;
-  afterSignInUrl: string;
-  afterSignUpUrl: string;
-  billingPortalUrl: string | null;
-}
-
-export interface ClerkApiConfig {
-  secretKey: string;
-  jwtAudience: string | null;
-  webhookSecret: string | null;
-  defaultOrganization: DefaultClerkOrganizationConfig;
-}
-
-export interface DefaultClerkOrganizationConfig {
-  id: string;
-  name: string;
-  role: string;
-}
-
 export interface RedactedGitHubAppConfig {
   appId: "REDACTED";
   privateKey: "REDACTED";
@@ -93,7 +71,7 @@ export interface GitHubAppConfig {
   toJSON(): RedactedGitHubAppConfig;
 }
 
-export type AuthProvider = "clerk" | "insforge";
+export type AuthProvider = "insforge";
 export type StorageProvider = "database" | "insforge";
 
 export interface AuthConfig {
@@ -141,9 +119,6 @@ export interface CodebaseScanConfig {
 
 export const DEFAULT_CI_LOG_MAX_BYTES = 20_000;
 export const DEFAULT_CODEBASE_SCAN_CADENCE_HOURS = 24;
-export const DEFAULT_CLERK_ORGANIZATION_ID = "org_3EGsxXDTl8pWEfV6da6oENrYhRr";
-export const DEFAULT_CLERK_ORGANIZATION_NAME = "Firmcode AI";
-export const DEFAULT_CLERK_ORGANIZATION_ROLE = "org:developer";
 
 const BOOLEAN_VALUES = new Map<string, boolean>([
   ["true", true],
@@ -183,36 +158,6 @@ export function createApiRuntimeConfig(env: EnvironmentVariables): ApiRuntimeCon
     review,
     codebaseScan,
     storage
-  };
-}
-
-export function createWebClerkConfig(env: EnvironmentVariables): ClerkWebConfig {
-  const issues: ConfigValidationIssue[] = [];
-  const publishableKey = readRequired(env, "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY", issues);
-  const signInUrl = readClerkRoute(env, "NEXT_PUBLIC_CLERK_SIGN_IN_URL", "/sign-in", issues);
-  const signUpUrl = readClerkRoute(env, "NEXT_PUBLIC_CLERK_SIGN_UP_URL", "/sign-up", issues);
-  const afterSignInUrl = readClerkRoute(env, "NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL", "/", issues);
-  const afterSignUpUrl = readClerkRoute(env, "NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL", "/", issues);
-  const billingPortalUrl = readOptionalHttpUrl(env, "CLERK_BILLING_PORTAL_URL", issues);
-
-  if (
-    issues.length > 0 ||
-    publishableKey === null ||
-    signInUrl === null ||
-    signUpUrl === null ||
-    afterSignInUrl === null ||
-    afterSignUpUrl === null
-  ) {
-    throw new ConfigValidationError("Web Clerk", issues);
-  }
-
-  return {
-    publishableKey,
-    signInUrl,
-    signUpUrl,
-    afterSignInUrl,
-    afterSignUpUrl,
-    billingPortalUrl
   };
 }
 
@@ -335,9 +280,8 @@ function readDatabaseConfig(
   return config;
 }
 
-function readAuthProvider(env: EnvironmentVariables): AuthProvider {
-  const value = readOptional(env, "AUTH_PROVIDER")?.toLowerCase();
-  return value === "clerk" ? "clerk" : "insforge";
+function readAuthProvider(_env: EnvironmentVariables): AuthProvider {
+  return "insforge";
 }
 
 function readAuthConfig(
@@ -356,7 +300,7 @@ function readAuthConfig(
   return {
     provider,
     insforge,
-    defaultWorkspace: readDefaultWorkspaceConfig(env, provider)
+    defaultWorkspace: readDefaultWorkspaceConfig(env)
   };
 }
 
@@ -370,18 +314,10 @@ function readInsForgeConfig(env: EnvironmentVariables, issues: ConfigValidationI
   };
 }
 
-function readDefaultWorkspaceConfig(env: EnvironmentVariables, authProvider: AuthProvider): DefaultWorkspaceConfig {
-  if (authProvider === "insforge") {
-    return {
-      id: readOptional(env, "FIRMCODE_DEFAULT_WORKSPACE_ID") ?? "",
-      name: readOptional(env, "FIRMCODE_DEFAULT_WORKSPACE_NAME") ?? "Firmcode AI"
-    };
-  }
-
-  // Legacy Clerk defaults
+function readDefaultWorkspaceConfig(env: EnvironmentVariables): DefaultWorkspaceConfig {
   return {
-    id: readOptional(env, "FIRMCODE_DEFAULT_CLERK_ORGANIZATION_ID") ?? DEFAULT_CLERK_ORGANIZATION_ID,
-    name: readOptional(env, "FIRMCODE_DEFAULT_CLERK_ORGANIZATION_NAME") ?? DEFAULT_CLERK_ORGANIZATION_NAME
+    id: readOptional(env, "FIRMCODE_DEFAULT_WORKSPACE_ID") ?? "",
+    name: readOptional(env, "FIRMCODE_DEFAULT_WORKSPACE_NAME") ?? "Firmcode AI"
   };
 }
 
@@ -391,36 +327,6 @@ function readStorageConfig(env: EnvironmentVariables, issues: ConfigValidationIs
   return {
     provider,
     insforgeBucket: provider === "insforge" ? (readOptional(env, "INSFORGE_STORAGE_BUCKET") ?? "review-artifacts") : undefined
-  };
-}
-
-function readClerkApiConfig(
-  env: EnvironmentVariables,
-  nodeEnv: RuntimeEnvironment,
-  issues: ConfigValidationIssue[]
-): ClerkApiConfig | null {
-  const secretKey = readRequired(env, "CLERK_SECRET_KEY", issues);
-  const jwtAudience =
-    readOptional(env, "CLERK_JWT_AUDIENCE") ??
-    (env.NODE_ENV === "production" ? readRequired(env, "CLERK_JWT_AUDIENCE", issues) : null);
-
-  if (secretKey === null || (env.NODE_ENV === "production" && jwtAudience === null)) {
-    return null;
-  }
-
-  return {
-    secretKey,
-    jwtAudience,
-    webhookSecret: readOptional(env, "CLERK_WEBHOOK_SECRET"),
-    defaultOrganization: readDefaultClerkOrganizationConfig(env)
-  };
-}
-
-function readDefaultClerkOrganizationConfig(env: EnvironmentVariables): DefaultClerkOrganizationConfig {
-  return {
-    id: readOptional(env, "FIRMCODE_DEFAULT_CLERK_ORGANIZATION_ID") ?? DEFAULT_CLERK_ORGANIZATION_ID,
-    name: readOptional(env, "FIRMCODE_DEFAULT_CLERK_ORGANIZATION_NAME") ?? DEFAULT_CLERK_ORGANIZATION_NAME,
-    role: readOptional(env, "FIRMCODE_DEFAULT_CLERK_ORGANIZATION_ROLE") ?? DEFAULT_CLERK_ORGANIZATION_ROLE
   };
 }
 
@@ -731,34 +637,6 @@ function readOptionalHttpUrl(
   issues.push({
     variable,
     message: "must be an absolute http(s) URL"
-  });
-  return null;
-}
-
-function readClerkRoute(
-  env: EnvironmentVariables,
-  variable: string,
-  fallback: string,
-  issues: ConfigValidationIssue[]
-): string | null {
-  const value = readOptional(env, variable) ?? fallback;
-
-  if (value.startsWith("/") && !value.startsWith("//")) {
-    return value;
-  }
-
-  try {
-    const url = new URL(value);
-    if (url.protocol === "https:" || url.protocol === "http:") {
-      return value;
-    }
-  } catch {
-    // Reported below with a stable message.
-  }
-
-  issues.push({
-    variable,
-    message: "must be an absolute http(s) URL or app-relative path"
   });
   return null;
 }

@@ -169,7 +169,7 @@ const repositoryDetail: RepositoryDetailResponse = {
     codebaseScanSeverityThreshold: "medium",
     codebaseScanMaxFiles: 500,
     codebaseScanMaxBytes: 10000000,
-    updatedByClerkUserId: null,
+    updatedByUserId: null,
     createdAt: "2026-05-22T09:00:00.000Z",
     updatedAt: "2026-05-22T09:00:00.000Z"
   },

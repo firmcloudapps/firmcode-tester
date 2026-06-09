@@ -48,7 +48,7 @@ describe("settings dashboard API", () => {
     expect(settings.workspace).toMatchObject({
       id: WORKSPACE_ID,
       name: "Firmcode",
-      clerkOrgId: "org_firmcode",
+      identityWorkspaceId: "org_firmcode",
       role: "admin",
       canManageSensitiveSettings: true
     });
@@ -62,19 +62,19 @@ describe("settings dashboard API", () => {
     ]);
     expect(settings.members).toEqual([
       expect.objectContaining({
-        clerkUserId: ADMIN_USER_ID,
+        userId: ADMIN_USER_ID,
         role: "admin",
         active: true,
         isCurrentUser: true
       }),
       expect.objectContaining({
-        clerkUserId: SUPPORT_ADMIN_USER_ID,
+        userId: SUPPORT_ADMIN_USER_ID,
         role: "admin",
         active: true,
         isCurrentUser: false
       }),
       expect.objectContaining({
-        clerkUserId: DEVELOPER_USER_ID,
+        userId: DEVELOPER_USER_ID,
         role: "developer",
         active: true,
         isCurrentUser: false
@@ -144,9 +144,9 @@ ORDER BY created_at, id
       [DEVELOPER_USER_ID]
     );
 
-    expect(promoted).toMatchObject({ clerkUserId: DEVELOPER_USER_ID, role: "admin", active: true });
-    expect(suspended).toMatchObject({ clerkUserId: DEVELOPER_USER_ID, role: "admin", active: false });
-    expect(restored).toMatchObject({ clerkUserId: DEVELOPER_USER_ID, role: "admin", active: true });
+    expect(promoted).toMatchObject({ userId: DEVELOPER_USER_ID, role: "admin", active: true });
+    expect(suspended).toMatchObject({ userId: DEVELOPER_USER_ID, role: "admin", active: false });
+    expect(restored).toMatchObject({ userId: DEVELOPER_USER_ID, role: "admin", active: true });
     expect(audits.rows).toEqual([
       {
         actor_clerk_user_id: ADMIN_USER_ID,
@@ -190,7 +190,7 @@ ORDER BY created_at, id
     ).rejects.toThrow(ForbiddenException);
   });
 
-  it("requires the Clerk dashboard workspace and user headers", async () => {
+  it("requires the dashboard workspace and user auth context", async () => {
     await expect(controller.getWorkspaceSettings(WORKSPACE_ID, undefined)).rejects.toThrow(UnauthorizedException);
     await expect(controller.getWorkspaceSettings(undefined, ADMIN_USER_ID)).rejects.toThrow(UnauthorizedException);
     await expect(controller.getWorkspaceSettings(WORKSPACE_ID, "user_missing")).rejects.toThrow(UnauthorizedException);

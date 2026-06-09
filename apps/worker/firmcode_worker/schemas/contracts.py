@@ -131,7 +131,7 @@ class CodebaseScanJobInput:
     commit_sha: str | None
     trigger: str
     correlation_id: str
-    requested_by_clerk_user_id: str | None
+    requested_by_user_id: str | None
     scan_config: CodebaseScanJobConfig | None = None
 
     @classmethod
@@ -148,7 +148,7 @@ class CodebaseScanJobInput:
             commit_sha=_read_nullable_str(value, "commitSha", errors),
             trigger=_read_literal_from_set(value, "trigger", CODEBASE_SCAN_TRIGGERS, errors),
             correlation_id=_read_non_empty_str(value, "correlationId", errors),
-            requested_by_clerk_user_id=_read_nullable_str(value, "requestedByClerkUserId", errors),
+            requested_by_user_id=_read_nullable_str(value, "requestedByUserId", errors),
             scan_config=CodebaseScanJobConfig.from_mapping(value, errors),
         )
         _raise_if_errors(errors)

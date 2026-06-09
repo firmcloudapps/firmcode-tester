@@ -27,8 +27,8 @@ export interface WorkspaceSettingsLookup {
 
 export interface WorkspaceMemberLookup {
   readonly workspaceId: string;
-  readonly targetClerkUserId: string;
-  readonly currentClerkUserId: string;
+  readonly targetUserId: string;
+  readonly currentUserId: string;
 }
 
 export interface UpdateWorkspaceMemberRoleInput extends WorkspaceMemberLookup {
@@ -41,7 +41,7 @@ export interface UpdateWorkspaceMemberStatusInput extends WorkspaceMemberLookup 
 
 interface WorkspaceRow {
   readonly id: string;
-  readonly clerk_org_id: string | null;
+  readonly identity_workspace_id: string | null;
   readonly name: string;
 }
 
@@ -71,11 +71,11 @@ export class EmptySettingsStore implements SettingsStore {
       workspace: {
         id: input.workspaceId,
         name: "Test workspace",
-        clerkOrgId: null,
+        identityWorkspaceId: null,
         role: input.role,
         canManageSensitiveSettings: canManageSensitiveWorkspaceSettings(input.role)
       },
-      clerk: buildClerkLinks(),
+      identity: buildIdentityLinks(),
       githubApp: {
         installUrl: "/github/installations",
         installations: [],
@@ -83,7 +83,7 @@ export class EmptySettingsStore implements SettingsStore {
       },
       members: [
         {
-          clerkUserId: input.userId,
+          userId: input.userId,
           role: input.role,
           active: true,
           isCurrentUser: true,
@@ -98,9 +98,9 @@ export class EmptySettingsStore implements SettingsStore {
   }
 
   async getWorkspaceMember(input: WorkspaceMemberLookup): Promise<WorkspaceSettingsMember | null> {
-    return input.targetClerkUserId === input.currentClerkUserId
+    return input.targetUserId === input.currentUserId
       ? {
-        clerkUserId: input.currentClerkUserId,
+        userId: input.currentUserId,
         role: "developer",
         active: true,
         isCurrentUser: true,
@@ -146,11 +146,11 @@ export class PostgresSettingsStore implements SettingsStore {
       workspace: {
         id: workspace.id,
         name: workspace.name,
-        clerkOrgId: workspace.clerk_org_id,
+        identityWorkspaceId: workspace.identity_workspace_id,
         role: input.role,
         canManageSensitiveSettings: canManageSensitiveWorkspaceSettings(input.role)
       },
-      clerk: buildClerkLinks(),
+      identity: buildIdentityLinks(),
       githubApp: {
         installUrl: "/github/installations",
         installations,
@@ -171,10 +171,10 @@ FROM workspace_memberships
 WHERE workspace_id = $1
   AND (clerk_user_id = $2 OR user_id = $2)
 `,
-      [input.workspaceId, input.targetClerkUserId]
+      [input.workspaceId, input.targetUserId]
     );
 
-    return result.rows[0] === undefined ? null : toMember(result.rows[0], input.currentClerkUserId);
+    return result.rows[0] === undefined ? null : toMember(result.rows[0], input.currentUserId);
   }
 
   async countOtherActiveAdmins(input: WorkspaceMemberLookup): Promise<number> {
@@ -188,7 +188,7 @@ WHERE workspace_id = $1
   AND role = 'admin'
   AND active = true
 `,
-      [input.workspaceId, input.targetClerkUserId]
+      [input.workspaceId, input.targetUserId]
     );
 
     return Number(result.rows[0]?.count ?? 0);
@@ -205,15 +205,15 @@ WHERE workspace_id = $1
   AND (clerk_user_id = $2 OR user_id = $2)
 RETURNING COALESCE(user_id, clerk_user_id) AS resolved_user_id, role, active, created_at, updated_at
 `,
-      [input.workspaceId, input.targetClerkUserId, input.role]
+      [input.workspaceId, input.targetUserId, input.role]
     );
-    const updated = result.rows[0] === undefined ? null : toMember(result.rows[0], input.currentClerkUserId);
+    const updated = result.rows[0] === undefined ? null : toMember(result.rows[0], input.currentUserId);
 
     if (updated !== null) {
       await this.auditElevatedRoleChange({
         workspaceId: input.workspaceId,
-        actorClerkUserId: input.currentClerkUserId,
-        targetClerkUserId: input.targetClerkUserId,
+        actorUserId: input.currentUserId,
+        targetUserId: input.targetUserId,
         previousRole: previous?.role ?? null,
         nextRole: input.role,
         source: "settings_member_role"
@@ -234,15 +234,15 @@ WHERE workspace_id = $1
   AND (clerk_user_id = $2 OR user_id = $2)
 RETURNING COALESCE(user_id, clerk_user_id) AS resolved_user_id, role, active, created_at, updated_at
 `,
-      [input.workspaceId, input.targetClerkUserId, input.active]
+      [input.workspaceId, input.targetUserId, input.active]
     );
-    const updated = result.rows[0] === undefined ? null : toMember(result.rows[0], input.currentClerkUserId);
+    const updated = result.rows[0] === undefined ? null : toMember(result.rows[0], input.currentUserId);
 
     if (previous?.role === "admin" && previous.active !== input.active) {
       await this.auditElevatedRoleChange({
         workspaceId: input.workspaceId,
-        actorClerkUserId: input.currentClerkUserId,
-        targetClerkUserId: input.targetClerkUserId,
+        actorUserId: input.currentUserId,
+        targetUserId: input.targetUserId,
         previousRole: input.active ? null : "admin",
         nextRole: input.active ? "admin" : null,
         source: input.active ? "settings_member_restored" : "settings_member_suspended"
@@ -257,7 +257,7 @@ RETURNING COALESCE(user_id, clerk_user_id) AS resolved_user_id, role, active, cr
       `
 SELECT
   id,
-  clerk_org_id,
+  COALESCE(identity_provider_org_id, clerk_org_id) AS identity_workspace_id,
   name
 FROM workspaces
 WHERE id = $1
@@ -307,8 +307,8 @@ ORDER BY active DESC, role ASC, created_at ASC
 
   private async auditElevatedRoleChange(input: {
     readonly workspaceId: string;
-    readonly actorClerkUserId: string;
-    readonly targetClerkUserId: string;
+    readonly actorUserId: string;
+    readonly targetUserId: string;
     readonly previousRole: DashboardWorkspaceRole | null;
     readonly nextRole: DashboardWorkspaceRole | null;
     readonly source: string;
@@ -340,8 +340,8 @@ INSERT INTO workspace_audit_events (
       [
         this.uuidFactory(),
         input.workspaceId,
-        input.actorClerkUserId,
-        input.targetClerkUserId,
+        input.actorUserId,
+        input.targetUserId,
         input.previousRole,
         input.nextRole,
         input.source
@@ -364,10 +364,10 @@ function buildRetentionPolicy(config: ApiRuntimeConfig): WorkspaceSettingsRespon
   };
 }
 
-function buildClerkLinks(): WorkspaceSettingsResponse["clerk"] {
+function buildIdentityLinks(): WorkspaceSettingsResponse["identity"] {
   return {
     userProfileUrl: "/user-profile",
-    organizationProfileUrl: "/organization-profile",
+    workspaceProfileUrl: "/organization-profile",
     memberManagementUrl: "/organization-profile/members"
   };
 }
@@ -400,7 +400,7 @@ function toInstallation(row: InstallationRow): WorkspaceSettingsInstallation {
 
 function toMember(row: MemberRow, currentUserId: string): WorkspaceSettingsMember {
   return {
-    clerkUserId: row.resolved_user_id ?? null,
+    userId: row.resolved_user_id ?? null,
     role: row.role,
     active: row.active,
     isCurrentUser: row.resolved_user_id === currentUserId,

@@ -2,7 +2,7 @@ import { forwardDashboardApiMutation } from "../../../../../../lib/dashboard-api
 
 interface WorkspaceMemberRouteContext {
   params: {
-    clerkUserId: string;
+    userId: string;
   };
 }
 
@@ -11,7 +11,7 @@ export async function PATCH(request: Request, context: WorkspaceMemberRouteConte
 
   return forwardDashboardApiMutation({
     method: "PATCH",
-    path: `/api/settings/members/${encodeURIComponent(context.params.clerkUserId)}/status`,
+    path: `/api/settings/members/${encodeURIComponent(context.params.userId)}/status`,
     body
   });
 }

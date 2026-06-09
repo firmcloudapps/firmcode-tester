@@ -16,18 +16,18 @@ import {
 describe("dashboard findings data loader", () => {
   const originalApiUrl = process.env.NEXT_PUBLIC_API_URL;
   const originalTestWorkspaceId = process.env.FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID;
-  const originalTestToken = process.env.FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN;
+  const originalTestToken = process.env.FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN;
 
   afterEach(() => {
     process.env.NEXT_PUBLIC_API_URL = originalApiUrl;
     restoreEnv("FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID", originalTestWorkspaceId);
-    restoreEnv("FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN", originalTestToken);
+    restoreEnv("FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN", originalTestToken);
     vi.unstubAllGlobals();
   });
 
   it("maps every findings filter into the API query string", async () => {
     process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
-    process.env.FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN = "session-token";
+    process.env.FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN = "session-token";
     const fetcher = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => jsonResponse(findingsResponse));
 
     vi.stubGlobal("fetch", fetcher);
@@ -64,9 +64,9 @@ describe("dashboard findings data loader", () => {
     expect(headers.get("x-firmcode-user-id")).toBeNull();
   });
 
-  it("fetches settings data with Clerk bearer auth and the optional workspace selector", async () => {
+  it("fetches settings data with dashboard bearer auth and the optional workspace selector", async () => {
     process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
-    process.env.FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN = "session-token";
+    process.env.FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN = "session-token";
     process.env.FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID = "workspace-1";
     const fetcher = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => jsonResponse(settingsResponse));
 
@@ -85,7 +85,7 @@ describe("dashboard findings data loader", () => {
 
   it("treats settings with no GitHub installation as empty", async () => {
     process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
-    process.env.FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN = "session-token";
+    process.env.FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN = "session-token";
     const fetcher = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
       jsonResponse({
         ...settingsResponse,
@@ -103,7 +103,7 @@ describe("dashboard findings data loader", () => {
 
   it("fetches rules policies with dashboard auth headers and repository selection", async () => {
     process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
-    process.env.FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN = "session-token";
+    process.env.FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN = "session-token";
     process.env.FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID = "workspace-1";
     const fetcher = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => jsonResponse(rulesPolicyResponse));
 
@@ -121,7 +121,7 @@ describe("dashboard findings data loader", () => {
     expect(headers.get("x-firmcode-user-id")).toBeNull();
   });
 
-  it("maps a missing Clerk session to signed-out state before calling the API", async () => {
+  it("maps a missing InsForge session to signed-out state before calling the API", async () => {
     process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
     const fetcher = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => jsonResponse({ message: "Unauthorized" }, 401));
 
@@ -133,7 +133,7 @@ describe("dashboard findings data loader", () => {
 
   it("loads GitHub installation entrypoint status from workspace settings", async () => {
     process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
-    process.env.FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN = "session-token";
+    process.env.FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN = "session-token";
     process.env.FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID = "workspace-1";
     const fetcher = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
       const pathname = new URL(String(input)).pathname;
@@ -170,7 +170,7 @@ describe("dashboard findings data loader", () => {
 
   it("loads repository GitHub control status without routing controls to missing pages", async () => {
     process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
-    process.env.FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN = "session-token";
+    process.env.FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN = "session-token";
     process.env.FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID = "workspace-1";
     const fetcher = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
       const pathname = new URL(String(input)).pathname;
@@ -189,7 +189,7 @@ describe("dashboard findings data loader", () => {
 
   it("fetches review run detail with dashboard auth headers for artifact role gating", async () => {
     process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
-    process.env.FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN = "session-token";
+    process.env.FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN = "session-token";
     process.env.FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID = "workspace-1";
     const fetcher = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => jsonResponse(reviewRunDetailResponse));
 
@@ -208,7 +208,7 @@ describe("dashboard findings data loader", () => {
 
   it("maps CI failure filters into the authenticated API query string", async () => {
     process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
-    process.env.FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN = "session-token";
+    process.env.FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN = "session-token";
     process.env.FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID = "workspace-1";
     const fetcher = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
       jsonResponse({ ciFailures: [{ id: "failure-1" }], filters: {}, pagination: { limit: 25, returned: 1 } })
@@ -246,7 +246,7 @@ describe("dashboard findings data loader", () => {
 
   it("fetches CI failure detail with dashboard auth headers and maps 404 to empty", async () => {
     process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
-    process.env.FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN = "session-token";
+    process.env.FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN = "session-token";
     process.env.FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID = "workspace-1";
     const fetcher = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
       const pathname = new URL(String(input)).pathname;
@@ -269,7 +269,7 @@ describe("dashboard findings data loader", () => {
 
   it("fetches repository detail with dashboard auth headers and maps 404 to empty", async () => {
     process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
-    process.env.FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN = "session-token";
+    process.env.FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN = "session-token";
     process.env.FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID = "workspace-1";
     const fetcher = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
       const pathname = new URL(String(input)).pathname;
@@ -290,9 +290,9 @@ describe("dashboard findings data loader", () => {
     expect(headers.get("x-firmcode-user-id")).toBeNull();
   });
 
-  it("fetches billing with Clerk bearer auth and no billing capability shim", async () => {
+  it("fetches billing with dashboard bearer auth and no billing capability shim", async () => {
     process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
-    process.env.FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN = "session-token";
+    process.env.FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN = "session-token";
     process.env.FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID = "workspace-1";
     const fetcher = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => jsonResponse(billingResponse));
 
@@ -306,12 +306,12 @@ describe("dashboard findings data loader", () => {
 
     expect(url.pathname).toBe("/api/billing");
     expect(headers.get("authorization")).toBe("Bearer session-token");
-    expect(headers.get("x-firmcode-clerk-billing-capability")).toBeNull();
+    expect(headers.get("x-firmcode-billing-capability")).toBeNull();
   });
 
   it("loads admin overview KPIs from the platform endpoint alongside settings and billing", async () => {
     process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
-    process.env.FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN = "session-token";
+    process.env.FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN = "session-token";
     process.env.FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID = "workspace-1";
     const fetcher = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
       const pathname = new URL(String(input)).pathname;
@@ -389,13 +389,13 @@ const settingsResponse = {
   workspace: {
     id: "workspace-1",
     name: "Firmcode",
-    clerkOrgId: "org_firmcode",
+    identityWorkspaceId: "org_firmcode",
     role: "admin",
     canManageSensitiveSettings: true
   },
-  clerk: {
+  identity: {
     userProfileUrl: "/user-profile",
-    organizationProfileUrl: "/organization-profile",
+    workspaceProfileUrl: "/organization-profile",
     memberManagementUrl: "/organization-profile/members"
   },
   githubApp: {
@@ -478,7 +478,7 @@ const repositoryDetailResponse = {
     ciExplanationEnabled: true,
     infrastructureReviewEnabled: true,
     dryRunEnabled: true,
-    updatedByClerkUserId: null,
+    updatedByUserId: null,
     createdAt: "2026-05-22T09:00:00.000Z",
     updatedAt: "2026-05-22T09:00:00.000Z"
   },
@@ -534,7 +534,7 @@ const rulesPolicy = {
     dependencyReviewEnabled: true,
     ciWorkflowReviewEnabled: true
   },
-  updatedByClerkUserId: "user_admin",
+  updatedByUserId: "user_admin",
   createdAt: "2026-05-22T09:00:00.000Z",
   updatedAt: "2026-05-22T09:00:00.000Z"
 };
@@ -607,11 +607,11 @@ const billingResponse = {
     id: "workspace-1",
     role: "admin",
     canManageBilling: true,
-    source: "clerk"
+    source: "insforge"
   },
   plan: {
-    name: "Clerk managed",
-    status: "managed_by_clerk"
+    name: "InsForge managed",
+    status: "active"
   },
   usage: {
     reviewRunsThisMonth: null,

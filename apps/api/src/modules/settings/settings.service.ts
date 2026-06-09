@@ -17,7 +17,7 @@ export interface SensitiveWorkspaceSettingsRequestContext extends WorkspaceSetti
 }
 
 export interface WorkspaceMemberMutationRequestContext extends WorkspaceSettingsRequestContext {
-  readonly targetClerkUserId: string;
+  readonly targetUserId: string;
   readonly body: unknown;
 }
 
@@ -69,16 +69,16 @@ export class SettingsService {
 
     await this.assertMemberMutationAllowed({
       workspaceId: membership.workspaceId,
-      actorClerkUserId: membership.clerkUserId,
-      targetClerkUserId: input.targetClerkUserId,
+      actorUserId: membership.userId,
+      targetUserId: input.targetUserId,
       nextRole: role,
       nextActive: null
     });
 
     const updated = await this.settingsStore.updateWorkspaceMemberRole({
       workspaceId: membership.workspaceId,
-      currentClerkUserId: membership.clerkUserId,
-      targetClerkUserId: input.targetClerkUserId,
+      currentUserId: membership.userId,
+      targetUserId: input.targetUserId,
       role
     });
 
@@ -95,16 +95,16 @@ export class SettingsService {
 
     await this.assertMemberMutationAllowed({
       workspaceId: membership.workspaceId,
-      actorClerkUserId: membership.clerkUserId,
-      targetClerkUserId: input.targetClerkUserId,
+      actorUserId: membership.userId,
+      targetUserId: input.targetUserId,
       nextRole: null,
       nextActive: active
     });
 
     const updated = await this.settingsStore.updateWorkspaceMemberStatus({
       workspaceId: membership.workspaceId,
-      currentClerkUserId: membership.clerkUserId,
-      targetClerkUserId: input.targetClerkUserId,
+      currentUserId: membership.userId,
+      targetUserId: input.targetUserId,
       active
     });
 
@@ -136,19 +136,19 @@ export class SettingsService {
 
   private async assertMemberMutationAllowed(input: {
     readonly workspaceId: string;
-    readonly actorClerkUserId: string;
-    readonly targetClerkUserId: string;
+    readonly actorUserId: string;
+    readonly targetUserId: string;
     readonly nextRole: "admin" | "developer" | null;
     readonly nextActive: boolean | null;
   }): Promise<void> {
-    if (input.actorClerkUserId === input.targetClerkUserId) {
+    if (input.actorUserId === input.targetUserId) {
       throw new ForbiddenException("Admins cannot change or suspend their own workspace membership");
     }
 
     const target = await this.settingsStore.getWorkspaceMember({
       workspaceId: input.workspaceId,
-      currentClerkUserId: input.actorClerkUserId,
-      targetClerkUserId: input.targetClerkUserId
+      currentUserId: input.actorUserId,
+      targetUserId: input.targetUserId
     });
 
     if (target === null) {
@@ -166,8 +166,8 @@ export class SettingsService {
 
     const otherAdmins = await this.settingsStore.countOtherActiveAdmins({
       workspaceId: input.workspaceId,
-      currentClerkUserId: input.actorClerkUserId,
-      targetClerkUserId: input.targetClerkUserId
+      currentUserId: input.actorUserId,
+      targetUserId: input.targetUserId
     });
 
     if (otherAdmins === 0) {

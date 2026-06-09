@@ -37,11 +37,11 @@ export const DASHBOARD_ROLE_CAPABILITY_MATRIX: Readonly<Record<DashboardAppRole,
 export function roleHasDashboardCapability(
   role: DashboardRole,
   capability: DashboardCapability,
-  options: { hasClerkBillingCapability?: boolean } = {}
+  options: { hasBillingCapability?: boolean } = {}
 ): boolean {
   const appRole = normalizeDashboardAppRole(role);
 
-  if (capability === "manage_billing" && options.hasClerkBillingCapability === true) {
+  if (capability === "manage_billing" && options.hasBillingCapability === true) {
     return true;
   }
 
@@ -63,7 +63,7 @@ export function normalizeDashboardAppRole(role: string | null | undefined): Dash
   }
 }
 
-export function hasClerkManagedBillingCapability(value: string | string[] | undefined): boolean {
+export function hasManagedBillingCapability(value: string | string[] | undefined): boolean {
   const candidate = Array.isArray(value) ? value[0] : value;
 
   if (candidate === undefined || candidate === "") {

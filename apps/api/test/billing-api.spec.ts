@@ -74,14 +74,11 @@ function dashboardAuth(overrides: Partial<DashboardRequestContext> = {}): Dashbo
     workspaceId: WORKSPACE_ID,
     userId: DEVELOPER_USER_ID,
     orgId: "org_firmcode",
-    clerkUserId: DEVELOPER_USER_ID,
-    clerkOrgId: "org_firmcode",
     sessionId: "sess_test",
     role: "developer",
     capabilities: ["retry_review_run"],
     billingCapabilities: [],
     provider: "insforge",
-    clerkCapabilities: [],
     ...overrides
   };
 }

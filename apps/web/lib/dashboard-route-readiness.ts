@@ -1,5 +1,5 @@
 export type DashboardDestinationKind = "internal" | "external";
-export type DashboardExternalProvider = "clerk" | "github";
+export type DashboardExternalProvider = "billing" | "github" | "identity";
 
 export interface DashboardRoutePattern {
   readonly pattern: string;
@@ -45,8 +45,8 @@ export const DASHBOARD_IMPLEMENTED_ROUTE_PATTERNS: readonly DashboardRoutePatter
   { pattern: "/api/review-runs/[id]/artifacts/[artifactId]/raw", kind: "route-handler" },
   { pattern: "/api/review-runs/[id]/retry", kind: "route-handler" },
   { pattern: "/api/rules", kind: "route-handler" },
-  { pattern: "/api/settings/members/[clerkUserId]/role", kind: "route-handler" },
-  { pattern: "/api/settings/members/[clerkUserId]/status", kind: "route-handler" },
+  { pattern: "/api/settings/members/[userId]/role", kind: "route-handler" },
+  { pattern: "/api/settings/members/[userId]/status", kind: "route-handler" },
   { pattern: "/api/pull-requests", kind: "route-handler" },
   { pattern: "/api/pull-requests/[id]", kind: "route-handler" },
   { pattern: "/api/ci-failures", kind: "route-handler" },
@@ -97,7 +97,11 @@ export function isAllowedExternalDashboardUrl(href: string, provider: DashboardE
     return hostname === "github.com" || hostname.endsWith(".github.com");
   }
 
-  return hostname.includes("clerk") || hostname.includes("accounts") || hostname.includes("billing");
+  if (provider === "identity") {
+    return hostname.includes("insforge") || hostname.includes("accounts");
+  }
+
+  return hostname.includes("billing") || hostname.includes("stripe") || hostname.includes("insforge");
 }
 
 function normalizeInternalPathname(href: string): string {

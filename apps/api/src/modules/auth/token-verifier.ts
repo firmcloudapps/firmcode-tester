@@ -1,6 +1,5 @@
 /**
- * Generic token verification interface for multi-provider auth.
- * Both Clerk and InsForge implement this interface.
+ * Token verification interface for InsForge dashboard auth.
  */
 
 export interface VerifiedToken {
@@ -12,7 +11,7 @@ export interface VerifiedToken {
   readonly billingCapabilities: readonly string[];
   readonly email?: string | null;
   readonly emailVerified?: boolean;
-  readonly provider: "clerk" | "insforge";
+  readonly provider: "insforge";
 }
 
 export interface TokenVerifier {

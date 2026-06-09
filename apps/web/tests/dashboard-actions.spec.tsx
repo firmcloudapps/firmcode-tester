@@ -113,10 +113,10 @@ describe("repository automation controls", () => {
     expect(html).toContain("Enabled");
   });
 
-  it("forwards a Clerk bearer token and optional workspace selector from the explicit test environment", async () => {
+  it("forwards a dashboard bearer token and optional workspace selector from the explicit test environment", async () => {
     const headers = await createDashboardApiHeaders(
       {
-        FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN: "session-token",
+        FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN: "session-token",
         FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID: "00000000-0000-4000-8000-000000000101"
       },
       true
@@ -126,16 +126,16 @@ describe("repository automation controls", () => {
     expect(headers?.get("authorization")).toBe("Bearer session-token");
     expect(headers?.get("x-firmcode-workspace-id")).toBe("00000000-0000-4000-8000-000000000101");
     expect(headers?.get("x-firmcode-user-id")).toBeNull();
-    expect(headers?.get("x-firmcode-clerk-billing-capability")).toBeNull();
+    expect(headers?.get("x-firmcode-billing-capability")).toBeNull();
     expect(headers?.get("content-type")).toBe("application/json");
   });
 
-  it("ignores legacy dashboard user-id shim variables when a Clerk token is available", async () => {
+  it("ignores legacy dashboard user-id shim variables when a dashboard session is available", async () => {
     const headers = await createDashboardApiHeaders(
       {
-        FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN: "session-token",
+        FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN: "session-token",
         FIRMCODE_DASHBOARD_WORKSPACE_ID: "00000000-0000-4000-8000-000000000101",
-        FIRMCODE_DASHBOARD_CLERK_USER_ID: "user_admin"
+        FIRMCODE_DASHBOARD_USER_ID: "user_admin"
       },
       false
     );
@@ -345,7 +345,7 @@ const repositoryConfiguration: RepositoryReviewConfiguration = {
   ciExplanationEnabled: true,
   infrastructureReviewEnabled: true,
   dryRunEnabled: true,
-  updatedByClerkUserId: "user_admin",
+  updatedByUserId: "user_admin",
   createdAt: "2026-05-23T10:00:00.000Z",
   updatedAt: "2026-05-23T10:01:00.000Z"
 };

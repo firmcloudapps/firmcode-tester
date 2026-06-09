@@ -1,7 +1,6 @@
 import { loadWebInsForgeAuthRenderConfig } from "../config/insforge";
 
 const TEST_SESSION_TOKEN_ENV = "FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN";
-const LEGACY_TEST_SESSION_TOKEN_ENV = "FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN";
 
 export interface DashboardAuthSession {
   readonly accessToken: string;
@@ -15,9 +14,6 @@ export async function getDashboardApiBearerToken(
   const session = await getServerDashboardAuthSession(env);
   return session?.accessToken ?? null;
 }
-
-// Kept as a compatibility export while the remaining dashboard code is migrated.
-export const getClerkApiBearerToken = getDashboardApiBearerToken;
 
 export async function getServerDashboardAuthSession(
   env: Record<string, string | undefined> = process.env
@@ -68,7 +64,7 @@ export async function getServerDashboardAuthSession(
 }
 
 function readTestSessionToken(env: Record<string, string | undefined>): string | null {
-  const token = env[TEST_SESSION_TOKEN_ENV] ?? env[LEGACY_TEST_SESSION_TOKEN_ENV];
+  const token = env[TEST_SESSION_TOKEN_ENV];
   return token === undefined || token.trim() === "" ? null : token;
 }
 

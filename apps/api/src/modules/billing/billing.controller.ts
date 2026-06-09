@@ -7,7 +7,7 @@ import {
   type DashboardAuthParam
 } from "../auth/dashboard-auth.context";
 import { DashboardAuthGuard } from "../auth/dashboard-auth.guard";
-import { hasClerkManagedBillingCapability } from "../review-runs/dashboard-auth.store";
+import { hasManagedBillingCapability } from "../review-runs/dashboard-auth.store";
 import { BillingService } from "./billing.service";
 
 @Controller("api/billing")
@@ -25,11 +25,11 @@ export class BillingController {
 
     return this.billingService.getWorkspaceBilling({
       ...serviceAuth,
-      hasClerkBillingCapability:
+      hasBillingCapability:
         (isDashboardRequestContext(auth) && auth.capabilities.includes("manage_billing")) ||
         (process.env.NODE_ENV === "test" &&
           !isDashboardRequestContext(auth) &&
-          hasClerkManagedBillingCapability(billingCapabilityHeader))
+          hasManagedBillingCapability(billingCapabilityHeader))
     });
   }
 }

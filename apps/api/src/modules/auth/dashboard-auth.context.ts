@@ -7,7 +7,7 @@ import {
 } from "@nestjs/common";
 import {
   DASHBOARD_CAPABILITIES,
-  hasClerkManagedBillingCapability,
+  hasManagedBillingCapability,
   roleHasDashboardCapability,
   type DashboardAuthStore,
   type DashboardCapability,
@@ -29,12 +29,6 @@ export interface DashboardRequestContext {
   readonly capabilities: readonly DashboardCapability[];
   readonly billingCapabilities: readonly string[];
   readonly provider: string;
-  /** @deprecated Use userId instead. */
-  readonly clerkUserId?: string;
-  /** @deprecated Use orgId instead. */
-  readonly clerkOrgId?: string | null;
-  /** @deprecated Use billingCapabilities instead. */
-  readonly clerkCapabilities?: readonly string[];
 }
 
 export interface DashboardAuthenticatedRequest {
@@ -77,31 +71,26 @@ export function requireDashboardRequestContext(value: DashboardAuthParam): Dashb
 export function toDashboardServiceAuth(auth: DashboardAuthParam): {
   readonly workspaceId: string;
   readonly userId: string;
-  readonly clerkUserId: string;
 };
 export function toDashboardServiceAuth(auth: DashboardAuthParam, legacyUserIdHeader: string | string[] | undefined): {
   readonly workspaceId: string | null;
   readonly userId: string | null;
-  readonly clerkUserId: string | null;
 };
 export function toDashboardServiceAuth(auth: DashboardAuthParam, legacyUserIdHeader?: string | string[] | undefined): {
   readonly workspaceId: string | null;
   readonly userId: string | null;
-  readonly clerkUserId: string | null;
 } {
   if (!isDashboardRequestContext(auth)) {
     const legacy = readTestOnlyLegacyServiceAuth(auth, legacyUserIdHeader);
     return {
       workspaceId: legacy.workspaceId,
-      userId: legacy.userId,
-      clerkUserId: legacy.userId
+      userId: legacy.userId
     };
   }
 
   return {
     workspaceId: auth.workspaceId,
-    userId: auth.userId,
-    clerkUserId: auth.clerkUserId ?? auth.userId
+    userId: auth.userId
   };
 }
 
@@ -119,7 +108,7 @@ export function resolveRepositoryAccessScopeFromMembership(membership: Dashboard
 
 export function hasDashboardCapability(context: DashboardRequestContext, capability: DashboardCapability): boolean {
   return roleHasDashboardCapability(context.role, capability, {
-    hasClerkBillingCapability: context.capabilities.includes("manage_billing")
+    hasBillingCapability: context.capabilities.includes("manage_billing")
   });
 }
 
@@ -135,15 +124,15 @@ export function requireDashboardCapability(
 
 export function deriveDashboardCapabilities(
   role: DashboardRole,
-  clerkCapabilities: readonly string[]
+  billingCapabilities: readonly string[]
 ): readonly DashboardCapability[] {
   const capabilities: DashboardCapability[] = [];
-  const hasClerkBillingCapability = clerkCapabilities.some((capability) =>
-    hasClerkManagedBillingCapability(capability)
+  const hasBillingCapability = billingCapabilities.some((capability) =>
+    hasManagedBillingCapability(capability)
   );
 
   for (const capability of DASHBOARD_CAPABILITIES) {
-    if (roleHasDashboardCapability(role, capability, { hasClerkBillingCapability })) {
+    if (roleHasDashboardCapability(role, capability, { hasBillingCapability })) {
       capabilities.push(capability);
     }
   }
@@ -179,8 +168,7 @@ export async function resolveDashboardMembership(
   return {
     workspaceId: auth.workspaceId,
     userId: auth.userId,
-    role: auth.role,
-    clerkUserId: auth.clerkUserId ?? auth.userId
+    role: auth.role
   };
 }
 

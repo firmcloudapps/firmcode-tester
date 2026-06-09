@@ -8,7 +8,7 @@ export interface DashboardApiProxyInput {
 
 const WORKSPACE_HEADER = "x-firmcode-workspace-id";
 const AUTHORIZATION_HEADER = "authorization";
-const TEST_SESSION_TOKEN_ENV = "FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN";
+const TEST_SESSION_TOKEN_ENV = "FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN";
 const TEST_WORKSPACE_ID_ENV = "FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID";
 
 type DashboardProxyEnvironment = Record<string, string | undefined>;
@@ -47,7 +47,7 @@ export async function createDashboardApiHeaders(env: DashboardProxyEnvironment, 
   const headers = new Headers({
     accept: "application/json"
   });
-  const token = await readClerkToken(env);
+  const token = await readDashboardToken(env);
 
   if (token === null) {
     return null;
@@ -67,15 +67,15 @@ export async function createDashboardApiHeaders(env: DashboardProxyEnvironment, 
   return headers;
 }
 
-async function readClerkToken(env: DashboardProxyEnvironment): Promise<string | null> {
+async function readDashboardToken(env: DashboardProxyEnvironment): Promise<string | null> {
   const testToken = env[TEST_SESSION_TOKEN_ENV];
 
   if (env.NODE_ENV !== "production" && testToken !== undefined && testToken.trim() !== "") {
     return testToken;
   }
 
-  const { getClerkApiBearerToken } = await import("./clerk-auth");
-  return getClerkApiBearerToken(env);
+  const { getDashboardApiBearerToken } = await import("./dashboard-auth");
+  return getDashboardApiBearerToken(env);
 }
 
 function createUnauthenticatedDashboardResponse(): Response {

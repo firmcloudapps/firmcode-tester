@@ -725,7 +725,7 @@ function EmptyRepositoriesMessage({ hasInstallations, hasOAuth }: { hasInstallat
 }
 
 function isAdminRole(role: string): boolean {
-  return role === "admin" || role === "owner";
+  return role === "admin";
 }
 
 function isDeveloperRole(role: string): boolean {

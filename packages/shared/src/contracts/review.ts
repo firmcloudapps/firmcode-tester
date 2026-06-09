@@ -283,8 +283,8 @@ export function canAccessRawReviewArtifacts(role: DashboardWorkspaceRole): boole
   return role === "developer";
 }
 
-export function canManageBilling(role: DashboardWorkspaceRole, hasClerkBillingCapability = false): boolean {
-  return role === "admin" || hasClerkBillingCapability;
+export function canManageBilling(role: DashboardWorkspaceRole, hasBillingCapability = false): boolean {
+  return role === "admin" || hasBillingCapability;
 }
 
 export const REPOSITORY_REVIEW_SEVERITY_THRESHOLDS = ["info", "low", "medium", "high", "critical"] as const;
@@ -741,7 +741,7 @@ export interface WorkspaceSettingsInstallation {
 }
 
 export interface WorkspaceSettingsMember {
-  clerkUserId: string;
+  userId: string;
   role: DashboardWorkspaceRole;
   active: boolean;
   isCurrentUser: boolean;
@@ -773,13 +773,13 @@ export interface WorkspaceSettingsResponse {
   workspace: {
     id: string;
     name: string;
-    clerkOrgId: string | null;
+    identityWorkspaceId: string | null;
     role: DashboardWorkspaceRole;
     canManageSensitiveSettings: boolean;
   };
-  clerk: {
+  identity: {
     userProfileUrl: string;
-    organizationProfileUrl: string;
+    workspaceProfileUrl: string;
     memberManagementUrl: string;
   };
   githubApp: {

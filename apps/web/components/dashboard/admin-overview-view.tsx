@@ -136,7 +136,7 @@ function WorkspaceCard({ settings }: { settings: WorkspaceSettingsResponse }) {
   const rows: { label: string; value: string }[] = [
     { label: "Workspace", value: settings.workspace.name },
     { label: "Role", value: settings.workspace.role },
-    { label: "Clerk org", value: settings.workspace.clerkOrgId ?? "—" },
+    { label: "Identity workspace", value: settings.workspace.identityWorkspaceId ?? "—" },
     { label: "API keys", value: settings.apiKeys.enabled ? "Enabled" : settings.apiKeys.message },
     { label: "Notifications", value: settings.notifications.enabled ? "Enabled" : settings.notifications.message }
   ];
@@ -145,9 +145,9 @@ function WorkspaceCard({ settings }: { settings: WorkspaceSettingsResponse }) {
     <section className="rounded-lg border border-border bg-surface p-4" aria-label="Workspace details">
       <div className="flex items-center justify-between gap-3 border-b border-border pb-3">
         <h2 className="text-sm font-semibold text-primary">Workspace</h2>
-        {settings.clerk.organizationProfileUrl ? (
+        {settings.identity.workspaceProfileUrl ? (
           <a
-            href={settings.clerk.organizationProfileUrl}
+            href={settings.identity.workspaceProfileUrl}
             target="_blank"
             rel="noreferrer"
             className="text-sm font-medium text-accent"

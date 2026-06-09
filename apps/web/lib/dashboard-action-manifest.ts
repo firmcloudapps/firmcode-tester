@@ -45,27 +45,27 @@ export const DASHBOARD_ROUTE_ACTIONS: readonly DashboardRouteAction[] = [
   { surface: "settings", label: "Repository configuration", status: "active", destination: "internal", href: "/repositories" },
   {
     surface: "settings",
-    label: "Open Clerk profile",
+    label: "Open profile",
     status: "active",
     destination: "external",
-    provider: "clerk",
-    href: "https://accounts.clerk.example/user"
+    provider: "identity",
+    href: "https://accounts.insforge.app/user"
   },
   {
     surface: "settings",
-    label: "Open Clerk organization",
+    label: "Open workspace",
     status: "active",
     destination: "external",
-    provider: "clerk",
-    href: "https://accounts.clerk.example/organization"
+    provider: "identity",
+    href: "https://accounts.insforge.app/workspace"
   },
   {
     surface: "settings",
-    label: "Open Clerk members",
+    label: "Open members",
     status: "active",
     destination: "external",
-    provider: "clerk",
-    href: "https://accounts.clerk.example/members"
+    provider: "identity",
+    href: "https://accounts.insforge.app/members"
   },
   {
     surface: "settings",
@@ -86,8 +86,8 @@ export const DASHBOARD_ROUTE_ACTIONS: readonly DashboardRouteAction[] = [
     label: "Manage subscription",
     status: "active",
     destination: "external",
-    provider: "clerk",
-    href: "https://accounts.clerk.example/billing"
+    provider: "billing",
+    href: "https://billing.insforge.app"
   },
   {
     surface: "github-installations",

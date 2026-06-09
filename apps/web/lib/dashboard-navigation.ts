@@ -38,7 +38,7 @@ export type DashboardNavRole = "admin" | "developer";
 export function isAdminDashboardRole(role: string | null | undefined): boolean {
   const normalized = role?.toLowerCase();
 
-  return normalized === "admin" || normalized === "owner";
+  return normalized === "admin";
 }
 
 export function navItemsForRole(role: string | null | undefined): readonly DashboardNavItem[] {

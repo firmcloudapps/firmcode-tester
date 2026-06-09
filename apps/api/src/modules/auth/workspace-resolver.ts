@@ -124,8 +124,8 @@ export class PostgresDashboardWorkspaceResolver implements DashboardWorkspaceRes
     return toResolvedWorkspace(input.token, membership);
   }
 
-  private async ensureOrganizationWorkspace(input: { readonly orgId: string; readonly name: string; readonly provider?: string }): Promise<string> {
-    const identityProvider = input.provider ?? "clerk";
+  private async ensureOrganizationWorkspace(input: { readonly orgId: string; readonly name: string; readonly provider?: "insforge" }): Promise<string> {
+    const identityProvider = input.provider ?? "insforge";
     const existing = await this.database.query<WorkspaceRow>(
       "SELECT id FROM workspaces WHERE identity_provider_org_id = $1 OR clerk_org_id = $1",
       [input.orgId]
@@ -139,7 +139,7 @@ export class PostgresDashboardWorkspaceResolver implements DashboardWorkspaceRes
     const result = await this.database.query<WorkspaceRow>(
       `
 INSERT INTO workspaces (id, identity_provider, identity_provider_org_id, clerk_org_id, name)
-VALUES ($1, $2, $3, CASE WHEN $2 = 'clerk' THEN $3 ELSE NULL END, $4)
+VALUES ($1, $2, $3, NULL, $4)
 ON CONFLICT (identity_provider_org_id) DO UPDATE SET updated_at = now()
 RETURNING id
 `,
@@ -411,15 +411,15 @@ function resolvePersonalRoleSource(token: VerifiedToken): string {
 }
 
 function resolveOrganizationRole(token: VerifiedToken): DashboardRole {
-  return normalizeClerkOrganizationRole(token.orgRole) ?? normalizeFirmcodeRole(token.firmcodeRole) ?? "developer";
+  return normalizeOrganizationRole(token.orgRole) ?? normalizeFirmcodeRole(token.firmcodeRole) ?? "developer";
 }
 
 function resolveConfiguredOrganizationRole(role: string): DashboardRole {
-  return normalizeClerkOrganizationRole(role) ?? normalizeFirmcodeRole(role) ?? "developer";
+  return normalizeOrganizationRole(role) ?? normalizeFirmcodeRole(role) ?? "developer";
 }
 
 function resolveOrganizationRoleSource(token: VerifiedToken): string {
-  if (normalizeClerkOrganizationRole(token.orgRole) !== null) {
+  if (normalizeOrganizationRole(token.orgRole) !== null) {
     return "organization_role";
   }
 
@@ -430,7 +430,7 @@ function hasExplicitFirmcodeRole(token: VerifiedToken): boolean {
   return normalizeFirmcodeRole(token.firmcodeRole) !== null;
 }
 
-function normalizeClerkOrganizationRole(role: string | null): DashboardRole | null {
+function normalizeOrganizationRole(role: string | null): DashboardRole | null {
   switch (role?.toLowerCase()) {
     case "org:admin":
     case "admin":

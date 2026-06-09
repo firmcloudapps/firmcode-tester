@@ -48,10 +48,8 @@ export async function resolveRoleBasedDashboardRedirect({
 export function landingPathForDashboardRole(role: string | null | undefined): RoleBasedDashboardPath {
   switch (role?.toLowerCase()) {
     case "admin":
-    case "owner":
       return "/dashboard/admin";
     case "developer":
-    case "member":
     default:
       return "/dashboard/developer";
   }

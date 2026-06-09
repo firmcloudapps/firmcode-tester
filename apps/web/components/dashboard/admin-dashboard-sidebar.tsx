@@ -1,6 +1,6 @@
 import { ADMIN_NAV_ITEMS } from "../../lib/admin-dashboard-nav";
 import { type DashboardActiveItem } from "../../lib/dashboard-navigation";
-import { DashboardWorkspaceLabel } from "./dashboard-clerk-controls";
+import { DashboardWorkspaceLabel } from "./dashboard-auth-controls";
 
 interface AdminDashboardSidebarProps {
     activeItem: DashboardActiveItem;

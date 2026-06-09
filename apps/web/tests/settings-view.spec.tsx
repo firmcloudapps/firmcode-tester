@@ -34,7 +34,7 @@ describe("SettingsView", () => {
     );
   });
 
-  it("renders populated workspace, GitHub, retention, placeholder, and Clerk delegation content", () => {
+  it("renders populated workspace, GitHub, retention, placeholder, and InsForge delegation content", () => {
     const general = renderToString(<SettingsView state={{ status: "populated", data: adminSettings }} activeTab="general" />);
     const github = renderToString(<SettingsView state={{ status: "populated", data: adminSettings }} activeTab="github-app" />);
     const retention = renderToString(<SettingsView state={{ status: "populated", data: adminSettings }} activeTab="data-retention" />);
@@ -48,7 +48,7 @@ describe("SettingsView", () => {
     expect(github).toContain("review automation enabled");
     expect(retention).toContain("Changed file patches");
     expect(retention).toContain("30 days");
-    expect(members).toContain("Open Clerk members");
+    expect(members).toContain("Open members");
     expect(members).toContain("New workspace memberships default to Developer");
     expect(members).toContain("user_developer");
     expect(members).toContain("Assign role");
@@ -64,7 +64,7 @@ describe("SettingsView", () => {
       </DashboardShell>
     );
 
-    expect(html).toContain('data-clerk-authenticated="required"');
+    expect(html).toContain('data-authenticated="required"');
     expect(html).toContain('href="/settings?tab=general" aria-current="page"');
   });
 
@@ -92,7 +92,7 @@ describe("SettingsView", () => {
     expect(developerHtml).toContain('href="https://github.com/apps/firmcode/installations/new"');
     expect(developerHtml).toContain('data-dashboard-destination="external"');
     expect(developerHtml).toContain("Read-only sensitive settings");
-    expect(developerMembers).toContain("Open Clerk members");
+    expect(developerMembers).toContain("Open members");
     expect(developerMembers).toContain("disabled=\"\"");
     expect(developerMembers).toContain("Admin required to assign roles.");
   });
@@ -102,13 +102,13 @@ const adminSettings: WorkspaceSettingsResponse = {
   workspace: {
     id: "00000000-0000-4000-8000-000000000101",
     name: "Firmcode",
-    clerkOrgId: "org_firmcode",
+    identityWorkspaceId: "org_firmcode",
     role: "admin",
     canManageSensitiveSettings: true
   },
-  clerk: {
+  identity: {
     userProfileUrl: "/user-profile",
-    organizationProfileUrl: "/organization-profile",
+    workspaceProfileUrl: "/organization-profile",
     memberManagementUrl: "/organization-profile/members"
   },
   githubApp: {
@@ -128,7 +128,7 @@ const adminSettings: WorkspaceSettingsResponse = {
   },
   members: [
     {
-      clerkUserId: "user_admin",
+      userId: "user_admin",
       role: "admin",
       active: true,
       isCurrentUser: true,
@@ -136,7 +136,7 @@ const adminSettings: WorkspaceSettingsResponse = {
       updatedAt: "2026-05-22T10:00:00.000Z"
     },
     {
-      clerkUserId: "user_developer",
+      userId: "user_developer",
       role: "developer",
       active: true,
       isCurrentUser: false,
@@ -144,7 +144,7 @@ const adminSettings: WorkspaceSettingsResponse = {
       updatedAt: "2026-05-22T11:00:00.000Z"
     },
     {
-      clerkUserId: "user_suspended",
+      userId: "user_suspended",
       role: "developer",
       active: false,
       isCurrentUser: false,

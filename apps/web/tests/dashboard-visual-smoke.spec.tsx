@@ -59,7 +59,7 @@ describe("dashboard visual navigation smoke", () => {
         </DashboardShell>
       );
 
-      expect(html, page.active).toContain('data-clerk-authenticated="required"');
+      expect(html, page.active).toContain('data-authenticated="required"');
       expect(html, page.active).toContain(page.expected);
       expect(html, page.active).toContain('aria-current="page"');
       expect(html, page.active).not.toContain("404");
@@ -123,7 +123,7 @@ describe("dashboard visual navigation smoke", () => {
     expect(html).not.toContain("Planned provider");
     expect(html).toContain("Connect GitHub before installing the GitHub App.");
     expect(html).toContain("Workspace API key creation is not enabled in the MVP.");
-    expect(html).toContain("Admin or Clerk billing permission is required to manage subscriptions.");
+    expect(html).toContain("Admin permission is required to manage subscriptions.");
     expect(html).toContain("disabled=\"\"");
   });
 });
@@ -146,14 +146,14 @@ const developerSettings = {
   workspace: {
     id: "workspace-1",
     name: "Firmcode",
-    clerkOrgId: "org_firmcode",
+    identityWorkspaceId: "org_firmcode",
     role: "developer" as const,
     canManageSensitiveSettings: false
   },
-  clerk: {
-    userProfileUrl: "https://accounts.clerk.example/user",
-    organizationProfileUrl: "https://accounts.clerk.example/organization",
-    memberManagementUrl: "https://accounts.clerk.example/members"
+  identity: {
+    userProfileUrl: "https://accounts.identity.example/user",
+    workspaceProfileUrl: "https://accounts.identity.example/organization",
+    memberManagementUrl: "https://accounts.identity.example/members"
   },
   githubApp: {
     installUrl: "/github/installations",
@@ -195,11 +195,11 @@ const developerBilling = {
     id: "workspace-1",
     role: "developer" as const,
     canManageBilling: false,
-    source: "clerk" as const
+    source: "insforge" as const
   },
   plan: {
-    name: "Clerk managed",
-    status: "managed_by_clerk" as const
+    name: "InsForge managed",
+    status: "active" as const
   },
   usage: {
     reviewRunsThisMonth: null,

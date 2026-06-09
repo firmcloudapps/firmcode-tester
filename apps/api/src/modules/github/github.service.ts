@@ -239,7 +239,7 @@ export class GitHubDashboardService {
       installationUuid: repository.installationUuid,
       repository: latest,
       preserveExistingEnabled: true,
-      grantAccessToClerkUserId: membership.userId
+      grantAccessToUserId: membership.userId
     });
 
     if (synced.enabled) {
@@ -255,7 +255,7 @@ export class GitHubDashboardService {
   private async syncInstallationRepositories(
     installationUuid: string,
     installationId: number,
-    grantAccessToClerkUserId?: string
+    grantAccessToUserId?: string
   ): Promise<number> {
     const repositories = await this.installationClient.fetchInstallationRepositories(installationId);
 
@@ -264,7 +264,7 @@ export class GitHubDashboardService {
         installationUuid,
         repository,
         preserveExistingEnabled: true,
-        grantAccessToClerkUserId
+        grantAccessToUserId
       });
 
       if (synced.enabled) {

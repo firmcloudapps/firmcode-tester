@@ -3,11 +3,6 @@ import { renderToString } from "react-dom/server";
 import { AuthPage } from "../components/auth/auth-page";
 import { DashboardShell } from "../components/dashboard/dashboard-shell";
 import { InsForgeProviderBoundary } from "../components/insforge-provider-boundary";
-import {
-  DEFAULT_CLERK_ORGANIZATION_ID,
-  ensureDefaultClerkOrganizationMembership,
-  readDefaultClerkOrganizationMembershipConfig
-} from "../lib/default-clerk-organization";
 import { forwardDashboardApiMutation } from "../lib/dashboard-api-proxy";
 
 describe("auth foundation compatibility", () => {
@@ -24,22 +19,22 @@ describe("auth foundation compatibility", () => {
     );
 
     expect(signInHtml).toContain("Sign in to Firmcode");
-    expect(signInHtml).not.toContain('data-clerk-authenticated="required"');
+    expect(signInHtml).not.toContain('data-authenticated="required"');
     expect(signInHtml).toContain("Continue with Google");
     expect(signUpHtml).toContain("Create your Firmcode workspace");
     expect(signUpHtml).toContain("Create account");
     expect(signUpHtml).toContain("Sign up with Google");
   });
 
-  it("renders dashboard account controls without restoring Clerk organization switching", () => {
+  it("renders dashboard account controls without organization switching", () => {
     const html = renderToString(
       <DashboardShell activeItem="PR Review">
         <div>Dashboard content</div>
       </DashboardShell>
     );
 
-    expect(html).toContain('data-clerk-component="UserButton"');
-    expect(html).not.toContain('data-clerk-component="OrganizationSwitcher"');
+    expect(html).toContain('data-auth-component="AccountButton"');
+    expect(html).not.toContain('data-auth-component="OrganizationSwitcher"');
     expect(html).toContain('data-active-workspace-name="true"');
     expect(html).toContain("Personal workspace");
   });
@@ -81,34 +76,5 @@ describe("auth foundation compatibility", () => {
 
     expect(headers.get("authorization")).toBe("Bearer session-token");
     expect(headers.get("x-firmcode-workspace-id")).toBe("workspace-1");
-  });
-});
-
-describe("legacy default workspace compatibility", () => {
-  it("keeps the historical default workspace identifiers available", () => {
-    expect(readDefaultClerkOrganizationMembershipConfig({ NODE_ENV: "development" })).toMatchObject({
-      organizationId: DEFAULT_CLERK_ORGANIZATION_ID,
-      organizationName: "Firmcode AI",
-      role: "org:developer"
-    });
-  });
-
-  it("treats the legacy default organization membership hook as a no-op", async () => {
-    await expect(
-      ensureDefaultClerkOrganizationMembership({
-        userId: "user_new",
-        config: {
-          organizationId: DEFAULT_CLERK_ORGANIZATION_ID,
-          organizationName: "Firmcode AI",
-          role: "org:developer"
-        }
-      })
-    ).resolves.toMatchObject({
-      status: "skipped",
-      organizationId: DEFAULT_CLERK_ORGANIZATION_ID,
-      userId: "user_new",
-      role: "org:developer",
-      reason: null
-    });
   });
 });

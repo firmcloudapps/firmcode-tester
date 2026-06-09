@@ -5,8 +5,8 @@ import { GET as readCiFailure } from "../app/api/ci-failures/[id]/route";
 import { GET as completeGitHubAppInstallation } from "../app/github/installations/callback/route";
 import { POST as syncInstallations } from "../app/api/github/installations/sync/route";
 import { GET as readRules, PATCH as saveRules } from "../app/api/rules/route";
-import { PATCH as updateMemberRole } from "../app/api/settings/members/[clerkUserId]/role/route";
-import { PATCH as updateMemberStatus } from "../app/api/settings/members/[clerkUserId]/status/route";
+import { PATCH as updateMemberRole } from "../app/api/settings/members/[userId]/role/route";
+import { PATCH as updateMemberStatus } from "../app/api/settings/members/[userId]/status/route";
 import { POST as syncRepository } from "../app/api/repositories/[id]/sync/route";
 import { parseGitHubInstallationsNotice } from "../lib/github-installations-notice";
 
@@ -15,20 +15,20 @@ describe("GitHub sync routes", () => {
   const originalAppUrl = process.env.APP_URL;
   const originalDashboardUrl = process.env.NEXT_PUBLIC_DASHBOARD_URL;
   const originalTestWorkspaceId = process.env.FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID;
-  const originalTestToken = process.env.FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN;
+  const originalTestToken = process.env.FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN;
 
   afterEach(() => {
     restoreEnv("NEXT_PUBLIC_API_URL", originalApiUrl);
     restoreEnv("APP_URL", originalAppUrl);
     restoreEnv("NEXT_PUBLIC_DASHBOARD_URL", originalDashboardUrl);
     restoreEnv("FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID", originalTestWorkspaceId);
-    restoreEnv("FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN", originalTestToken);
+    restoreEnv("FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN", originalTestToken);
     vi.unstubAllGlobals();
   });
 
   it("routes Connect GitHub through the implemented OAuth start endpoint", async () => {
     process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
-    process.env.FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN = "session-token";
+    process.env.FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN = "session-token";
     process.env.FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID = "workspace-1";
     const fetcher = vi.fn(async () =>
       jsonResponse({
@@ -51,7 +51,7 @@ describe("GitHub sync routes", () => {
     expect(response.headers.get("location")).toBe("https://github.com/login/oauth/authorize?client_id=firmcode");
   });
 
-  it("redirects GitHub OAuth start to sign-in before calling the API when Clerk auth is missing", async () => {
+  it("redirects GitHub OAuth start to sign-in before calling the API when dashboard auth is missing", async () => {
     process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
     const fetcher = vi.fn(async () =>
       jsonResponse({
@@ -70,7 +70,7 @@ describe("GitHub sync routes", () => {
   it("routes GitHub OAuth callback through the API and returns to GitHub setup", async () => {
     process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
     process.env.APP_URL = "https://firmcode.firmoncloud.com";
-    process.env.FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN = "session-token";
+    process.env.FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN = "session-token";
     process.env.FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID = "workspace-1";
     const fetcher = vi.fn(async () => jsonResponse({ connected: true, user: { login: "octo-user" } }));
 
@@ -95,7 +95,7 @@ describe("GitHub sync routes", () => {
   it("marks GitHub OAuth callbacks without state as installation-started OAuth", async () => {
     process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
     process.env.APP_URL = "https://firmcode.firmoncloud.com";
-    process.env.FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN = "session-token";
+    process.env.FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN = "session-token";
     process.env.FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID = "workspace-1";
     const fetcher = vi.fn(async () => jsonResponse({ connected: true, user: { login: "octo-user" } }));
 
@@ -122,7 +122,7 @@ describe("GitHub sync routes", () => {
     expect(parseGitHubInstallationsNotice({ github_oauth: "oauth-code", github_installation: "raw-payload" })).toBeNull();
   });
 
-  it("redirects GitHub OAuth callback to sign-in before calling the API when Clerk auth is missing", async () => {
+  it("redirects GitHub OAuth callback to sign-in before calling the API when dashboard auth is missing", async () => {
     process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
     process.env.APP_URL = "https://firmcode.firmoncloud.com";
     const fetcher = vi.fn(async () => jsonResponse({ connected: true }));
@@ -140,7 +140,7 @@ describe("GitHub sync routes", () => {
   it("routes GitHub App installation callback through the API and returns to setup", async () => {
     process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
     process.env.APP_URL = "https://firmcode.firmoncloud.com";
-    process.env.FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN = "session-token";
+    process.env.FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN = "session-token";
     process.env.FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID = "workspace-1";
     const fetcher = vi.fn(async () => jsonResponse({ installations: [], syncedRepositoryCount: 0 }));
 
@@ -162,7 +162,7 @@ describe("GitHub sync routes", () => {
     expect(response.headers.get("location")).toBe("https://firmcode.firmoncloud.com/github/installations?github_installation=connected");
   });
 
-  it("redirects GitHub App installation callback to sign-in before calling the API when Clerk auth is missing", async () => {
+  it("redirects GitHub App installation callback to sign-in before calling the API when dashboard auth is missing", async () => {
     process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
     process.env.APP_URL = "https://firmcode.firmoncloud.com";
     const fetcher = vi.fn(async () => jsonResponse({ installations: [], syncedRepositoryCount: 0 }));
@@ -180,7 +180,7 @@ describe("GitHub sync routes", () => {
   it("returns a safe error notice when GitHub App installation callback fails", async () => {
     process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
     process.env.APP_URL = "https://firmcode.firmoncloud.com";
-    process.env.FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN = "session-token";
+    process.env.FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN = "session-token";
     const fetcher = vi.fn(async () => new Response(JSON.stringify({ message: "GitHub installation not found" }), { status: 404 }));
 
     vi.stubGlobal("fetch", fetcher);
@@ -194,7 +194,7 @@ describe("GitHub sync routes", () => {
 
   it("routes Sync GitHub to the installation sync API with dashboard auth headers", async () => {
     process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
-    process.env.FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN = "session-token";
+    process.env.FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN = "session-token";
     process.env.FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID = "workspace-1";
     const fetcher = vi.fn(async () => jsonResponse({ installations: [], syncedRepositoryCount: 0 }));
 
@@ -218,7 +218,7 @@ describe("GitHub sync routes", () => {
 
   it("routes repository row Sync to the repository sync API", async () => {
     process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
-    process.env.FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN = "session-token";
+    process.env.FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN = "session-token";
     const fetcher = vi.fn(async () => jsonResponse({ repository: { id: "repo-1" } }));
 
     vi.stubGlobal("fetch", fetcher);
@@ -239,7 +239,7 @@ describe("GitHub sync routes", () => {
 
   it("routes Rules / Policies reads to the role-aware API endpoint", async () => {
     process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
-    process.env.FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN = "session-token";
+    process.env.FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN = "session-token";
     process.env.FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID = "workspace-1";
     const fetcher = vi.fn(async () => jsonResponse({ workspacePolicy: {}, repositoryPolicies: [], selectedRepositoryPolicy: null }));
 
@@ -262,7 +262,7 @@ describe("GitHub sync routes", () => {
 
   it("routes Rules / Policies saves to the role-gated API endpoint", async () => {
     process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
-    process.env.FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN = "session-token";
+    process.env.FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN = "session-token";
     process.env.FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID = "workspace-1";
     const fetcher = vi.fn(async () => jsonResponse({ workspacePolicy: {}, repositoryPolicies: [], selectedRepositoryPolicy: null }));
 
@@ -290,9 +290,9 @@ describe("GitHub sync routes", () => {
 
   it("routes workspace member role and status updates to the Settings API", async () => {
     process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
-    process.env.FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN = "session-token";
+    process.env.FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN = "session-token";
     process.env.FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID = "workspace-1";
-    const fetcher = vi.fn(async () => jsonResponse({ clerkUserId: "user_developer", role: "admin", active: true }));
+    const fetcher = vi.fn(async () => jsonResponse({ userId: "user_developer", role: "admin", active: true }));
 
     vi.stubGlobal("fetch", fetcher);
 
@@ -301,14 +301,14 @@ describe("GitHub sync routes", () => {
         method: "PATCH",
         body: JSON.stringify({ role: "admin" })
       }),
-      { params: { clerkUserId: "user_developer" } }
+      { params: { userId: "user_developer" } }
     );
     await updateMemberStatus(
       new Request("http://localhost/api/settings/members/user_developer/status", {
         method: "PATCH",
         body: JSON.stringify({ active: false })
       }),
-      { params: { clerkUserId: "user_developer" } }
+      { params: { userId: "user_developer" } }
     );
 
     const calls = fetcher.mock.calls as unknown as Array<[RequestInfo | URL, RequestInit | undefined]>;
@@ -327,7 +327,7 @@ describe("GitHub sync routes", () => {
 
   it("routes CI failure list and detail reads to the authenticated dashboard API", async () => {
     process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
-    process.env.FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN = "session-token";
+    process.env.FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN = "session-token";
     process.env.FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID = "workspace-1";
     const fetcher = vi.fn(async () => jsonResponse({ ciFailures: [], filters: {}, pagination: { limit: 50, returned: 0 } }));
 

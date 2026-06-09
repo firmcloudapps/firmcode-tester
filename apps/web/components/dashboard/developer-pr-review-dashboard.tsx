@@ -74,7 +74,7 @@ function DeveloperSignedOutState() {
     <section className="rounded-lg border border-amber-200 bg-amber-50 p-5">
       <h2 className="text-base font-semibold text-amber-900">Sign in is required</h2>
       <p className="mt-2 max-w-2xl text-sm leading-6 text-amber-800">
-        Firmcode needs a Clerk workspace session before it can connect GitHub or load PR review history.
+        Firmcode needs an InsForge session before it can connect GitHub or load PR review history.
       </p>
       <a className="mt-4 inline-flex rounded-md bg-accent px-3 py-2 text-sm font-medium text-white" href="/sign-in">
         Sign in

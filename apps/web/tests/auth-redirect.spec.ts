@@ -3,24 +3,23 @@ import { landingPathForDashboardRole, resolveRoleBasedDashboardRedirect } from "
 describe("role-based auth redirect", () => {
   const originalApiUrl = process.env.NEXT_PUBLIC_API_URL;
   const originalTestWorkspaceId = process.env.FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID;
-  const originalTestToken = process.env.FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN;
+  const originalTestToken = process.env.FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN;
 
   afterEach(() => {
     process.env.NEXT_PUBLIC_API_URL = originalApiUrl;
     restoreEnv("FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID", originalTestWorkspaceId);
-    restoreEnv("FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN", originalTestToken);
+    restoreEnv("FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN", originalTestToken);
   });
 
   it("maps admin and developer roles to their dashboard landings", () => {
     expect(landingPathForDashboardRole("admin")).toBe("/dashboard/admin");
-    expect(landingPathForDashboardRole("owner")).toBe("/dashboard/admin");
     expect(landingPathForDashboardRole("developer")).toBe("/dashboard/developer");
-    expect(landingPathForDashboardRole("member")).toBe("/dashboard/developer");
+    expect(landingPathForDashboardRole("unknown")).toBe("/dashboard/developer");
   });
 
   it("redirects signed-in admins to the admin dashboard", async () => {
     process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
-    process.env.FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN = "session-token";
+    process.env.FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN = "session-token";
     const fetcher = vi.fn(async () =>
       jsonResponse({
         workspace: { role: "admin" }
@@ -36,7 +35,7 @@ describe("role-based auth redirect", () => {
   });
 
   it("redirects signed-out users back to sign-in before fetching settings", async () => {
-    delete process.env.FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN;
+    delete process.env.FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN;
     const fetcher = vi.fn(async () => jsonResponse({}, 200));
 
     const url = await resolveRoleBasedDashboardRedirect({
@@ -50,7 +49,7 @@ describe("role-based auth redirect", () => {
 
   it("falls back to the neutral dashboard redirect when role lookup fails", async () => {
     process.env.NEXT_PUBLIC_API_URL = "http://dashboard-api.test";
-    process.env.FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN = "session-token";
+    process.env.FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN = "session-token";
 
     const responseFailure = await resolveRoleBasedDashboardRedirect({
       requestUrl: "http://app.test/auth/redirect",

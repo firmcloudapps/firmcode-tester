@@ -48,7 +48,7 @@ export function BillingView({ state, billingPortalUrl }: BillingViewProps) {
   const data = state.status === "populated" ? state.data : null;
   const canManage = data?.workspace.canManageBilling === true;
   const hasBillingPortal =
-    billingPortalUrl !== null && isAllowedExternalDashboardUrl(billingPortalUrl, "clerk");
+    billingPortalUrl !== null && isAllowedExternalDashboardUrl(billingPortalUrl, "billing");
 
   return (
     <div className="space-y-4">
@@ -58,8 +58,7 @@ export function BillingView({ state, billingPortalUrl }: BillingViewProps) {
           <div>
             <h2 className="text-lg font-semibold text-primary">Workspace plan</h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-secondary">
-              Firmcode shows application usage for context while Clerk remains the source of truth for checkout, plans, invoices,
-              and subscription changes.
+              Firmcode shows application usage for context while billing state is managed outside the dashboard.
             </p>
           </div>
           <span
@@ -71,7 +70,7 @@ export function BillingView({ state, billingPortalUrl }: BillingViewProps) {
           </span>
         </div>
         <dl className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          <BillingMetric label="Current plan" value={data?.plan.name ?? "Clerk managed"} />
+          <BillingMetric label="Current plan" value={data?.plan.name ?? "Externally managed"} />
           <BillingMetric label="Monthly review runs" value={formatNullableMetric(data?.usage.reviewRunsThisMonth, "runs")} />
           <BillingMetric label="AI tokens" value={formatNullableMetric(data?.usage.aiTokensThisMonth, "tokens")} />
           <BillingMetric label="Repositories" value={formatNullableMetric(data?.usage.repositoriesMonitored, "monitored")} />
@@ -82,7 +81,7 @@ export function BillingView({ state, billingPortalUrl }: BillingViewProps) {
           <a
             className="mt-6 inline-flex h-10 items-center rounded-md bg-accent px-4 text-sm font-medium text-white"
             data-dashboard-destination="external"
-            data-dashboard-provider="clerk"
+            data-dashboard-provider="billing"
             href={billingPortalUrl}
             rel="noreferrer"
           >
@@ -93,7 +92,7 @@ export function BillingView({ state, billingPortalUrl }: BillingViewProps) {
             className="mt-6 inline-flex h-10 items-center rounded-md bg-slate-200 px-4 text-sm font-medium text-secondary"
             type="button"
             disabled
-            title={canManage ? "Clerk billing portal URL is not configured." : "Admin or Clerk billing permission is required to manage subscriptions."}
+            title={canManage ? "Billing portal URL is not configured." : "Admin permission is required to manage subscriptions."}
           >
             Manage subscription
           </button>
@@ -103,8 +102,7 @@ export function BillingView({ state, billingPortalUrl }: BillingViewProps) {
         <section className="rounded-lg border border-blue-100 bg-blue-50 p-4">
           <h2 className="text-sm font-semibold text-accent">Upgrade and plan changes</h2>
           <p className="mt-2 text-sm leading-6 text-secondary">
-            Developers can review current plan and usage context. Ask an Admin, or sign in with a Clerk-managed billing capability, to
-            manage subscription changes.
+            Developers can review current plan and usage context. Ask an Admin to manage subscription changes.
           </p>
         </section>
       ) : null}
@@ -118,7 +116,7 @@ function BillingHeader() {
       <p className="text-sm font-medium text-accent">Billing</p>
       <h1 className="mt-1 text-2xl font-semibold tracking-normal text-primary">Subscription</h1>
       <p className="mt-2 max-w-2xl text-sm leading-6 text-secondary">
-        Plan, seat, and usage management are delegated to Clerk Billing for the MVP.
+        Plan, seat, and usage management are delegated to the configured billing portal.
       </p>
     </div>
   );
@@ -134,9 +132,9 @@ function BillingMetric({ label, value }: { label: string; value: string }) {
 }
 
 function formatNullableMetric(value: number | null | undefined, suffix: string): string {
-  return value === null || value === undefined ? "Clerk managed" : `${value.toLocaleString()} ${suffix}`;
+  return value === null || value === undefined ? "Externally managed" : `${value.toLocaleString()} ${suffix}`;
 }
 
 function formatBillingStatus(status: WorkspaceBillingResponse["plan"]["status"] | undefined): string {
-  return status === "managed_by_clerk" ? "Managed by Clerk" : "Clerk managed";
+  return status === undefined || status.trim() === "" ? "Externally managed" : status.replace(/_/g, " ");
 }

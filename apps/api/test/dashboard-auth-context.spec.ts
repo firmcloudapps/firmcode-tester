@@ -20,7 +20,6 @@ describe("dashboard auth context helpers", () => {
         return {
           workspaceId: "workspace-from-header",
           userId: "user-from-header",
-          clerkUserId: "user-from-header",
           role: "admin"
         };
       }
@@ -47,8 +46,7 @@ describe("dashboard auth context helpers", () => {
 
     expect(toDashboardServiceAuth(auth, "user-from-header")).toEqual({
       workspaceId: "workspace-from-token",
-      userId: "user-from-token",
-      clerkUserId: "user-from-token"
+      userId: "user-from-token"
     });
   });
 });

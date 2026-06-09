@@ -41,8 +41,7 @@ export function hasInsForgeConfig(
 }
 
 export function getAuthProvider(
-  env: Record<string, string | undefined> = process.env
-): "clerk" | "insforge" {
-  const provider = env.NEXT_PUBLIC_AUTH_PROVIDER?.toLowerCase();
-  return provider === "clerk" ? "clerk" : "insforge";
+  _env: Record<string, string | undefined> = process.env
+): "insforge" {
+  return "insforge";
 }

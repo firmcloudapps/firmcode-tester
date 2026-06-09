@@ -47,30 +47,30 @@ export class SettingsController {
     });
   }
 
-  @Patch("members/:clerkUserId/role")
+  @Patch("members/:userId/role")
   async updateWorkspaceMemberRole(
-    @Param("clerkUserId") clerkUserId: string,
+    @Param("userId") userId: string,
     @Body() body: unknown,
     @DashboardAuth() auth: DashboardAuthParam,
     userIdHeader?: string | string[]
   ): Promise<WorkspaceSettingsMember> {
     return this.settingsService.updateWorkspaceMemberRole({
       ...readServiceAuth(auth, userIdHeader),
-      targetClerkUserId: clerkUserId,
+      targetUserId: userId,
       body
     });
   }
 
-  @Patch("members/:clerkUserId/status")
+  @Patch("members/:userId/status")
   async updateWorkspaceMemberStatus(
-    @Param("clerkUserId") clerkUserId: string,
+    @Param("userId") userId: string,
     @Body() body: unknown,
     @DashboardAuth() auth: DashboardAuthParam,
     userIdHeader?: string | string[]
   ): Promise<WorkspaceSettingsMember> {
     return this.settingsService.updateWorkspaceMemberStatus({
       ...readServiceAuth(auth, userIdHeader),
-      targetClerkUserId: clerkUserId,
+      targetUserId: userId,
       body
     });
   }

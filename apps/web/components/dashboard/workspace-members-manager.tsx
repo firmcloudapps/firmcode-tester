@@ -22,19 +22,17 @@ export function WorkspaceMembersManager({ members, canManage }: WorkspaceMembers
   const [pendingMemberId, setPendingMemberId] = React.useState<string | null>(null);
   const [feedback, setFeedback] = React.useState<Feedback>(null);
 
-  async function mutateMember(clerkUserId: string, action: () => Promise<WorkspaceSettingsMember>, successMessage: string) {
+  async function mutateMember(userId: string, action: () => Promise<WorkspaceSettingsMember>, successMessage: string) {
     if (!canManage || guardRef.current.isPending) {
       return;
     }
 
-    setPendingMemberId(clerkUserId);
+    setPendingMemberId(userId);
     setFeedback(null);
 
     try {
       const updated = await guardRef.current.run(action);
-      setWorkspaceMembers((current) =>
-        current.map((member) => (member.clerkUserId === updated.clerkUserId ? updated : member))
-      );
+      setWorkspaceMembers((current) => current.map((member) => (member.userId === updated.userId ? updated : member)));
       setFeedback({ tone: "success", message: successMessage });
     } catch (error) {
       setFeedback({
@@ -62,22 +60,22 @@ export function WorkspaceMembersManager({ members, canManage }: WorkspaceMembers
           <tbody className="divide-y divide-border bg-surface">
             {workspaceMembers.map((member) => (
               <WorkspaceMemberRow
-                key={member.clerkUserId}
+                key={member.userId}
                 member={member}
                 canManage={canManage}
-                pending={pendingMemberId === member.clerkUserId}
+                pending={pendingMemberId === member.userId}
                 onRoleChange={(role) =>
                   mutateMember(
-                    member.clerkUserId,
-                    () => updateWorkspaceMemberRole(member.clerkUserId, role),
-                    `Updated ${member.clerkUserId} to ${role}.`
+                    member.userId,
+                    () => updateWorkspaceMemberRole(member.userId, role),
+                    `Updated ${member.userId} to ${role}.`
                   )
                 }
                 onStatusChange={(active) =>
                   mutateMember(
-                    member.clerkUserId,
-                    () => updateWorkspaceMemberStatus(member.clerkUserId, active),
-                    `${active ? "Restored" : "Suspended"} ${member.clerkUserId}.`
+                    member.userId,
+                    () => updateWorkspaceMemberStatus(member.userId, active),
+                    `${active ? "Restored" : "Suspended"} ${member.userId}.`
                   )
                 }
               />
@@ -122,7 +120,7 @@ function WorkspaceMemberRow({
   return (
     <tr>
       <td className="px-3 py-3 align-top">
-        <p className="font-mono text-xs text-primary">{member.clerkUserId}</p>
+        <p className="font-mono text-xs text-primary">{member.userId}</p>
         {member.isCurrentUser ? <p className="mt-1 text-xs font-medium text-accent">Current user</p> : null}
       </td>
       <td className="px-3 py-3 align-top">
@@ -131,7 +129,7 @@ function WorkspaceMemberRow({
             className="rounded-md border border-border bg-surface px-2 py-1 text-sm text-primary disabled:bg-subtle disabled:text-secondary"
             disabled={blocked}
             value={selectedRole}
-            aria-label={`Role for ${member.clerkUserId}`}
+            aria-label={`Role for ${member.userId}`}
             onChange={(event) => setSelectedRole(event.currentTarget.value as "admin" | "developer")}
           >
             <option value="developer">Developer</option>
@@ -174,5 +172,5 @@ function WorkspaceMemberRow({
 }
 
 function toAssignableRole(role: DashboardWorkspaceRole): "admin" | "developer" {
-  return role === "admin" || role === "owner" ? "admin" : "developer";
+  return role === "admin" ? "admin" : "developer";
 }

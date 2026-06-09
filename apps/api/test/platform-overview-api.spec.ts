@@ -67,9 +67,6 @@ function dashboardAuth(overrides: Partial<DashboardRequestContext> = {}): Dashbo
     capabilities: ["manage_sensitive_settings", "manage_billing", "manage_github_installations", "manage_review_policies"],
     billingCapabilities: [],
     provider: "insforge",
-    clerkUserId: ADMIN_USER_ID,
-    clerkOrgId: "org_firmcode",
-    clerkCapabilities: [],
     ...overrides
   };
 }

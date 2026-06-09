@@ -73,9 +73,9 @@ describe("web InsForge auth config", () => {
     ).toBe(true);
   });
 
-  it("defaults the auth provider to InsForge unless an old Clerk flag is still set", () => {
+  it("defaults the auth provider to InsForge unless an old InsForge flag is still set", () => {
     expect(getAuthProvider({})).toBe("insforge");
     expect(getAuthProvider({ NEXT_PUBLIC_AUTH_PROVIDER: "insforge" })).toBe("insforge");
-    expect(getAuthProvider({ NEXT_PUBLIC_AUTH_PROVIDER: "clerk" })).toBe("clerk");
+    expect(getAuthProvider({ NEXT_PUBLIC_AUTH_PROVIDER: "insforge" })).toBe("insforge");
   });
 });

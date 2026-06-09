@@ -3,7 +3,7 @@ import { normalizeDashboardAppRole, type DashboardRole } from "./dashboard-autho
 /**
  * Repository visibility scope for dashboard data queries.
  *
- * `restrictToClerkUserId === null` means full workspace visibility.
+ * `restrictToUserId === null` means full workspace visibility.
  * A non-null value restricts repository visibility to explicit grants or repos
  * where the user's connected GitHub login authored PR activity.
  *
@@ -12,30 +12,28 @@ import { normalizeDashboardAppRole, type DashboardRole } from "./dashboard-autho
  * fails closed and returns no PR-backed records.
  */
 export interface RepositoryAccessScope {
-  readonly restrictToClerkUserId: string | null;
+  readonly restrictToUserId: string | null;
   readonly restrictToOwnPullRequestActivity: boolean;
 }
 
 export const FULL_REPOSITORY_ACCESS_SCOPE: RepositoryAccessScope = {
-  restrictToClerkUserId: null,
+  restrictToUserId: null,
   restrictToOwnPullRequestActivity: false
 };
 
 /**
  * Zero-access scope used for the platform admin role.
  * Admin is the platform operator and must not read any customer code data.
- * The empty-string clerk_user_id matches no rows in any access table.
+ * The empty-string user id matches no rows in any access table.
  */
 export const NO_REPOSITORY_ACCESS_SCOPE: RepositoryAccessScope = {
-  restrictToClerkUserId: "",
+  restrictToUserId: "",
   restrictToOwnPullRequestActivity: true
 };
 
 export function resolveRepositoryAccessScope(input: {
   readonly role: DashboardRole | string | null | undefined;
   readonly userId?: string | null;
-  /** @deprecated Use userId instead */
-  readonly clerkUserId?: string | null;
 }): RepositoryAccessScope {
   const appRole = normalizeDashboardAppRole(input.role ?? undefined);
 
@@ -44,14 +42,14 @@ export function resolveRepositoryAccessScope(input: {
     return NO_REPOSITORY_ACCESS_SCOPE;
   }
 
-  const userId = input.userId ?? input.clerkUserId ?? null;
+  const userId = input.userId ?? null;
   if (userId === null) {
     // Unknown user — fail closed.
     return NO_REPOSITORY_ACCESS_SCOPE;
   }
 
   return {
-    restrictToClerkUserId: userId,
+    restrictToUserId: userId,
     restrictToOwnPullRequestActivity: true
   };
 }
@@ -68,7 +66,7 @@ export function buildRepositoryAccessClause(
   repositoryAlias: string,
   nextParamIndex: number
 ): { sql: string; values: unknown[] } {
-  if (scope.restrictToClerkUserId === null) {
+  if (scope.restrictToUserId === null) {
     return { sql: "", values: [] };
   }
 
@@ -79,7 +77,7 @@ export function buildRepositoryAccessClause(
       JOIN github_oauth_connections goc_scope ON lower(goc_scope.github_login) = lower(pr_scope.author_login)
       WHERE goc_scope.clerk_user_id = $${nextParamIndex}
     ))`,
-    values: [scope.restrictToClerkUserId]
+    values: [scope.restrictToUserId]
   };
 }
 
@@ -102,7 +100,7 @@ export function buildOwnPullRequestActivityClause(
       FROM github_oauth_connections goc_scope
       WHERE goc_scope.clerk_user_id = $${nextParamIndex}
     )`,
-    values: [scope.restrictToClerkUserId ?? ""]
+    values: [scope.restrictToUserId ?? ""]
   };
 }
 

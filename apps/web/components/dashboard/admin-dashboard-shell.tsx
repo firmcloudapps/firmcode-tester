@@ -2,7 +2,7 @@ import React from "react";
 import { type DashboardActiveItem } from "../../lib/dashboard-navigation";
 import { ADMIN_NAV_ITEMS } from "../../lib/admin-dashboard-nav";
 import { DashboardChrome } from "./dashboard-chrome";
-import { DashboardWorkspaceLabel } from "./dashboard-clerk-controls";
+import { DashboardWorkspaceLabel } from "./dashboard-auth-controls";
 
 interface AdminDashboardShellProps {
   activeItem: DashboardActiveItem;
@@ -13,7 +13,7 @@ export function AdminDashboardShell({ activeItem, children }: AdminDashboardShel
   const navItems = ADMIN_NAV_ITEMS;
 
   return (
-    <div className="min-h-screen bg-shell text-primary" data-clerk-authenticated="required">
+    <div className="min-h-screen bg-shell text-primary" data-authenticated="required">
       <DashboardChrome
         activeItem={activeItem}
         showGitHubShortcut={true}

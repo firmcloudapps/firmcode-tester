@@ -40,7 +40,7 @@ export function SettingsView({ state, activeTab, githubAppInstallUrl = null, tab
         <p className="text-sm font-medium text-accent">Settings</p>
         <h1 className="mt-1 text-2xl font-semibold tracking-normal text-primary">Workspace settings</h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-secondary">
-          Manage the Firmcode-owned workspace surfaces while Clerk owns identity, members, and billing.
+          Manage Firmcode workspace settings while InsForge owns identity and sessions.
         </p>
       </div>
       <SettingsTabs activeTab={activeTab} tabBasePath={tabBasePath} />
@@ -121,7 +121,7 @@ function SettingsContent({
       <section className="rounded-lg border border-border bg-surface p-6">
         <h2 className="text-lg font-semibold text-primary">No settings data is available</h2>
         <p className="mt-2 max-w-xl text-sm leading-6 text-secondary">
-          Connect Clerk workspace headers to load Firmcode-owned workspace settings.
+          Sign in with InsForge to load Firmcode-owned workspace settings.
         </p>
       </section>
     );
@@ -178,15 +178,15 @@ function EmptyInstallNotice() {
 
 function GeneralPanel({ data }: { data: WorkspaceSettingsResponse }) {
   return (
-    <SettingsPanel title="General" description="Workspace identity is sourced from Clerk and linked to Firmcode application state.">
+    <SettingsPanel title="General" description="Workspace identity is sourced from InsForge and linked to Firmcode application state.">
       <dl className="grid gap-3 sm:grid-cols-3">
         <MetadataCard label="Workspace" value={data.workspace.name} />
         <MetadataCard label="Workspace ID" value={data.workspace.id} monospace />
-        <MetadataCard label="Clerk organization" value={data.workspace.clerkOrgId ?? "Personal workspace"} monospace />
+        <MetadataCard label="Identity workspace" value={data.workspace.identityWorkspaceId ?? "Personal workspace"} monospace />
       </dl>
       <div className="mt-4 flex flex-wrap gap-2">
-        <RouteReadyAction href={data.clerk.userProfileUrl} label="Open Clerk profile" provider="clerk" />
-        <RouteReadyAction href={data.clerk.organizationProfileUrl} label="Open Clerk organization" provider="clerk" />
+        <RouteReadyAction href={data.identity.userProfileUrl} label="Open profile" provider="identity" />
+        <RouteReadyAction href={data.identity.workspaceProfileUrl} label="Open workspace" provider="identity" />
       </div>
     </SettingsPanel>
   );
@@ -250,21 +250,21 @@ function MembersPanel({ data }: { data: WorkspaceSettingsResponse }) {
   const canManage = data.workspace.canManageSensitiveSettings;
 
   return (
-    <SettingsPanel title="Members" description="Manage Firmcode workspace authorization while Clerk remains the identity provider.">
+    <SettingsPanel title="Members" description="Manage Firmcode workspace authorization with database-owned roles.">
       <div className="flex flex-wrap gap-2">
         {canManage ? (
-          <RouteReadyAction href={data.clerk.memberManagementUrl} label="Open Clerk members" primary provider="clerk" />
+          <RouteReadyAction href={data.identity.memberManagementUrl} label="Open members" primary provider="identity" />
         ) : (
           <button
             className="rounded-md bg-slate-200 px-3 py-2 text-sm font-medium text-secondary"
             type="button"
             disabled
-            title="Admin required to manage Clerk members."
+            title="Admin required to manage members."
           >
-            Open Clerk members
+            Open members
           </button>
         )}
-        <RouteReadyAction href={data.clerk.organizationProfileUrl} label="View organization" provider="clerk" />
+        <RouteReadyAction href={data.identity.workspaceProfileUrl} label="View workspace" provider="identity" />
       </div>
       <p className="mt-4 rounded-md border border-border bg-subtle p-3 text-sm leading-6 text-secondary">
         New workspace memberships default to Developer. Promote users to Admin only when they need billing, members, retention,

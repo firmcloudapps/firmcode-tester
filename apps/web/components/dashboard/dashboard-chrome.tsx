@@ -1,6 +1,6 @@
 import React from "react";
 import { DashboardActiveItem } from "../../lib/dashboard-navigation";
-import { DashboardClerkControls, DashboardWorkspaceLabel } from "./dashboard-clerk-controls";
+import { DashboardAuthControls, DashboardWorkspaceLabel } from "./dashboard-auth-controls";
 
 interface NavigationItem {
   readonly label: string;
@@ -52,7 +52,7 @@ export function DashboardChrome({ activeItem, showGitHubShortcut, navItems }: Da
         >
           !
         </button>
-        <DashboardClerkControls />
+        <DashboardAuthControls />
       </div>
       <details className="border-t border-border px-4 py-2 lg:hidden">
         <summary className="cursor-pointer text-sm font-medium text-primary">Navigation</summary>

@@ -46,8 +46,8 @@ describe("dashboard authorization policy", () => {
   it("allows external billing capability without broadening the workspace role", () => {
     expect(roleHasDashboardCapability("developer", "manage_billing")).toBe(false);
     expect(roleHasDashboardCapability("developer", "access_raw_artifacts")).toBe(true);
-    expect(roleHasDashboardCapability("developer", "manage_billing", { hasClerkBillingCapability: true })).toBe(true);
-    expect(roleHasDashboardCapability("developer", "manage_sensitive_settings", { hasClerkBillingCapability: true })).toBe(false);
+    expect(roleHasDashboardCapability("developer", "manage_billing", { hasBillingCapability: true })).toBe(true);
+    expect(roleHasDashboardCapability("developer", "manage_sensitive_settings", { hasBillingCapability: true })).toBe(false);
   });
 
   it("accepts only the database-owned Admin and Developer roles", () => {

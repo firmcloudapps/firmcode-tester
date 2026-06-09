@@ -74,7 +74,6 @@ export interface UpsertInstallationRepositoryInput {
   readonly installationUuid: string;
   readonly repository: GitHubRepositoryMetadata;
   readonly preserveExistingEnabled?: boolean;
-  readonly grantAccessToClerkUserId?: string;
   readonly grantAccessToUserId?: string;
 }
 
@@ -445,21 +444,21 @@ RETURNING *
 
     const repository = toRepositoryListItem(requireRow(result.rows[0], "repository"));
 
-    if (input.grantAccessToClerkUserId !== undefined && input.grantAccessToClerkUserId !== "") {
-      await this.grantRepositoryAccess(repository.id, input.grantAccessToClerkUserId);
+    if (input.grantAccessToUserId !== undefined && input.grantAccessToUserId !== "") {
+      await this.grantRepositoryAccess(repository.id, input.grantAccessToUserId);
     }
 
     return repository;
   }
 
-  private async grantRepositoryAccess(repositoryId: string, clerkUserId: string): Promise<void> {
+  private async grantRepositoryAccess(repositoryId: string, userId: string): Promise<void> {
     await this.database.query(
       `
 INSERT INTO repository_access (repository_id, clerk_user_id, granted_by_clerk_user_id)
 VALUES ($1, $2, $2)
 ON CONFLICT (repository_id, clerk_user_id) DO NOTHING
 `,
-      [repositoryId, clerkUserId]
+      [repositoryId, userId]
     );
   }
 
