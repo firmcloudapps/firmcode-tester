@@ -40,10 +40,6 @@ export class DashboardAuthGuard implements CanActivate {
 
     const verified = await this.verifier.verify(token);
 
-    if (verified.sessionId === null) {
-      throw new UnauthorizedException("Session is required");
-    }
-
     const workspace = await this.workspaceResolver.resolve({
       token: verified,
       selectedWorkspaceId: readHeader(headers, WORKSPACE_HEADER)

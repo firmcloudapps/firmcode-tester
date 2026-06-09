@@ -33,11 +33,7 @@ services:
       INSFORGE_BASE_URL: ${INSFORGE_BASE_URL:-https://h35yzuga.eu-central.insforge.app}
       INSFORGE_SERVICE_KEY: ${INSFORGE_SERVICE_KEY:-}
       REDIS_URL: redis://redis:6379
-      # Auth Provider: 'clerk' (default) or 'insforge'
-      AUTH_PROVIDER: ${AUTH_PROVIDER:-clerk}
-      CLERK_SECRET_KEY: ${CLERK_SECRET_KEY:-sk_test_local_placeholder}
-      CLERK_JWT_AUDIENCE: ${CLERK_JWT_AUDIENCE:-firmcode-api}
-      CLERK_WEBHOOK_SECRET: ${CLERK_WEBHOOK_SECRET:-whsec_local_placeholder}
+      AUTH_PROVIDER: ${AUTH_PROVIDER:-insforge}
       # Storage Provider: 'database' (default) or 'insforge'
       STORAGE_PROVIDER: ${STORAGE_PROVIDER:-database}
       INSFORGE_STORAGE_BUCKET: ${INSFORGE_STORAGE_BUCKET:-review-artifacts}

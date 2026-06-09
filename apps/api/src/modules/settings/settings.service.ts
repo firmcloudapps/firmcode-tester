@@ -9,7 +9,7 @@ import { SETTINGS_STORE, type SettingsStore } from "./settings.store";
 
 export interface WorkspaceSettingsRequestContext {
   readonly workspaceId: string | null;
-  readonly clerkUserId: string | null;
+  readonly userId: string | null;
 }
 
 export interface SensitiveWorkspaceSettingsRequestContext extends WorkspaceSettingsRequestContext {
@@ -26,14 +26,14 @@ export class SettingsService {
   constructor(
     @Inject(SETTINGS_STORE) private readonly settingsStore: SettingsStore,
     @Inject(DASHBOARD_AUTH_STORE) private readonly dashboardAuthStore: DashboardAuthStore
-  ) {}
+  ) { }
 
   async getWorkspaceSettings(input: WorkspaceSettingsRequestContext): Promise<WorkspaceSettingsResponse> {
     assertAuthenticated(input);
 
     const membership = await this.dashboardAuthStore.findActiveMembership({
       workspaceId: input.workspaceId,
-      clerkUserId: input.clerkUserId
+      userId: input.userId
     });
 
     if (membership === null) {
@@ -42,7 +42,7 @@ export class SettingsService {
 
     const settings = await this.settingsStore.getWorkspaceSettings({
       workspaceId: membership.workspaceId,
-      clerkUserId: membership.clerkUserId,
+      userId: membership.userId,
       role: membership.role
     });
 
@@ -120,7 +120,7 @@ export class SettingsService {
 
     const membership = await this.dashboardAuthStore.findActiveMembership({
       workspaceId: input.workspaceId,
-      clerkUserId: input.clerkUserId
+      userId: input.userId
     });
 
     if (membership === null) {
@@ -178,9 +178,9 @@ export class SettingsService {
 
 function assertAuthenticated(input: WorkspaceSettingsRequestContext): asserts input is WorkspaceSettingsRequestContext & {
   workspaceId: string;
-  clerkUserId: string;
+  userId: string;
 } {
-  if (input.workspaceId === null || input.clerkUserId === null) {
+  if (input.workspaceId === null || input.userId === null) {
     throw new UnauthorizedException("Dashboard authentication is required");
   }
 }

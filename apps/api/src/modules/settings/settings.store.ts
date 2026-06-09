@@ -21,7 +21,7 @@ export interface SettingsStore {
 
 export interface WorkspaceSettingsLookup {
   readonly workspaceId: string;
-  readonly clerkUserId: string;
+  readonly userId: string;
   readonly role: DashboardWorkspaceRole;
 }
 
@@ -46,7 +46,7 @@ interface WorkspaceRow {
 }
 
 interface MemberRow {
-  readonly clerk_user_id: string;
+  readonly resolved_user_id: string;
   readonly role: DashboardWorkspaceRole;
   readonly active: boolean;
   readonly created_at: Date | string;
@@ -64,7 +64,7 @@ interface InstallationRow {
 }
 
 export class EmptySettingsStore implements SettingsStore {
-  constructor(private readonly config: ApiRuntimeConfig) {}
+  constructor(private readonly config: ApiRuntimeConfig) { }
 
   async getWorkspaceSettings(input: WorkspaceSettingsLookup): Promise<WorkspaceSettingsResponse | null> {
     return {
@@ -83,7 +83,7 @@ export class EmptySettingsStore implements SettingsStore {
       },
       members: [
         {
-          clerkUserId: input.clerkUserId,
+          clerkUserId: input.userId,
           role: input.role,
           active: true,
           isCurrentUser: true,
@@ -100,13 +100,13 @@ export class EmptySettingsStore implements SettingsStore {
   async getWorkspaceMember(input: WorkspaceMemberLookup): Promise<WorkspaceSettingsMember | null> {
     return input.targetClerkUserId === input.currentClerkUserId
       ? {
-          clerkUserId: input.currentClerkUserId,
-          role: "developer",
-          active: true,
-          isCurrentUser: true,
-          createdAt: new Date(0).toISOString(),
-          updatedAt: new Date(0).toISOString()
-        }
+        clerkUserId: input.currentClerkUserId,
+        role: "developer",
+        active: true,
+        isCurrentUser: true,
+        createdAt: new Date(0).toISOString(),
+        updatedAt: new Date(0).toISOString()
+      }
       : null;
   }
 
@@ -128,7 +128,7 @@ export class PostgresSettingsStore implements SettingsStore {
     private readonly database: DatabaseExecutor,
     private readonly config: ApiRuntimeConfig,
     private readonly uuidFactory: () => string = randomUUID
-  ) {}
+  ) { }
 
   async getWorkspaceSettings(input: WorkspaceSettingsLookup): Promise<WorkspaceSettingsResponse | null> {
     const workspace = await this.loadWorkspace(input.workspaceId);
@@ -139,7 +139,7 @@ export class PostgresSettingsStore implements SettingsStore {
 
     const [installations, members] = await Promise.all([
       this.loadInstallations(input.workspaceId),
-      this.loadMembers(input.workspaceId, input.clerkUserId)
+      this.loadMembers(input.workspaceId, input.userId)
     ]);
 
     return {
@@ -166,10 +166,10 @@ export class PostgresSettingsStore implements SettingsStore {
   async getWorkspaceMember(input: WorkspaceMemberLookup): Promise<WorkspaceSettingsMember | null> {
     const result = await this.database.query<MemberRow>(
       `
-SELECT clerk_user_id, role, active, created_at, updated_at
+SELECT COALESCE(user_id, clerk_user_id) AS resolved_user_id, role, active, created_at, updated_at
 FROM workspace_memberships
 WHERE workspace_id = $1
-  AND clerk_user_id = $2
+  AND (clerk_user_id = $2 OR user_id = $2)
 `,
       [input.workspaceId, input.targetClerkUserId]
     );
@@ -183,7 +183,8 @@ WHERE workspace_id = $1
 SELECT COUNT(*) AS count
 FROM workspace_memberships
 WHERE workspace_id = $1
-  AND clerk_user_id <> $2
+  AND (clerk_user_id <> $2 OR clerk_user_id IS NULL)
+  AND (user_id IS NULL OR user_id <> $2)
   AND role = 'admin'
   AND active = true
 `,
@@ -201,8 +202,8 @@ UPDATE workspace_memberships
 SET role = $3,
     updated_at = now()
 WHERE workspace_id = $1
-  AND clerk_user_id = $2
-RETURNING clerk_user_id, role, active, created_at, updated_at
+  AND (clerk_user_id = $2 OR user_id = $2)
+RETURNING COALESCE(user_id, clerk_user_id) AS resolved_user_id, role, active, created_at, updated_at
 `,
       [input.workspaceId, input.targetClerkUserId, input.role]
     );
@@ -230,8 +231,8 @@ UPDATE workspace_memberships
 SET active = $3,
     updated_at = now()
 WHERE workspace_id = $1
-  AND clerk_user_id = $2
-RETURNING clerk_user_id, role, active, created_at, updated_at
+  AND (clerk_user_id = $2 OR user_id = $2)
+RETURNING COALESCE(user_id, clerk_user_id) AS resolved_user_id, role, active, created_at, updated_at
 `,
       [input.workspaceId, input.targetClerkUserId, input.active]
     );
@@ -290,18 +291,18 @@ ORDER BY gi.updated_at DESC
     return result.rows.map(toInstallation);
   }
 
-  private async loadMembers(workspaceId: string, currentClerkUserId: string): Promise<WorkspaceSettingsMember[]> {
+  private async loadMembers(workspaceId: string, currentUserId: string): Promise<WorkspaceSettingsMember[]> {
     const result = await this.database.query<MemberRow>(
       `
-SELECT clerk_user_id, role, active, created_at, updated_at
+SELECT COALESCE(user_id, clerk_user_id) AS resolved_user_id, role, active, created_at, updated_at
 FROM workspace_memberships
 WHERE workspace_id = $1
-ORDER BY active DESC, role ASC, created_at ASC, clerk_user_id ASC
+ORDER BY active DESC, role ASC, created_at ASC
 `,
       [workspaceId]
     );
 
-    return result.rows.map((row) => toMember(row, currentClerkUserId));
+    return result.rows.map((row) => toMember(row, currentUserId));
   }
 
   private async auditElevatedRoleChange(input: {
@@ -395,12 +396,12 @@ function toInstallation(row: InstallationRow): WorkspaceSettingsInstallation {
   };
 }
 
-function toMember(row: MemberRow, currentClerkUserId: string): WorkspaceSettingsMember {
+function toMember(row: MemberRow, currentUserId: string): WorkspaceSettingsMember {
   return {
-    clerkUserId: row.clerk_user_id,
+    clerkUserId: row.resolved_user_id ?? null,
     role: row.role,
     active: row.active,
-    isCurrentUser: row.clerk_user_id === currentClerkUserId,
+    isCurrentUser: row.resolved_user_id === currentUserId,
     createdAt: toIsoString(row.created_at),
     updatedAt: toIsoString(row.updated_at)
   };
