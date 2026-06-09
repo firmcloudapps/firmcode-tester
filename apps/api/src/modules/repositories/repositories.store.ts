@@ -62,7 +62,7 @@ export interface RepositoryActivityLookup extends RepositoryConfigurationLookup 
 
 export interface RepositoryConfigurationUpdate extends RepositoryConfigurationLookup {
   readonly updates: UpdateRepositoryReviewConfigurationRequest;
-  readonly updatedByClerkUserId: string;
+  readonly updatedByUserId: string;
 }
 
 interface RepositoryListRow {
@@ -996,7 +996,7 @@ GROUP BY repository_id
     await this.ensureRepositoryConfiguration(input.repositoryId);
 
     const assignments = buildConfigurationAssignments(input.updates);
-    const values: unknown[] = [input.repositoryId, input.updatedByClerkUserId, ...assignments.values];
+    const values: unknown[] = [input.repositoryId, input.updatedByUserId, ...assignments.values];
     const result = await this.database.query<RepositoryConfigurationRow>(
       `
 UPDATE repository_review_configurations
@@ -1310,7 +1310,7 @@ function toRepositoryReviewConfiguration(row: RepositoryConfigurationRow): Repos
     ciExplanationEnabled: row.ci_explanation_enabled,
     infrastructureReviewEnabled: row.infrastructure_review_enabled,
     dryRunEnabled: row.dry_run_enabled,
-    updatedByClerkUserId: row.updated_by_clerk_user_id,
+    updatedByUserId: row.updated_by_clerk_user_id,
     createdAt: toRequiredIsoString(row.created_at),
     updatedAt: toRequiredIsoString(row.updated_at)
   };

@@ -36,7 +36,7 @@ export interface RulesPolicyUpdate {
   readonly repositoryId: string | null;
   readonly accessScope?: RepositoryAccessScope;
   readonly updates: ParsedReviewPolicyUpdate;
-  readonly updatedByClerkUserId: string;
+  readonly updatedByUserId: string;
 }
 
 export type ParsedReviewPolicyUpdate = Omit<UpdateReviewPolicyRequest, "repositoryId">;
@@ -92,7 +92,7 @@ export class EmptyRulesStore implements RulesStore {
       workspaceId: input.workspaceId,
       repositoryId: input.repositoryId,
       scope: input.repositoryId === null ? "workspace" : "repository",
-      updatedByClerkUserId: input.updatedByClerkUserId,
+      updatedByUserId: input.updatedByUserId,
       createdAt: new Date(0).toISOString(),
       updatedAt: new Date(0).toISOString(),
       updates: input.updates
@@ -101,7 +101,7 @@ export class EmptyRulesStore implements RulesStore {
 }
 
 export class PostgresRulesStore implements RulesStore {
-  constructor(private readonly database: DatabaseExecutor) {}
+  constructor(private readonly database: DatabaseExecutor) { }
 
   async getRules(input: RulesLookup): Promise<RulesStoreResult | null> {
     const workspaceExists = await this.workspaceExists(input.workspaceId);
@@ -119,10 +119,10 @@ export class PostgresRulesStore implements RulesStore {
       input.repositoryId === undefined
         ? null
         : await this.ensureRepositoryPolicy({
-            workspaceId: input.workspaceId,
-            repositoryId: input.repositoryId,
-            accessScope: input.accessScope ?? FULL_REPOSITORY_ACCESS_SCOPE
-          });
+          workspaceId: input.workspaceId,
+          repositoryId: input.repositoryId,
+          accessScope: input.accessScope ?? FULL_REPOSITORY_ACCESS_SCOPE
+        });
 
     if (input.repositoryId !== undefined && selectedRepositoryPolicy === null) {
       return null;
@@ -140,10 +140,10 @@ export class PostgresRulesStore implements RulesStore {
       input.repositoryId === null
         ? await this.ensureWorkspacePolicy(input.workspaceId)
         : await this.ensureRepositoryPolicy({
-            workspaceId: input.workspaceId,
-            repositoryId: input.repositoryId,
-            accessScope: input.accessScope ?? FULL_REPOSITORY_ACCESS_SCOPE
-          });
+          workspaceId: input.workspaceId,
+          repositoryId: input.repositoryId,
+          accessScope: input.accessScope ?? FULL_REPOSITORY_ACCESS_SCOPE
+        });
 
     if (current === null) {
       return null;
@@ -181,7 +181,7 @@ WHERE id = $1
         JSON.stringify(merged.analysis),
         JSON.stringify(merged.infrastructureSecurity),
         JSON.stringify(merged.workspaceControls),
-        input.updatedByClerkUserId
+        input.updatedByUserId
       ]
     );
     return this.findPolicyById(policyId(input.workspaceId, input.repositoryId));
@@ -536,7 +536,7 @@ function toReviewPolicy(row: ReviewPolicyRow): ReviewPolicy {
     analysis: mergeDefaults(DEFAULT_ANALYSIS, row.analysis_toggles_json),
     infrastructureSecurity: mergeDefaults(DEFAULT_INFRASTRUCTURE_SECURITY, row.infrastructure_security_policy_json),
     workspaceControls: mergeDefaults(DEFAULT_WORKSPACE_CONTROLS, row.workspace_controls_json),
-    updatedByClerkUserId: row.updated_by_clerk_user_id,
+    updatedByUserId: row.updated_by_clerk_user_id,
     createdAt: toRequiredIsoString(row.created_at),
     updatedAt: toRequiredIsoString(row.updated_at)
   };
@@ -546,7 +546,7 @@ function buildDefaultReviewPolicy(input: {
   workspaceId: string;
   repositoryId: string | null;
   scope: ReviewPolicy["scope"];
-  updatedByClerkUserId?: string | null;
+  updatedByUserId?: string | null;
   createdAt: string;
   updatedAt: string;
   updates?: ParsedReviewPolicyUpdate;
@@ -566,7 +566,7 @@ function buildDefaultReviewPolicy(input: {
       analysis: DEFAULT_ANALYSIS,
       infrastructureSecurity: DEFAULT_INFRASTRUCTURE_SECURITY,
       workspaceControls: DEFAULT_WORKSPACE_CONTROLS,
-      updatedByClerkUserId: input.updatedByClerkUserId ?? null,
+      updatedByUserId: input.updatedByUserId ?? null,
       createdAt: input.createdAt,
       updatedAt: input.updatedAt
     },

@@ -47,7 +47,7 @@ export class CodebaseScansController {
   constructor(
     @Inject(CODEBASE_SCAN_STORE) private readonly scanStore: CodebaseScanStore,
     @Inject(DASHBOARD_AUTH_STORE) private readonly dashboardAuthStore: DashboardAuthStore
-  ) {}
+  ) { }
 
   @Get("api/repositories/:id/codebase-scans")
   async listRepositoryScans(
@@ -161,13 +161,10 @@ function hasMembershipCapability(
       orgId: null,
       provider: "insforge",
       workspaceId: membership.workspaceId,
-      clerkUserId: membership.clerkUserId,
-      clerkOrgId: null,
       sessionId: null,
       role: membership.role,
       capabilities: [],
-      billingCapabilities: [],
-      clerkCapabilities: []
+      billingCapabilities: []
     },
     capability
   );

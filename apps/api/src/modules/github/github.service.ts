@@ -43,7 +43,7 @@ import {
 
 export interface GitHubDashboardContext {
   readonly workspaceId: string | null;
-  readonly clerkUserId: string | null;
+  readonly userId: string | null;
 }
 
 export interface GitHubOAuthCallbackContext extends GitHubDashboardContext {
@@ -81,7 +81,7 @@ export class GitHubDashboardService {
 
   async getOAuthStatus(input: GitHubDashboardContext): Promise<GitHubOAuthStatusResponse> {
     const membership = await this.requireMembership(input);
-    return this.store.getOAuthStatus(membership.clerkUserId);
+    return this.store.getOAuthStatus(membership.userId);
   }
 
   async startOAuth(input: GitHubDashboardContext): Promise<GitHubOAuthStartResponse> {
@@ -94,7 +94,7 @@ export class GitHubDashboardService {
     await this.store.createOAuthState({
       state,
       workspaceId: membership.workspaceId,
-      clerkUserId: membership.clerkUserId,
+      userId: membership.userId,
       redirectUri,
       expiresAt
     });
@@ -130,7 +130,7 @@ export class GitHubDashboardService {
     const stateRecord = await this.store.consumeOAuthState({
       state: input.state,
       workspaceId: membership.workspaceId,
-      clerkUserId: membership.clerkUserId
+      userId: membership.userId
     });
 
     if (stateRecord === null) {
@@ -143,7 +143,7 @@ export class GitHubDashboardService {
     });
     const user = await this.accountClient.fetchOAuthUser(token.accessToken);
     const status = await this.store.upsertOAuthConnection({
-      clerkUserId: membership.clerkUserId,
+      userId: membership.userId,
       user,
       scopes: token.scopes,
       accessToken: token.accessToken
@@ -178,7 +178,7 @@ export class GitHubDashboardService {
     const syncedRepositoryCount = await this.syncInstallationRepositories(
       mappedInstallation.id,
       mappedInstallation.installationId,
-      membership.clerkUserId
+      membership.userId
     );
 
     return {
@@ -206,7 +206,7 @@ export class GitHubDashboardService {
       syncedRepositoryCount += await this.syncInstallationRepositories(
         mappedInstallation.id,
         mappedInstallation.installationId,
-        membership.clerkUserId
+        membership.userId
       );
     }
 
@@ -239,13 +239,13 @@ export class GitHubDashboardService {
       installationUuid: repository.installationUuid,
       repository: latest,
       preserveExistingEnabled: true,
-      grantAccessToClerkUserId: membership.clerkUserId
+      grantAccessToClerkUserId: membership.userId
     });
 
     if (synced.enabled) {
       await this.codebaseScanEnqueueService?.enqueueInitialScanForRepository({
         repositoryId: synced.id,
-        requestedByClerkUserId: membership.clerkUserId
+        requestedByUserId: membership.userId
       });
     }
 
@@ -295,7 +295,7 @@ export class GitHubDashboardService {
       await this.syncInstallationRepositories(
         mappedInstallation.id,
         mappedInstallation.installationId,
-        membership.clerkUserId
+        membership.userId
       );
     }
   }
@@ -307,7 +307,7 @@ export class GitHubDashboardService {
     });
     const user = await this.accountClient.fetchOAuthUser(token.accessToken);
     const status = await this.store.upsertOAuthConnection({
-      clerkUserId: input.membership.clerkUserId,
+      userId: input.membership.userId,
       user,
       scopes: token.scopes,
       accessToken: token.accessToken
@@ -328,7 +328,7 @@ export class GitHubDashboardService {
       console.error(
         `[github-oauth] GitHub App installation sync failed after OAuth connection: ${JSON.stringify({
           workspaceId: membership.workspaceId,
-          clerkUserId: membership.clerkUserId,
+          userId: membership.userId,
           message
         })}`
       );
@@ -353,7 +353,7 @@ export class GitHubDashboardService {
 
   private async requireConnectedMembership(input: GitHubDashboardContext): Promise<DashboardMembership> {
     const membership = await this.requireMembership(input);
-    const oauth = await this.store.getOAuthStatus(membership.clerkUserId);
+    const oauth = await this.store.getOAuthStatus(membership.userId);
 
     if (!oauth.connected) {
       throw new ForbiddenException("GitHub OAuth connection is required");
@@ -378,7 +378,7 @@ export class GitHubDashboardService {
 
     const membership = await this.dashboardAuthStore.findActiveMembership({
       workspaceId: input.workspaceId,
-      clerkUserId: input.clerkUserId
+      userId: input.userId
     });
 
     if (membership === null) {
@@ -452,9 +452,9 @@ function parsePositiveIntegerValue(label: string, value: unknown): number {
 
 function assertAuthenticated(input: GitHubDashboardContext): asserts input is GitHubDashboardContext & {
   workspaceId: string;
-  clerkUserId: string;
+  userId: string;
 } {
-  if (input.workspaceId === null || input.clerkUserId === null) {
+  if (input.workspaceId === null || input.userId === null) {
     throw new UnauthorizedException("Dashboard authentication is required");
   }
 }

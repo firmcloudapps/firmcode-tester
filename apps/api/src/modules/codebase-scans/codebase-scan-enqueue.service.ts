@@ -69,12 +69,12 @@ export interface CodebaseScanRepositoryTarget {
 export interface ManualCodebaseScanRequest {
   readonly repositoryId: string;
   readonly workspaceId: string | null;
-  readonly clerkUserId: string | null;
+  readonly userId: string | null;
 }
 
 export interface InitialCodebaseScanRequest {
   readonly repositoryId: string;
-  readonly requestedByClerkUserId?: string | null;
+  readonly requestedByUserId?: string | null;
   readonly correlationId?: string;
 }
 
@@ -91,7 +91,7 @@ export class CodebaseScanEnqueueService {
     @Optional()
     @Inject(CODEBASE_SCAN_CORRELATION_ID_FACTORY)
     private readonly createCorrelationId: () => string = randomUUID
-  ) {}
+  ) { }
 
   async enqueueInitialScanForRepository(input: InitialCodebaseScanRequest): Promise<CodebaseScanEnqueueResponse | null> {
     assertUuid("repository ID", input.repositoryId);
@@ -109,7 +109,7 @@ export class CodebaseScanEnqueueService {
       target,
       trigger: "install",
       commitSha: null,
-      requestedByClerkUserId: input.requestedByClerkUserId ?? null,
+      requestedByUserId: input.requestedByUserId ?? null,
       correlationId
     });
   }
@@ -141,7 +141,7 @@ export class CodebaseScanEnqueueService {
 
     const membership = await this.dashboardAuthStore.findActiveMembership({
       workspaceId: input.workspaceId,
-      clerkUserId: input.clerkUserId
+      userId: input.userId
     });
 
     if (membership === null) {
@@ -157,7 +157,7 @@ export class CodebaseScanEnqueueService {
       workspaceId: input.workspaceId,
       accessScope: resolveRepositoryAccessScope({
         role: membership.role,
-        clerkUserId: membership.clerkUserId
+        userId: membership.userId
       })
     });
 
@@ -173,7 +173,7 @@ export class CodebaseScanEnqueueService {
       target,
       trigger: "manual",
       commitSha: null,
-      requestedByClerkUserId: input.clerkUserId,
+      requestedByUserId: membership.userId,
       correlationId: this.createCorrelationId()
     });
   }
@@ -190,7 +190,7 @@ export class CodebaseScanEnqueueService {
         commitSha: null,
         trigger: "scheduled",
         correlationId,
-        requestedByClerkUserId: null,
+        requestedByUserId: null,
         scanConfig: toScanJobConfig(target)
       },
       target.codebaseScanCadenceHours
@@ -201,7 +201,7 @@ export class CodebaseScanEnqueueService {
     readonly target: CodebaseScanRepositoryTarget;
     readonly trigger: WorkerCodebaseScanTrigger;
     readonly commitSha: string | null;
-    readonly requestedByClerkUserId: string | null;
+    readonly requestedByUserId: string | null;
     readonly correlationId: string;
   }): Promise<CodebaseScanEnqueueResponse> {
     const startedAt = Date.now();
@@ -231,7 +231,7 @@ export class CodebaseScanEnqueueService {
         commitSha: input.commitSha,
         trigger: input.trigger,
         correlationId: input.correlationId,
-        requestedByClerkUserId: input.requestedByClerkUserId,
+        requestedByUserId: input.requestedByUserId,
         scanConfig: toScanJobConfig(input.target)
       });
 
@@ -285,7 +285,7 @@ export class EmptyCodebaseScanTargetStore implements CodebaseScanTargetStore {
 }
 
 export class PostgresCodebaseScanTargetStore implements CodebaseScanTargetStore {
-  constructor(private readonly database: DatabaseExecutor) {}
+  constructor(private readonly database: DatabaseExecutor) { }
 
   async findRepositoryTarget(repositoryId: string): Promise<CodebaseScanRepositoryTarget | null> {
     const result = await this.database.query<CodebaseScanTargetRow>(
@@ -445,9 +445,9 @@ function logScanQueueEvent(
 
 function assertAuthenticated(input: ManualCodebaseScanRequest): asserts input is ManualCodebaseScanRequest & {
   workspaceId: string;
-  clerkUserId: string;
+  userId: string;
 } {
-  if (input.workspaceId === null || input.clerkUserId === null) {
+  if (input.workspaceId === null || input.userId === null) {
     throw new UnauthorizedException("Dashboard authentication is required");
   }
 }

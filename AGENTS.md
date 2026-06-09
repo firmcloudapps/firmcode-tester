@@ -16,6 +16,8 @@ Firmcode reviews GitHub pull requests by combining deterministic static analysis
 
 Keep the MVP simple: Docker Compose, PostgreSQL, Redis, NestJS API, BullMQ jobs, Python AI worker, and Next.js dashboard.
 
+Auth is handled by **InsForge** (migrated from Clerk). Do not reintroduce Clerk.
+
 ## Reference Repository Policy
 
 The included `pr-agent/`, `semgrep/`, and `tree-sitter/` directories are reference implementations only. Do not vendor, import, or modify their code unless the user explicitly requests it. Before implementing an analogous Firmcode component, read the relevant reference files and adapt the design into Firmcode-owned modules, contracts, and tests.
@@ -101,6 +103,59 @@ pytest apps/worker/tests
 ```
 
 If a command does not exist yet, add or update the relevant package script as part of the implementation task.
+
+## Auth Migration: Clerk → InsForge (Completed)
+
+The codebase has been fully migrated from Clerk to InsForge. All Clerk packages, modules, and references have been removed.
+
+### What Changed
+
+**Deleted**
+- `apps/api/src/modules/webhooks/clerk/` — entire Clerk webhook module removed
+- `apps/api/src/modules/auth/clerk-token-verifier.ts` — replaced by `insforge-token-verifier.ts`
+- All `@clerk/*` npm dependencies
+
+**API: Auth module (`apps/api/src/modules/auth/`)**
+- `dashboard-auth.module.ts` — now provides only `InsForgeTokenVerifier` as `TOKEN_VERIFIER`; removed `CLERK_TOKEN_VERIFIER` provider and Clerk factory
+- `dashboard-auth.guard.ts` — removed deprecated `clerkUserId`, `clerkOrgId`, `clerkCapabilities` fields from `DashboardRequestContext` construction
+- `dashboard-auth.context.ts` — `DashboardRequestContext` uses generic `userId`, `orgId`, `billingCapabilities`, `provider: string`; deprecated Clerk fields removed
+- `workspace-resolver.ts` — replaced `DefaultClerkOrganizationConfig` with `DefaultWorkspaceConfig`; removed Clerk-specific SQL columns from audit queries; removed `readDefaultOrganizationRole` helper
+
+**API: Service & store renames**
+
+| File | Change |
+|---|---|
+| `review-runs.controller.ts` | `clerkUserId` → `userId` in `hasMembershipCapability` and retry call |
+| `findings.controller.ts` | `clerkUserId` → `userId` in `hasDashboardCapability` |
+| `ci-failures.controller.ts` | `clerkUserId` → `userId` in `hasMembershipCapability` |
+| `codebase-scans.controller.ts` | `clerkUserId` → `userId` in `hasMembershipCapability` |
+| `repositories.controller.ts` | `clerkUserId` → `userId` in `hasMembershipCapability` |
+| `review-run-retry.service.ts` | `ReviewRunRetryRequest.clerkUserId` → `userId` |
+| `review-runs.store.ts` | `CreateRetryReviewRunInput.clerkUserId` → `userId` |
+| `billing.service.ts` | `WorkspaceBillingRequestContext.clerkUserId` → `userId`; billing source/plan values updated to InsForge literals |
+| `rules.service.ts` | `RulesRequestContext.clerkUserId` → `userId` |
+| `rules.store.ts` | `RulesPolicyUpdate.updatedByClerkUserId` → `updatedByUserId` |
+| `github.service.ts` | `GitHubDashboardContext.clerkUserId` → `userId`; all method calls updated |
+| `github.store.ts` | `CreateOAuthStateInput`, `ConsumeOAuthStateInput`, `OAuthStateRecord`, `UpsertOAuthConnectionInput` — `clerkUserId` → `userId` |
+| `repositories.store.ts` | `RepositoryConfigurationUpdate.updatedByClerkUserId` → `updatedByUserId` |
+| `repository-configuration.service.ts` | `RepositoryConfigurationRequestContext.clerkUserId` → `userId` |
+| `codebase-scan-enqueue.service.ts` | `ManualCodebaseScanRequest.clerkUserId` → `userId`; `requestedByClerkUserId` → `requestedByUserId` |
+| `main.ts` | Removed `/webhooks/clerk` body-parser middleware |
+| `app.module.ts` | Removed `ClerkWebhookModule` import and usage |
+
+**Shared package (`packages/shared/src/contracts/`)**
+
+| File | Change |
+|---|---|
+| `review.ts` | `ReviewPolicy.updatedByClerkUserId` → `updatedByUserId`; `RepositoryReviewConfiguration.updatedByClerkUserId` → `updatedByUserId`; `WorkspaceBillingResponse.source` widened from `"clerk"` literal to `string`; plan status widened from `"managed_by_clerk"` to `string` |
+| `worker.ts` | `WorkerCodebaseScanJobInput.requestedByClerkUserId` → `requestedByUserId`; JSON schema `required` array and `properties` updated to match |
+
+### Rules for Future Work
+
+- Always use `userId` (never `clerkUserId`) when referencing an authenticated user.
+- Always use `DashboardMembership.userId` (the `clerkUserId` field is a deprecated alias kept only for backward-compatible SQL queries).
+- `findActiveMembership` accepts both `userId` and `clerkUserId` in its input for DB compatibility — always pass `userId`.
+- The `RepositoryAccessScope.restrictToClerkUserId` field name is intentionally kept as-is (maps to the `clerk_user_id` DB column); do not rename it without a DB migration.
 
 ## Definition Of Done
 

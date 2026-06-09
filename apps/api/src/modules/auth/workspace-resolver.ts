@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { ForbiddenException, Injectable } from "@nestjs/common";
-import type { DefaultClerkOrganizationConfig, DefaultWorkspaceConfig } from "@firmcode/shared";
+import type { DefaultWorkspaceConfig } from "@firmcode/shared";
 import type { DatabaseExecutor } from "../../infrastructure/database/migrations";
 import type { DashboardRole } from "../review-runs/dashboard-auth.store";
 import type { VerifiedToken } from "./token-verifier";
@@ -14,10 +14,6 @@ export interface ResolvedDashboardWorkspace {
   readonly sessionId: string | null;
   readonly role: DashboardRole;
   readonly billingCapabilities: readonly string[];
-  /** @deprecated Use userId instead */
-  readonly clerkUserId?: string;
-  /** @deprecated Use orgId instead */
-  readonly clerkOrgId?: string | null;
 }
 
 export interface DashboardWorkspaceResolver {
@@ -47,7 +43,7 @@ export class PostgresDashboardWorkspaceResolver implements DashboardWorkspaceRes
   constructor(
     private readonly database: DatabaseExecutor,
     private readonly uuidFactory: () => string = randomUUID,
-    private readonly defaultOrganization: DefaultWorkspaceConfig | DefaultClerkOrganizationConfig | null = null
+    private readonly defaultOrganization: DefaultWorkspaceConfig | null = null
   ) { }
 
   async resolve(input: {
@@ -96,7 +92,7 @@ export class PostgresDashboardWorkspaceResolver implements DashboardWorkspaceRes
         name: this.defaultOrganization.name,
         provider: input.token.provider
       });
-      const defaultRole = resolveConfiguredOrganizationRole(readDefaultOrganizationRole(this.defaultOrganization));
+      const defaultRole = resolveConfiguredOrganizationRole("org:developer");
       const membership = await this.ensureMembership({
         workspaceId,
         userId,
@@ -432,12 +428,6 @@ function isElevatedRole(role: DashboardRole | null): boolean {
   return role === "owner" || role === "admin";
 }
 
-function readDefaultOrganizationRole(
-  organization: DefaultWorkspaceConfig | DefaultClerkOrganizationConfig
-): string {
-  return "role" in organization ? organization.role : "org:developer";
-}
-
 function toResolvedWorkspace(token: VerifiedToken, membership: MembershipRow): ResolvedDashboardWorkspace {
   const userId = membership.user_id ?? membership.clerk_user_id ?? token.userId;
 
@@ -453,9 +443,6 @@ function toResolvedWorkspace(token: VerifiedToken, membership: MembershipRow): R
     orgId,
     sessionId: token.sessionId,
     role: membership.role,
-    billingCapabilities: token.billingCapabilities,
-    // Deprecated fields for backward compatibility
-    clerkUserId: userId,
-    clerkOrgId: orgId
+    billingCapabilities: token.billingCapabilities
   };
 }

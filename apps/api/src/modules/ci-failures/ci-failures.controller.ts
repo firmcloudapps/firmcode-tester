@@ -90,13 +90,10 @@ function hasMembershipCapability(
       orgId: null,
       provider: "insforge",
       workspaceId: membership.workspaceId,
-      clerkUserId: membership.clerkUserId,
-      clerkOrgId: null,
       sessionId: null,
       role: membership.role,
       capabilities: [],
-      billingCapabilities: [],
-      clerkCapabilities: []
+      billingCapabilities: []
     },
     capability
   );

@@ -28,7 +28,7 @@ import {
 export interface ReviewRunRetryRequest {
   readonly reviewRunId: string;
   readonly workspaceId: string | null;
-  readonly clerkUserId: string | null;
+  readonly userId: string | null;
 }
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -39,7 +39,7 @@ export class ReviewRunRetryService {
     @Inject(REVIEW_RUNS_STORE) private readonly reviewRunsStore: ReviewRunsStore,
     @Inject(DASHBOARD_AUTH_STORE) private readonly dashboardAuthStore: DashboardAuthStore,
     @Inject(REVIEW_QUEUE) private readonly reviewQueue: ReviewQueueProducer
-  ) {}
+  ) { }
 
   async retryReviewRun(input: ReviewRunRetryRequest): Promise<ReviewRunRetryResponse> {
     assertUuid("review run ID", input.reviewRunId);
@@ -49,7 +49,7 @@ export class ReviewRunRetryService {
 
     const membership = await this.dashboardAuthStore.findActiveMembership({
       workspaceId: input.workspaceId,
-      clerkUserId: input.clerkUserId
+      userId: input.userId
     });
 
     if (membership === null) {
@@ -63,10 +63,10 @@ export class ReviewRunRetryService {
     const retry = await this.reviewRunsStore.createRetryReviewRun({
       reviewRunId: input.reviewRunId,
       workspaceId: input.workspaceId,
-      clerkUserId: input.clerkUserId,
+      userId: input.userId,
       accessScope: resolveRepositoryAccessScope({
         role: membership.role,
-        clerkUserId: membership.clerkUserId
+        userId: membership.userId
       })
     });
 
@@ -118,9 +118,9 @@ export class ReviewRunRetryService {
 
 function assertAuthenticated(input: ReviewRunRetryRequest): asserts input is ReviewRunRetryRequest & {
   workspaceId: string;
-  clerkUserId: string;
+  userId: string;
 } {
-  if (input.workspaceId === null || input.clerkUserId === null) {
+  if (input.workspaceId === null || input.userId === null) {
     throw new UnauthorizedException("Dashboard authentication is required");
   }
 }

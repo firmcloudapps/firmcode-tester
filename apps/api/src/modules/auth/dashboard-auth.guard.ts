@@ -58,11 +58,7 @@ export class DashboardAuthGuard implements CanActivate {
       role: workspace.role,
       capabilities,
       billingCapabilities: workspace.billingCapabilities,
-      provider: verified.provider,
-      // Deprecated fields for backward compatibility
-      clerkUserId: workspace.userId,
-      clerkOrgId: workspace.orgId,
-      clerkCapabilities: workspace.billingCapabilities
+      provider: verified.provider
     };
 
     request.dashboardAuth = requestContext;

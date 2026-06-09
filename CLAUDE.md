@@ -23,8 +23,8 @@ Primary outcomes:
 - Worker: Python.
 - Queue: Redis + BullMQ.
 - Database: NeonDB/PostgreSQL.
-- Auth: Clerk.
-- Billing: Clerk Billing.
+- Auth: InsForge.
+- Billing: InsForge managed.
 - Static analysis: Semgrep CLI.
 - Semantic parsing: Tree-sitter.
 - Deployment: Docker Compose.
@@ -75,7 +75,48 @@ docs/
 
 ## Dashboard Design
 
-The dashboard must follow [docs/DASHBOARD_DESIGN.md](docs/DASHBOARD_DESIGN.md): clean modern light mode, TypeScript, Tailwind CSS, compact SaaS shell, Clerk for auth/billing, and NeonDB-backed application data. Build operational product screens first, not a marketing landing page.
+The dashboard must follow [docs/DASHBOARD_DESIGN.md](docs/DASHBOARD_DESIGN.md): clean modern light mode, TypeScript, Tailwind CSS, compact SaaS shell, InsForge for auth, and NeonDB-backed application data. Build operational product screens first, not a marketing landing page.
+
+## Auth Provider: InsForge
+
+The project has been fully migrated from Clerk to InsForge. All authentication is handled exclusively through InsForge. The following rules apply:
+
+- **Do not reintroduce Clerk**. All `@clerk/*` packages have been removed.
+- The active auth provider is configured via `AUTH_PROVIDER=insforge` in environment variables.
+- Token verification uses `InsForgeTokenVerifier` exclusively — see `apps/api/src/modules/auth/insforge-token-verifier.ts`.
+- The `DashboardAuthModule` provides only `InsForgeTokenVerifier` as `TOKEN_VERIFIER`.
+- Dashboard auth context uses generic fields: `userId`, `orgId`, `billingCapabilities`, `provider` — no Clerk-specific fields.
+- Workspace resolution uses `DefaultWorkspaceConfig` (fields: `id`, `name`) — not `DefaultClerkOrganizationConfig`.
+
+### Auth Refactoring Reference (completed)
+
+| Old (Clerk) | New (InsForge) |
+|---|---|
+| `clerkUserId` | `userId` |
+| `clerkOrgId` | `orgId` |
+| `clerkCapabilities` | `billingCapabilities` |
+| `updatedByClerkUserId` | `updatedByUserId` |
+| `requestedByClerkUserId` | `requestedByUserId` |
+| `DefaultClerkOrganizationConfig` | `DefaultWorkspaceConfig` |
+| `ClerkBackendTokenVerifier` | `InsForgeTokenVerifier` |
+| `ClerkWebhookModule` | deleted |
+| `DashboardRequestContext.clerkUserId/orgId/clerkCapabilities` | removed (deprecated fields deleted) |
+| `WorkspaceBillingResponse.source: "clerk"` | `source: string` (widened) |
+| `ReviewPolicy.updatedByClerkUserId` | `updatedByUserId` |
+| `RepositoryReviewConfiguration.updatedByClerkUserId` | `updatedByUserId` |
+| `WorkerCodebaseScanJobInput.requestedByClerkUserId` | `requestedByUserId` |
+
+### Key Auth Files
+
+- `apps/api/src/modules/auth/insforge-token-verifier.ts` — Token verification
+- `apps/api/src/modules/auth/dashboard-auth.module.ts` — Module wiring (InsForge only)
+- `apps/api/src/modules/auth/dashboard-auth.guard.ts` — Request guard
+- `apps/api/src/modules/auth/dashboard-auth.context.ts` — `DashboardRequestContext` type
+- `apps/api/src/modules/auth/workspace-resolver.ts` — Workspace/membership resolution
+- `apps/api/src/modules/review-runs/dashboard-auth.store.ts` — `DashboardMembership` + DB queries
+- `apps/web/components/auth/auth-page.tsx` — InsForge login/signup UI
+- `apps/web/components/auth/auth-provider-boundary.tsx` — Auth session boundary
+- `apps/web/middleware.ts` — Next.js middleware (Clerk middleware removed)
 
 ## Implementation Priorities
 

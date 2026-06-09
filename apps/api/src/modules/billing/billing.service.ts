@@ -9,7 +9,7 @@ import { BILLING_USAGE_STORE, EmptyBillingUsageStore, type BillingUsageStore } f
 
 export interface WorkspaceBillingRequestContext {
   readonly workspaceId: string | null;
-  readonly clerkUserId: string | null;
+  readonly userId: string | null;
   readonly hasClerkBillingCapability: boolean;
 }
 
@@ -20,14 +20,14 @@ export class BillingService {
     @Optional()
     @Inject(BILLING_USAGE_STORE)
     private readonly billingUsageStore: BillingUsageStore = new EmptyBillingUsageStore()
-  ) {}
+  ) { }
 
   async getWorkspaceBilling(input: WorkspaceBillingRequestContext): Promise<WorkspaceBillingResponse> {
     assertAuthenticated(input);
 
     const membership = await this.dashboardAuthStore.findActiveMembership({
       workspaceId: input.workspaceId,
-      clerkUserId: input.clerkUserId
+      userId: input.userId
     });
 
     if (membership === null) {
@@ -49,11 +49,11 @@ export class BillingService {
         id: membership.workspaceId,
         role: membership.role,
         canManageBilling: canManage,
-        source: "clerk"
+        source: "insforge"
       },
       plan: {
-        name: "Clerk managed",
-        status: "managed_by_clerk"
+        name: "InsForge managed",
+        status: "active"
       },
       usage
     };
@@ -62,9 +62,9 @@ export class BillingService {
 
 function assertAuthenticated(input: WorkspaceBillingRequestContext): asserts input is WorkspaceBillingRequestContext & {
   workspaceId: string;
-  clerkUserId: string;
+  userId: string;
 } {
-  if (input.workspaceId === null || input.clerkUserId === null) {
+  if (input.workspaceId === null || input.userId === null) {
     throw new UnauthorizedException("Dashboard authentication is required");
   }
 }

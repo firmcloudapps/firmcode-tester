@@ -3,6 +3,17 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { insforge } from "../lib/insforge";
 
+const ACCESS_TOKEN_COOKIE = "insforge_access_token";
+
+function persistAccessToken(token: string): void {
+  const secure = window.location.protocol === "https:" ? "; Secure" : "";
+  document.cookie = `${ACCESS_TOKEN_COOKIE}=${token}; path=/; SameSite=Lax; max-age=3600${secure}`;
+}
+
+function clearAccessToken(): void {
+  document.cookie = `${ACCESS_TOKEN_COOKIE}=; path=/; max-age=0`;
+}
+
 interface InsForgeUser {
   id: string;
   email: string;
@@ -70,6 +81,10 @@ export function InsForgeProviderBoundary({
 
         if (data?.user) {
           setUser(data.user as InsForgeUser);
+          const tokenInMemory = (insforge as any).tokenManager?.getSession()?.accessToken as string | undefined;
+          if (tokenInMemory) {
+            persistAccessToken(tokenInMemory);
+          }
         }
 
         if (configResult.data) {
@@ -100,6 +115,7 @@ export function InsForgeProviderBoundary({
 
     if (data?.user && data.accessToken) {
       setUser(data.user as InsForgeUser);
+      persistAccessToken(data.accessToken);
       window.location.href = afterSignInUrl;
       return { status: "signed_in" } satisfies AuthCompletionResult;
     }
@@ -129,6 +145,7 @@ export function InsForgeProviderBoundary({
 
     if (data?.user && data.accessToken) {
       setUser(data.user as InsForgeUser);
+      persistAccessToken(data.accessToken);
       window.location.href = afterSignUpUrl;
       return { status: "signed_in" } satisfies AuthCompletionResult;
     }
@@ -144,6 +161,7 @@ export function InsForgeProviderBoundary({
 
     if (data?.user) {
       setUser(data.user as InsForgeUser);
+      if (data.accessToken) persistAccessToken(data.accessToken);
       window.location.href = afterSignUpUrl;
       return { status: "signed_in" } satisfies AuthCompletionResult;
     }
@@ -152,7 +170,7 @@ export function InsForgeProviderBoundary({
   };
 
   const signInWithGoogle = async () => {
-    const redirectTo = new URL(afterSignInUrl, window.location.origin).toString();
+    const redirectTo = new URL("/auth/callback", window.location.origin).toString();
     const { error } = await insforge.auth.signInWithOAuth("google", { redirectTo });
 
     if (error) {
@@ -175,6 +193,8 @@ export function InsForgeProviderBoundary({
     }
 
     setUser(data.user as InsForgeUser);
+    const verifyToken = (data as any)?.accessToken as string | undefined;
+    if (verifyToken) persistAccessToken(verifyToken);
     window.location.href = intent === "sign-in" ? afterSignInUrl : afterSignUpUrl;
   };
 
@@ -191,12 +211,22 @@ export function InsForgeProviderBoundary({
 
   const signOut = async () => {
     await insforge.auth.signOut();
+    clearAccessToken();
     setUser(null);
     window.location.href = signInUrl;
   };
 
   const getToken = async (): Promise<string | null> => {
-    // In InsForge, the SDK handles tokens via cookies.
+    const fromMemory = (insforge as any).tokenManager?.getSession()?.accessToken as string | undefined;
+    if (fromMemory) {
+      persistAccessToken(fromMemory);
+      return fromMemory;
+    }
+    const { data } = await insforge.auth.refreshSession();
+    if (data?.accessToken) {
+      persistAccessToken(data.accessToken);
+      return data.accessToken;
+    }
     return null;
   };
 

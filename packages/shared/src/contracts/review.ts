@@ -308,7 +308,7 @@ export interface RepositoryReviewConfiguration {
   ciExplanationEnabled: boolean;
   infrastructureReviewEnabled: boolean;
   dryRunEnabled: boolean;
-  updatedByClerkUserId: string | null;
+  updatedByUserId: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -390,7 +390,7 @@ export interface ReviewPolicy {
   analysis: ReviewPolicyAnalysisToggles;
   infrastructureSecurity: ReviewPolicyInfrastructureSecurity;
   workspaceControls: ReviewPolicyWorkspaceControls;
-  updatedByClerkUserId: string | null;
+  updatedByUserId: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -950,11 +950,11 @@ export interface WorkspaceBillingResponse {
     id: string;
     role: DashboardWorkspaceRole;
     canManageBilling: boolean;
-    source: "clerk";
+    source: string;
   };
   plan: {
     name: string;
-    status: "managed_by_clerk";
+    status: string;
   };
   usage: {
     reviewRunsThisMonth: number | null;

@@ -25,7 +25,7 @@ import { REPOSITORIES_STORE, type RepositoriesStore } from "./repositories.store
 export interface RepositoryConfigurationRequestContext {
   readonly repositoryId: string;
   readonly workspaceId: string | null;
-  readonly clerkUserId: string | null;
+  readonly userId: string | null;
 }
 
 export interface RepositoryConfigurationUpdateContext extends RepositoryConfigurationRequestContext {
@@ -75,7 +75,7 @@ export class RepositoryConfigurationService {
     @Inject(REPOSITORIES_STORE) private readonly repositoriesStore: RepositoriesStore,
     @Inject(DASHBOARD_AUTH_STORE) private readonly dashboardAuthStore: DashboardAuthStore,
     private readonly codebaseScanEnqueueService?: CodebaseScanEnqueueService
-  ) {}
+  ) { }
 
   async getRepositoryConfiguration(input: RepositoryConfigurationRequestContext): Promise<RepositoryReviewConfiguration> {
     const context = await this.authorize(input, { requireManageConfiguration: false });
@@ -94,7 +94,7 @@ export class RepositoryConfigurationService {
     const configuration = await this.repositoriesStore.updateRepositoryConfiguration({
       ...context,
       updates,
-      updatedByClerkUserId: context.clerkUserId
+      updatedByUserId: context.userId
     });
 
     if (configuration === null) {
@@ -107,7 +107,7 @@ export class RepositoryConfigurationService {
       if (updates.automationEnabled === true || updates.codebaseScanEnabled === true) {
         await this.codebaseScanEnqueueService?.enqueueInitialScanForRepository({
           repositoryId: context.repositoryId,
-          requestedByClerkUserId: context.clerkUserId
+          requestedByUserId: context.userId
         });
       }
 
@@ -133,7 +133,7 @@ export class RepositoryConfigurationService {
   ): Promise<{
     repositoryId: string;
     workspaceId: string;
-    clerkUserId: string;
+    userId: string;
     accessScope: RepositoryAccessScope;
   }> {
     assertUuid("repository ID", input.repositoryId);
@@ -142,7 +142,7 @@ export class RepositoryConfigurationService {
 
     const membership = await this.dashboardAuthStore.findActiveMembership({
       workspaceId: input.workspaceId,
-      clerkUserId: input.clerkUserId
+      userId: input.userId
     });
 
     if (membership === null) {
@@ -156,10 +156,10 @@ export class RepositoryConfigurationService {
     return {
       repositoryId: input.repositoryId,
       workspaceId: input.workspaceId,
-      clerkUserId: input.clerkUserId,
+      userId: input.userId,
       accessScope: resolveRepositoryAccessScope({
         role: membership.role,
-        clerkUserId: membership.clerkUserId
+        userId: membership.userId
       })
     };
   }
@@ -293,9 +293,9 @@ function parsePathPatterns(label: string, value: unknown): string[] {
 
 function assertAuthenticated(input: RepositoryConfigurationRequestContext): asserts input is RepositoryConfigurationRequestContext & {
   workspaceId: string;
-  clerkUserId: string;
+  userId: string;
 } {
-  if (input.workspaceId === null || input.clerkUserId === null) {
+  if (input.workspaceId === null || input.userId === null) {
     throw new UnauthorizedException("Dashboard authentication is required");
   }
 }

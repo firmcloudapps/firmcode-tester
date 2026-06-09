@@ -23,7 +23,7 @@ import { RULES_STORE, type ParsedReviewPolicyUpdate, type RulesStore } from "./r
 
 export interface RulesRequestContext {
   readonly workspaceId: string | null;
-  readonly clerkUserId: string | null;
+  readonly userId: string | null;
   readonly repositoryId?: string | null;
 }
 
@@ -83,7 +83,7 @@ export class RulesService {
   constructor(
     @Inject(RULES_STORE) private readonly rulesStore: RulesStore,
     @Inject(DASHBOARD_AUTH_STORE) private readonly dashboardAuthStore: DashboardAuthStore
-  ) {}
+  ) { }
 
   async getRules(input: RulesRequestContext): Promise<RulesPolicyResponse> {
     const membership = await this.authorize(input, { requireManagePolicies: false });
@@ -98,7 +98,7 @@ export class RulesService {
       repositoryId,
       accessScope: resolveRepositoryAccessScope({
         role: membership.role,
-        clerkUserId: membership.clerkUserId
+        userId: membership.userId
       })
     });
 
@@ -142,10 +142,10 @@ export class RulesService {
       repositoryId,
       accessScope: resolveRepositoryAccessScope({
         role: membership.role,
-        clerkUserId: membership.clerkUserId
+        userId: membership.userId
       }),
       updates,
-      updatedByClerkUserId: membership.clerkUserId
+      updatedByUserId: membership.userId
     });
 
     if (updated === null) {
@@ -157,7 +157,7 @@ export class RulesService {
       repositoryId: repositoryId ?? undefined,
       accessScope: resolveRepositoryAccessScope({
         role: membership.role,
-        clerkUserId: membership.clerkUserId
+        userId: membership.userId
       })
     });
 
@@ -184,7 +184,7 @@ export class RulesService {
 
     const membership = await this.dashboardAuthStore.findActiveMembership({
       workspaceId: input.workspaceId,
-      clerkUserId: input.clerkUserId
+      userId: input.userId
     });
 
     if (membership === null) {
@@ -481,9 +481,9 @@ function containsSensitiveValue(value: string): boolean {
 
 function assertAuthenticated(input: RulesRequestContext): asserts input is RulesRequestContext & {
   workspaceId: string;
-  clerkUserId: string;
+  userId: string;
 } {
-  if (input.workspaceId === null || input.clerkUserId === null) {
+  if (input.workspaceId === null || input.userId === null) {
     throw new UnauthorizedException("Dashboard authentication is required");
   }
 }

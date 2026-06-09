@@ -62,7 +62,7 @@ export interface RawArtifactAccessLookup {
 export interface CreateRetryReviewRunInput {
   readonly reviewRunId: string;
   readonly workspaceId: string;
-  readonly clerkUserId: string;
+  readonly userId: string | null;
   readonly accessScope?: RepositoryAccessScope;
 }
 
@@ -611,7 +611,7 @@ INSERT INTO review_run_retries (
   created_by_clerk_user_id
 ) VALUES ($1, $2, $3, $4, $5)
 `,
-        [retryStateId, original.id, retryRunId, retryDeliveryId, input.clerkUserId]
+        [retryStateId, original.id, retryRunId, retryDeliveryId, input.userId]
       );
 
       await this.database.query("COMMIT");

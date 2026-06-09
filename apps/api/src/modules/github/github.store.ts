@@ -13,7 +13,7 @@ export const GITHUB_DASHBOARD_STORE = Symbol("GITHUB_DASHBOARD_STORE");
 export interface GitHubDashboardStore {
   createOAuthState(input: CreateOAuthStateInput): Promise<OAuthStateRecord>;
   consumeOAuthState(input: ConsumeOAuthStateInput): Promise<OAuthStateRecord | null>;
-  getOAuthStatus(clerkUserId: string): Promise<GitHubOAuthStatusResponse>;
+  getOAuthStatus(userId: string): Promise<GitHubOAuthStatusResponse>;
   upsertOAuthConnection(input: UpsertOAuthConnectionInput): Promise<GitHubOAuthStatusResponse>;
   listWorkspaceInstallations(workspaceId: string): Promise<GitHubInstallationListItem[]>;
   findWorkspaceInstallation(input: WorkspaceInstallationLookup): Promise<WorkspaceInstallationRecord | null>;
@@ -26,7 +26,7 @@ export interface GitHubDashboardStore {
 export interface CreateOAuthStateInput {
   readonly state: string;
   readonly workspaceId: string;
-  readonly clerkUserId: string;
+  readonly userId: string;
   readonly redirectUri: string;
   readonly expiresAt: Date;
 }
@@ -34,18 +34,18 @@ export interface CreateOAuthStateInput {
 export interface ConsumeOAuthStateInput {
   readonly state: string;
   readonly workspaceId: string;
-  readonly clerkUserId: string;
+  readonly userId: string;
 }
 
 export interface OAuthStateRecord {
   readonly workspaceId: string;
-  readonly clerkUserId: string;
+  readonly userId: string;
   readonly redirectUri: string;
   readonly expiresAt: Date;
 }
 
 export interface UpsertOAuthConnectionInput {
-  readonly clerkUserId: string;
+  readonly userId: string;
   readonly user: GitHubOAuthUser;
   readonly scopes: string[];
   readonly accessToken: string;
@@ -75,6 +75,7 @@ export interface UpsertInstallationRepositoryInput {
   readonly repository: GitHubRepositoryMetadata;
   readonly preserveExistingEnabled?: boolean;
   readonly grantAccessToClerkUserId?: string;
+  readonly grantAccessToUserId?: string;
 }
 
 export interface WorkspaceRepositoryLookup {
@@ -140,7 +141,7 @@ export class EmptyGitHubDashboardStore implements GitHubDashboardStore {
   async createOAuthState(input: CreateOAuthStateInput): Promise<OAuthStateRecord> {
     return {
       workspaceId: input.workspaceId,
-      clerkUserId: input.clerkUserId,
+      userId: input.userId,
       redirectUri: input.redirectUri,
       expiresAt: input.expiresAt
     };
@@ -230,7 +231,7 @@ INSERT INTO github_oauth_states (
 ) VALUES ($1, $2, $3, $4, $5)
 RETURNING workspace_id, clerk_user_id, redirect_uri, expires_at
 `,
-      [hashSecret(input.state), input.workspaceId, input.clerkUserId, input.redirectUri, input.expiresAt]
+      [hashSecret(input.state), input.workspaceId, input.userId, input.redirectUri, input.expiresAt]
     );
 
     return toOAuthStateRecord(requireRow(result.rows[0], "github oauth state"));
@@ -248,13 +249,13 @@ WHERE state_hash = $1
   AND expires_at > now()
 RETURNING workspace_id, clerk_user_id, redirect_uri, expires_at
 `,
-      [hashSecret(input.state), input.workspaceId, input.clerkUserId]
+      [hashSecret(input.state), input.workspaceId, input.userId]
     );
 
     return result.rows[0] === undefined ? null : toOAuthStateRecord(result.rows[0]);
   }
 
-  async getOAuthStatus(clerkUserId: string): Promise<GitHubOAuthStatusResponse> {
+  async getOAuthStatus(userId: string): Promise<GitHubOAuthStatusResponse> {
     const result = await this.database.query<OAuthConnectionRow>(
       `
 SELECT
@@ -267,7 +268,7 @@ SELECT
 FROM github_oauth_connections
 WHERE clerk_user_id = $1
 `,
-      [clerkUserId]
+      [userId]
     );
 
     return result.rows[0] === undefined ? { connected: false, user: null } : toOAuthStatus(result.rows[0]);
@@ -280,7 +281,7 @@ DELETE FROM github_oauth_connections
 WHERE github_user_id = $1
   AND clerk_user_id <> $2
 `,
-      [input.user.githubUserId, input.clerkUserId]
+      [input.user.githubUserId, input.userId]
     );
 
     const result = await this.database.query<OAuthConnectionRow>(
@@ -305,7 +306,7 @@ SET github_user_id = EXCLUDED.github_user_id,
 RETURNING github_user_id, github_login, github_name, github_avatar_url, connected_at, updated_at
 `,
       [
-        input.clerkUserId,
+        input.userId,
         input.user.githubUserId,
         input.user.login,
         input.user.name,
@@ -504,7 +505,7 @@ export function toRepositorySyncResponse(repository: RepositoryListItem): GitHub
 function toOAuthStateRecord(row: OAuthStateRow): OAuthStateRecord {
   return {
     workspaceId: row.workspace_id,
-    clerkUserId: row.clerk_user_id,
+    userId: row.clerk_user_id,
     redirectUri: row.redirect_uri,
     expiresAt: toDate(row.expires_at)
   };

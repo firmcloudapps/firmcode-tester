@@ -385,7 +385,7 @@ export interface WorkerCodebaseScanJobInput {
   readonly commitSha: string | null;
   readonly trigger: WorkerCodebaseScanTrigger;
   readonly correlationId: string;
-  readonly requestedByClerkUserId: string | null;
+  readonly requestedByUserId: string | null;
   readonly scanConfig?: WorkerCodebaseScanJobConfig;
 }
 
@@ -669,7 +669,7 @@ export const workerCodebaseScanJobInputJsonSchema = {
     "commitSha",
     "trigger",
     "correlationId",
-    "requestedByClerkUserId"
+    "requestedByUserId"
   ],
   properties: {
     schemaVersion: { const: WORKER_CODEBASE_SCAN_JOB_INPUT_SCHEMA_VERSION },
@@ -681,7 +681,7 @@ export const workerCodebaseScanJobInputJsonSchema = {
     commitSha: nullableStringSchema,
     trigger: codebaseScanTriggerSchema,
     correlationId: nonEmptyStringSchema,
-    requestedByClerkUserId: nullableStringSchema,
+    requestedByUserId: nullableStringSchema,
     scanConfig: {
       type: "object",
       additionalProperties: false,
