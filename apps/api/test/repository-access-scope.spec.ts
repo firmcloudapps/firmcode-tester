@@ -159,8 +159,14 @@ async function seedWorkspaceWithRepositories(
 
   for (const membership of input.memberships) {
     await pool.query(
-      `INSERT INTO workspace_memberships (workspace_id, clerk_user_id, role, active)
-       VALUES ($1, $2, $3, true)`,
+      `INSERT INTO user_profiles (id, identity_provider, provider_user_id)
+       VALUES ($1, 'insforge', $1)
+       ON CONFLICT (id) DO NOTHING`,
+      [membership.clerkUserId]
+    );
+    await pool.query(
+      `INSERT INTO workspace_memberships (workspace_id, clerk_user_id, user_id, role, active)
+       VALUES ($1, $2, $2, $3, true)`,
       [input.workspaceId, membership.clerkUserId, membership.role]
     );
   }

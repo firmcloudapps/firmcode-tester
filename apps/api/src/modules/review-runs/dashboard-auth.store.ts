@@ -34,7 +34,7 @@ export interface DashboardAuthStore {
 interface DashboardMembershipRow {
   readonly workspace_id: string;
   readonly user_id: string;
-  readonly clerk_user_id: string;
+  readonly clerk_user_id: string | null;
   readonly role: DashboardRole;
 }
 
@@ -86,7 +86,7 @@ WHERE workspace_id = $1
       workspaceId: row.workspace_id,
       userId: row.user_id,
       role: row.role,
-      clerkUserId: row.clerk_user_id
+      clerkUserId: row.clerk_user_id ?? row.user_id
     };
   }
 }

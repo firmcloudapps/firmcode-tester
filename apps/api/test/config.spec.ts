@@ -14,7 +14,9 @@ const VALID_ENV = {
   DATABASE_URL: "postgresql://firmcode:secret@localhost:5432/firmcode",
   DATABASE_SSL: "false",
   REDIS_URL: "redis://:secret@localhost:6379",
-  CLERK_SECRET_KEY: "sk_test_example",
+  INSFORGE_BASE_URL: "https://h35yzuga.eu-central.insforge.app",
+  INSFORGE_ANON_KEY: "anon_test_example",
+  INSFORGE_SERVICE_KEY: "service_test_example",
   GITHUB_APP_ID: "12345",
   GITHUB_APP_PRIVATE_KEY: RAW_PRIVATE_KEY,
   GITHUB_WEBHOOK_SECRET: "github_webhook_secret",
@@ -23,18 +25,24 @@ const VALID_ENV = {
 };
 
 describe("API runtime config", () => {
-  it("validates required Clerk and database variables", () => {
+  it("validates required InsForge and database variables", () => {
     const config = createApiRuntimeConfig(VALID_ENV);
 
+    expect(config.database.provider).toBe("neon");
     expect(config.database.url).toBe(VALID_ENV.DATABASE_URL);
     expect(config.database.ssl).toBe(false);
     expect(config.queue.redactedRedisUrl).toBe("redis://:REDACTED@localhost:6379");
-    expect(config.clerk.secretKey).toBe("sk_test_example");
-    expect(config.clerk.jwtAudience).toBeNull();
-    expect(config.clerk.defaultOrganization).toEqual({
-      id: "org_3EGsxXDTl8pWEfV6da6oENrYhRr",
-      name: "Firmcode AI",
-      role: "org:developer"
+    expect(config.auth).toEqual({
+      provider: "insforge",
+      insforge: {
+        baseUrl: "https://h35yzuga.eu-central.insforge.app",
+        anonKey: "anon_test_example",
+        serviceKey: "service_test_example"
+      },
+      defaultWorkspace: {
+        id: "",
+        name: "Firmcode AI"
+      }
     });
     expect(config.publicAppUrl).toBe("https://firmcode.firmoncloud.com");
     expect(config.publicApiUrl).toBe("https://firmcodeapi.firmoncloud.com");
@@ -47,28 +55,16 @@ describe("API runtime config", () => {
     expect(config.codebaseScan.defaultCadenceHours).toBe(24);
   });
 
-  it("loads the configured Clerk JWT audience", () => {
+  it("loads a configured default InsForge workspace", () => {
     const config = createApiRuntimeConfig({
       ...VALID_ENV,
-      CLERK_JWT_AUDIENCE: "firmcode-api"
+      FIRMCODE_DEFAULT_WORKSPACE_ID: "workspace_default",
+      FIRMCODE_DEFAULT_WORKSPACE_NAME: "Firmcode AI Team"
     });
 
-    expect(config.clerk.secretKey).toBe("sk_test_example");
-    expect(config.clerk.jwtAudience).toBe("firmcode-api");
-  });
-
-  it("loads the default Clerk organization used for signup membership", () => {
-    const config = createApiRuntimeConfig({
-      ...VALID_ENV,
-      FIRMCODE_DEFAULT_CLERK_ORGANIZATION_ID: "org_3EGsxXDTl8pWEfV6da6oENrYhRr",
-      FIRMCODE_DEFAULT_CLERK_ORGANIZATION_NAME: "Firmcode AI",
-      FIRMCODE_DEFAULT_CLERK_ORGANIZATION_ROLE: "org:developer"
-    });
-
-    expect(config.clerk.defaultOrganization).toEqual({
-      id: "org_3EGsxXDTl8pWEfV6da6oENrYhRr",
-      name: "Firmcode AI",
-      role: "org:developer"
+    expect(config.auth.defaultWorkspace).toEqual({
+      id: "workspace_default",
+      name: "Firmcode AI Team"
     });
   });
 
@@ -77,7 +73,9 @@ describe("API runtime config", () => {
       ...VALID_ENV,
       DATABASE_URL: `"${VALID_ENV.DATABASE_URL}"`,
       REDIS_URL: `"${VALID_ENV.REDIS_URL}"`,
-      CLERK_SECRET_KEY: `"${VALID_ENV.CLERK_SECRET_KEY}"`,
+      INSFORGE_BASE_URL: `"${VALID_ENV.INSFORGE_BASE_URL}"`,
+      INSFORGE_ANON_KEY: `"${VALID_ENV.INSFORGE_ANON_KEY}"`,
+      INSFORGE_SERVICE_KEY: `"${VALID_ENV.INSFORGE_SERVICE_KEY}"`,
       GITHUB_APP_ID: `"${VALID_ENV.GITHUB_APP_ID}"`,
       GITHUB_APP_PRIVATE_KEY: `"${RAW_PRIVATE_KEY.replace(/\n/g, "\\n")}"`,
       GITHUB_WEBHOOK_SECRET: `"${VALID_ENV.GITHUB_WEBHOOK_SECRET}"`,
@@ -90,14 +88,15 @@ describe("API runtime config", () => {
     expect(config.github?.privateKey).toBe(RAW_PRIVATE_KEY);
   });
 
-  it("fails fast when Clerk, database, or GitHub variables are missing", () => {
+  it("fails fast when database or GitHub variables are missing", () => {
     expect(() => createApiRuntimeConfig({ NODE_ENV: "development" })).toThrow(ConfigValidationError);
   });
 
-  it("requires a Clerk secret key", () => {
-    const { CLERK_SECRET_KEY: _missingSecret, ...env } = VALID_ENV;
+  it("uses the default InsForge backend URL when it is not explicitly configured", () => {
+    const { INSFORGE_BASE_URL: _missingBaseUrl, ...env } = VALID_ENV;
+    const config = createApiRuntimeConfig(env);
 
-    expect(() => createApiRuntimeConfig(env)).toThrow(/CLERK_SECRET_KEY is required/);
+    expect(config.auth.insforge?.baseUrl).toBe("https://h35yzuga.eu-central.insforge.app");
   });
 
   it("allows GitHub App config to be omitted in test environments", () => {
@@ -105,8 +104,7 @@ describe("API runtime config", () => {
       NODE_ENV: "test",
       DATABASE_URL: "postgresql://firmcode:secret@localhost:5432/firmcode",
       DATABASE_SSL: "false",
-      REDIS_URL: "redis://localhost:6379",
-      CLERK_SECRET_KEY: "sk_test_example"
+      REDIS_URL: "redis://localhost:6379"
     });
 
     expect(config.github).toBeNull();
@@ -134,20 +132,9 @@ describe("API runtime config", () => {
       createApiRuntimeConfig({
         ...VALID_ENV,
         NODE_ENV: "production",
-        CLERK_JWT_AUDIENCE: "firmcode-api",
         DATABASE_SSL: "false"
       })
     ).toThrow(/DATABASE_SSL must be true/);
-  });
-
-  it("requires a Clerk JWT audience in production", () => {
-    expect(() =>
-      createApiRuntimeConfig({
-        ...VALID_ENV,
-        NODE_ENV: "production",
-        DATABASE_SSL: "true"
-      })
-    ).toThrow(/CLERK_JWT_AUDIENCE is required/);
   });
 
   it("rejects an invalid API port", () => {

@@ -8,7 +8,7 @@ Firmcode should be developed Docker-first for API and worker runtime behavior. D
 - Python
 - Docker Desktop or compatible Docker runtime
 - GitHub account
-- Clerk development application
+- InsForge development project
 - NeonDB development database
 - Redis through Docker Compose
 - LLM provider API key
@@ -17,8 +17,8 @@ Firmcode should be developed Docker-first for API and worker runtime behavior. D
 ## Setup Steps
 
 1. Copy `.env.example` to `.env`.
-2. Create Clerk application and fill Clerk env vars.
-3. Configure Clerk sign-in/sign-up URLs and keep organization setup optional unless specifically testing team workspaces.
+2. Create an InsForge project and fill InsForge env vars.
+3. Configure InsForge allowed redirect URLs for the local dashboard.
 4. Create a NeonDB database and set `DATABASE_URL`.
 5. Create GitHub App with required permissions and webhook secret.
 6. Set `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, and `GITHUB_WEBHOOK_SECRET`.
@@ -26,52 +26,52 @@ Firmcode should be developed Docker-first for API and worker runtime behavior. D
 8. Start API, worker, and Redis with local Docker Compose.
 9. Run migrations.
 10. Start the web dashboard independently with Next.js dev.
-11. Sign in through Clerk, confirm workspace creation/mapping, then connect GitHub OAuth.
+11. Sign in through InsForge, confirm workspace creation/mapping, then connect GitHub OAuth.
 12. Use webhook tunnel for GitHub App webhook URL.
 
-## Clerk Local Authentication Setup
+## InsForge Local Authentication Setup
 
-Create a Clerk development application and configure:
+Create an InsForge development project and configure:
 
+- InsForge backend URL and anon key.
 - Sign-in URL: `http://localhost:3000/sign-in`
 - Sign-up URL: `http://localhost:3000/sign-up`
 - After sign-in URL: `http://localhost:3000/auth/redirect`
 - After sign-up URL: `http://localhost:3000/auth/redirect`
 - Allowed redirect origin: `http://localhost:3000`
-- The Clerk instance used locally must contain the Firmcode AI organization, or the default organization env vars below must point to another test organization that new signups should join.
-- A JWT template or audience matching `CLERK_JWT_AUDIENCE` for API calls.
+- Google OAuth configured in InsForge if you want to use the Google button locally.
 
 Local `.env` values should include:
 
 ```text
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
-CLERK_SECRET_KEY=sk_test_...
-CLERK_JWT_AUDIENCE=firmcode-api
-NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
-NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
-NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/auth/redirect
-NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/auth/redirect
-NEXT_PUBLIC_CLERK_ORGANIZATIONS_ENABLED=false
-FIRMCODE_DEFAULT_CLERK_ORGANIZATION_ID=org_3EGsxXDTl8pWEfV6da6oENrYhRr
-FIRMCODE_DEFAULT_CLERK_ORGANIZATION_NAME=Firmcode AI
-FIRMCODE_DEFAULT_CLERK_ORGANIZATION_ROLE=org:developer
+AUTH_PROVIDER=insforge
+NEXT_PUBLIC_AUTH_PROVIDER=insforge
+INSFORGE_BASE_URL=https://h35yzuga.eu-central.insforge.app
+NEXT_PUBLIC_INSFORGE_BASE_URL=https://h35yzuga.eu-central.insforge.app
+NEXT_PUBLIC_INSFORGE_URL=https://h35yzuga.eu-central.insforge.app
+INSFORGE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+NEXT_PUBLIC_INSFORGE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+NEXT_PUBLIC_INSFORGE_AFTER_SIGN_IN_URL=/auth/redirect
+NEXT_PUBLIC_INSFORGE_AFTER_SIGN_UP_URL=/auth/redirect
+FIRMCODE_DEFAULT_WORKSPACE_ID=
+FIRMCODE_DEFAULT_WORKSPACE_NAME=Firmcode AI
 ```
 
 The expected local auth flow is:
 
 1. Visit `http://localhost:3000`.
 2. The root holding page renders with dashboard entry points.
-3. Sign in or sign up through Clerk.
-4. Clerk sends the browser to `/auth/redirect`.
-5. `/auth/redirect` adds the signed-in Clerk user to the configured default organization as `org:developer`, then the API creates or resolves the matching Firmcode workspace.
+3. Sign in or sign up through InsForge.
+4. The browser stores the InsForge access token and goes to `/auth/redirect`.
+5. `/auth/redirect` calls the API with the InsForge bearer token, then the API creates or resolves the matching Firmcode workspace.
 6. `/auth/redirect` sends Admins to `/dashboard/admin` and Developers to `/dashboard/developer`.
-7. Web server requests to the API include a Clerk bearer token.
-8. API dashboard endpoints reject requests without a valid Clerk token.
+7. Web server requests to the API include an InsForge bearer token.
+8. API dashboard endpoints reject requests without a valid InsForge token.
 
-Configured default-organization signups resolve to Developer by default. For local Admin testing without requiring Clerk organization membership, set trusted Clerk user metadata such as `public_metadata.firmcode_role = "admin"` in the Clerk dashboard and expose it in the session token as `firmcode_role`, `public_metadata.firmcode_role`, or `firmcode.role`.
+Configured default or personal workspace signups resolve to Developer by default. For local Admin testing, update the database-backed `workspace_memberships.role` row after the user has signed in and `user_profiles`/membership rows have been created.
 9. Connect GitHub OAuth from `/dashboard/developer` or `/github/installations` before using GitHub-backed workflows.
 
-Do not use dashboard user or workspace environment shims for normal local development once Task 9.0 is implemented. Web-to-API calls should use Clerk sessions. `FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN` and `FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID` are reserved for isolated web unit tests only.
+Do not use dashboard user or workspace environment shims for normal local development. Web-to-API calls should use InsForge sessions. `FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN`, its deprecated `FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN` alias, and `FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID` are reserved for isolated web unit tests only.
 
 ## Docker-First Workflow
 
@@ -105,13 +105,13 @@ Do not add PostgreSQL or the Next.js web app to either backend Compose stack. Ne
 
 Before merging implementation work, verify:
 
-- Unauthenticated dashboard requests redirect to Clerk sign-in.
-- Signed-in dashboard requests include a Clerk bearer token when calling the API.
+- Unauthenticated dashboard requests redirect to `/sign-in`.
+- Signed-in dashboard requests include an InsForge bearer token when calling the API.
 - API protected routes return `401` without a token and tenant-scoped data with a valid token.
 - A user cannot access another workspace by changing request headers or IDs.
-- `x-firmcode-user-id` and `FIRMCODE_DASHBOARD_*` do not authenticate any production or normal local request; only `FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN` is allowed for isolated web unit tests.
-- GitHub OAuth start/callback routes redirect to sign-in or return `401` unless a Clerk session token is present.
-- Billing management is denied unless the resolved role is Admin or the Clerk token carries the billing capability.
+- `x-firmcode-user-id` and `FIRMCODE_DASHBOARD_*` do not authenticate any production or normal local request; only `FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN` and its deprecated `FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN` alias are allowed for isolated web unit tests.
+- GitHub OAuth start/callback routes redirect to sign-in or return `401` unless an InsForge session token is present.
+- Billing management is denied unless the resolved role is Admin or the token carries the billing capability.
 - API image builds.
 - Worker image builds.
 - Worker image includes Semgrep CLI and Tree-sitter runtime dependencies.
@@ -227,9 +227,10 @@ docker compose run --rm worker pytest
 ## Troubleshooting
 
 - If webhook verification fails, confirm raw body handling and `GITHUB_WEBHOOK_SECRET`.
-- If Clerk auth fails in the web app, confirm publishable key, sign-in/sign-up URLs, after-auth URLs, allowed redirect URLs, and middleware route matching.
-- If protected API calls return `401`, confirm the web route handler is sending `Authorization: Bearer <Clerk token>`, `CLERK_SECRET_KEY` is configured on the API, and `CLERK_JWT_AUDIENCE` matches the token template/audience.
-- If protected API calls return `403`, confirm the Clerk user is mapped to an active workspace membership with the required role.
+- If InsForge auth fails in the web app, confirm `NEXT_PUBLIC_INSFORGE_BASE_URL`, `NEXT_PUBLIC_INSFORGE_URL`, `NEXT_PUBLIC_INSFORGE_ANON_KEY`, after-auth URLs, and allowed redirect URLs.
+- If `/auth/redirect` sends a signed-in user back to `/sign-in`, confirm the server runtime has `INSFORGE_BASE_URL` and `INSFORGE_ANON_KEY` so Next.js can validate the `insforge_access_token` cookie.
+- If protected API calls return `401`, confirm the web route handler is sending `Authorization: Bearer <InsForge access token>` and the API is running with `AUTH_PROVIDER=insforge`.
+- If protected API calls return `403`, confirm the InsForge user is mapped to an active workspace membership with the required role.
 - If cross-workspace data appears, stop and fix workspace ownership checks before continuing; this is a release blocker.
 - If NeonDB fails, confirm SSL settings and connection string.
 - If worker does not process jobs, confirm `REDIS_URL` and queue names.

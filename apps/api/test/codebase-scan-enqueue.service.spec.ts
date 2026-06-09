@@ -115,6 +115,7 @@ const testConfig = {
   port: 3001,
   corsAllowedOrigins: [],
   database: {
+    provider: "neon" as const,
     url: "postgres://firmcode:secret@localhost:5432/firmcode",
     ssl: false,
     redactedUrl: "postgres://firmcode:REDACTED@localhost:5432/firmcode"
@@ -123,14 +124,14 @@ const testConfig = {
     redisUrl: "redis://localhost:6379",
     redactedRedisUrl: "redis://localhost:6379/"
   },
-  clerk: {
-    secretKey: "sk_test_example",
-    jwtAudience: "firmcode-api",
-    webhookSecret: null,
-    defaultOrganization: {
-      id: "org_3EGsxXDTl8pWEfV6da6oENrYhRr",
-      name: "Firmcode AI",
-      role: "org:developer"
+  auth: {
+    provider: "insforge" as const,
+    insforge: {
+      baseUrl: "https://h35yzuga.eu-central.insforge.app"
+    },
+    defaultWorkspace: {
+      id: "",
+      name: "Firmcode AI"
     }
   },
   github: null,
@@ -154,6 +155,9 @@ const testConfig = {
   },
   codebaseScan: {
     defaultCadenceHours: 24
+  },
+  storage: {
+    provider: "database" as const
   }
 };
 

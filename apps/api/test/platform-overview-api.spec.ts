@@ -81,10 +81,16 @@ INSERT INTO workspaces (id, clerk_org_id, name) VALUES
 ('${WORKSPACE_ID}', 'org_firmcode', 'Firmcode'),
 ('00000000-0000-4000-8000-000000000102', 'org_customer', 'Customer Workspace');
 
-INSERT INTO workspace_memberships (workspace_id, clerk_user_id, role, active) VALUES
-('${WORKSPACE_ID}', '${ADMIN_USER_ID}', 'admin', true),
-('${WORKSPACE_ID}', 'user_support_admin', 'admin', true),
-('00000000-0000-4000-8000-000000000102', '${DEVELOPER_USER_ID}', 'developer', true);
+INSERT INTO user_profiles (id, identity_provider, provider_user_id) VALUES
+('${ADMIN_USER_ID}', 'insforge', '${ADMIN_USER_ID}'),
+('user_support_admin', 'insforge', 'user_support_admin'),
+('${DEVELOPER_USER_ID}', 'insforge', '${DEVELOPER_USER_ID}')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO workspace_memberships (workspace_id, clerk_user_id, user_id, role, active) VALUES
+('${WORKSPACE_ID}', '${ADMIN_USER_ID}', '${ADMIN_USER_ID}', 'admin', true),
+('${WORKSPACE_ID}', 'user_support_admin', 'user_support_admin', 'admin', true),
+('00000000-0000-4000-8000-000000000102', '${DEVELOPER_USER_ID}', '${DEVELOPER_USER_ID}', 'developer', true);
 
 INSERT INTO github_installations (id, workspace_id, installation_id, account_login, account_type) VALUES
 ('00000000-0000-4000-8000-000000000201', '${WORKSPACE_ID}', 301, 'openclaw', 'Organization'),

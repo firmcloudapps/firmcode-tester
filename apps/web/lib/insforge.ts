@@ -1,7 +1,7 @@
 import { createClient } from "@insforge/sdk";
+import { loadWebInsForgeAuthRenderConfig } from "../config/insforge";
 
-const baseUrl = process.env.NEXT_PUBLIC_INSFORGE_BASE_URL || "https://h35yzuga.eu-central.insforge.app";
-const anonKey = process.env.NEXT_PUBLIC_INSFORGE_ANON_KEY || process.env.INSFORGE_ANON_KEY || "";
+const { baseUrl, anonKey } = loadWebInsForgeAuthRenderConfig();
 
 export const insforge = createClient({
   baseUrl,

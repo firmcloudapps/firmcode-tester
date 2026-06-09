@@ -63,7 +63,7 @@ SELECT
       AND r.enabled = true
   ) AS repositories_monitored,
   (
-    SELECT COUNT(wm.clerk_user_id)
+    SELECT COUNT(wm.user_id)
     FROM workspace_memberships wm
     WHERE wm.workspace_id = $1
       AND wm.active = true

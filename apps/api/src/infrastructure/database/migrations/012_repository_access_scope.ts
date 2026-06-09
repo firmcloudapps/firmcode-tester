@@ -25,7 +25,7 @@ JOIN github_installations gi ON gi.id = r.installation_id
 JOIN workspace_memberships wm ON wm.workspace_id = gi.workspace_id
 JOIN github_oauth_connections goc ON goc.clerk_user_id = wm.clerk_user_id
 WHERE wm.active = true
-  AND lower(wm.role) NOT IN ('owner', 'admin')
+  AND lower(wm.role) <> 'admin'
   AND lower(goc.github_login) = lower(pr.author_login)
 ON CONFLICT (repository_id, clerk_user_id) DO NOTHING;
 `

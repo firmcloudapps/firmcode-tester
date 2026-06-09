@@ -43,7 +43,7 @@ describe("rules and policies dashboard API", () => {
     await pool.end();
   });
 
-  it("reads workspace review policies with typed defaults and Owner/Admin permissions", async () => {
+  it("reads workspace review policies with typed defaults and Admin permissions", async () => {
     const response = await controller.getRules(undefined, WORKSPACE_ID, OWNER_USER_ID);
 
     expect(response.workspacePolicy).toMatchObject({
@@ -103,23 +103,20 @@ describe("rules and policies dashboard API", () => {
     expect(response.repositoryPolicies).toEqual([]);
   });
 
-  it("allows Developer and Viewer roles to read policies as read-only", async () => {
+  it("allows Developers to read workspace policies and manage repository policies", async () => {
     const developer = await controller.getRules(undefined, WORKSPACE_ID, DEVELOPER_USER_ID);
     const developerRepository = await controller.getRules(REPOSITORY_ID, WORKSPACE_ID, DEVELOPER_USER_ID);
-    const viewer = await controller.getRules(undefined, WORKSPACE_ID, VIEWER_USER_ID);
 
     expect(developer.permissions.canManagePolicies).toBe(false);
     expect(developerRepository.permissions.canManagePolicies).toBe(true);
     expect(developer.permissions.canManageWorkspacePolicies).toBe(false);
     expect(developer.permissions.canManageRepositoryPolicies).toBe(true);
     expect(developer.permissions.canManageSensitiveWorkspacePolicies).toBe(false);
-    expect(viewer.permissions.canManagePolicies).toBe(false);
     expect(developer.workspacePolicy.commentPolicy.severityThreshold).toBe("medium");
     expect(developerRepository.selectedRepositoryPolicy?.repositoryId).toBe(REPOSITORY_ID);
-    expect(viewer.workspacePolicy.commentPolicy.maxInlineComments).toBe(10);
   });
 
-  it("updates workspace policy fields for owners and preserves unrelated fields on partial updates", async () => {
+  it("updates workspace policy fields for admins and preserves unrelated fields on partial updates", async () => {
     await controller.updateRules(
       {
         commentPolicy: {
@@ -301,7 +298,7 @@ describe("rules and policies dashboard API", () => {
     ).rejects.toThrow(BadRequestException);
   });
 
-  it("requires Owner/Admin for mutations and denies cross-workspace policy targets", async () => {
+  it("requires Admin for workspace mutations and denies cross-workspace policy targets", async () => {
     await expect(controller.getRules(undefined, WORKSPACE_ID, undefined)).rejects.toThrow(UnauthorizedException);
     await expect(
       controller.updateRules({ commentPolicy: { maxInlineComments: 3 } }, WORKSPACE_ID, DEVELOPER_USER_ID)
@@ -311,9 +308,6 @@ describe("rules and policies dashboard API", () => {
     ).rejects.toThrow(ForbiddenException);
     await expect(
       controller.updateRules({ repositoryId: REPOSITORY_ID, workspaceControls: { retentionDays: 45 } }, WORKSPACE_ID, OWNER_USER_ID)
-    ).rejects.toThrow(ForbiddenException);
-    await expect(
-      controller.updateRules({ commentPolicy: { maxInlineComments: 3 } }, WORKSPACE_ID, VIEWER_USER_ID)
     ).rejects.toThrow(ForbiddenException);
     await expect(controller.getRules(OTHER_REPOSITORY_ID, WORKSPACE_ID, OWNER_USER_ID)).rejects.toThrow(NotFoundException);
     await expect(
@@ -357,11 +351,18 @@ INSERT INTO workspaces (id, clerk_org_id, name) VALUES
 ('${WORKSPACE_ID}', 'org_firmcode', 'Firmcode'),
 ('${OTHER_WORKSPACE_ID}', 'org_other', 'Other');
 
-INSERT INTO workspace_memberships (workspace_id, clerk_user_id, role, active) VALUES
-('${WORKSPACE_ID}', '${OWNER_USER_ID}', 'owner', true),
-('${WORKSPACE_ID}', '${ADMIN_USER_ID}', 'admin', true),
-('${WORKSPACE_ID}', '${DEVELOPER_USER_ID}', 'developer', true),
-('${WORKSPACE_ID}', '${VIEWER_USER_ID}', 'viewer', true);
+INSERT INTO user_profiles (id, identity_provider, provider_user_id) VALUES
+('${OWNER_USER_ID}', 'insforge', '${OWNER_USER_ID}'),
+('${ADMIN_USER_ID}', 'insforge', '${ADMIN_USER_ID}'),
+('${DEVELOPER_USER_ID}', 'insforge', '${DEVELOPER_USER_ID}'),
+('${VIEWER_USER_ID}', 'insforge', '${VIEWER_USER_ID}')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO workspace_memberships (workspace_id, clerk_user_id, user_id, role, active) VALUES
+('${WORKSPACE_ID}', '${OWNER_USER_ID}', '${OWNER_USER_ID}', 'admin', true),
+('${WORKSPACE_ID}', '${ADMIN_USER_ID}', '${ADMIN_USER_ID}', 'admin', true),
+('${WORKSPACE_ID}', '${DEVELOPER_USER_ID}', '${DEVELOPER_USER_ID}', 'developer', true),
+('${WORKSPACE_ID}', '${VIEWER_USER_ID}', '${VIEWER_USER_ID}', 'developer', true);
 
 INSERT INTO github_installations (
   id,

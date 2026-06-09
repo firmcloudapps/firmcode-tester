@@ -296,7 +296,7 @@ ORDER BY full_name
 
     const start = await controller.startOAuth(WORKSPACE_ID, UNCONNECTED_USER_ID);
     const state = new URL(start.authorizationUrl).searchParams.get("state") ?? "";
-    await pool.query("UPDATE workspace_memberships SET role = 'viewer' WHERE clerk_user_id = $1", [UNCONNECTED_USER_ID]);
+    await pool.query("UPDATE workspace_memberships SET role = 'developer' WHERE clerk_user_id = $1", [UNCONNECTED_USER_ID]);
     await controller.completeOAuth("oauth-code", state, WORKSPACE_ID, UNCONNECTED_USER_ID);
 
     const installationRows = await pool.query<{ installation_id: string | number }>(
@@ -412,7 +412,7 @@ ORDER BY full_name
     await expect(controller.syncInstallations({ installationId: 301 }, WORKSPACE_ID, DEVELOPER_USER_ID)).resolves.toMatchObject({
       syncedRepositoryCount: 2
     });
-    await expect(controller.syncRepository(REPOSITORY_ID, WORKSPACE_ID, VIEWER_USER_ID)).rejects.toThrow(ForbiddenException);
+    await expect(controller.syncRepository(REPOSITORY_ID, WORKSPACE_ID, DEVELOPER_USER_ID)).rejects.toThrow(ForbiddenException);
     await expect(controller.syncRepository(OTHER_REPOSITORY_ID, WORKSPACE_ID, OWNER_USER_ID)).rejects.toThrow(
       NotFoundException
     );
@@ -598,6 +598,7 @@ const testConfig: ApiRuntimeConfig = {
   publicApiUrl: "https://firmcodeapi.firmoncloud.com",
   corsAllowedOrigins: [],
   database: {
+    provider: "neon",
     url: "postgres://firmcode:secret@localhost:5432/firmcode",
     ssl: false,
     redactedUrl: "postgres://firmcode:REDACTED@localhost:5432/firmcode"
@@ -606,14 +607,14 @@ const testConfig: ApiRuntimeConfig = {
     redisUrl: "redis://localhost:6379",
     redactedRedisUrl: "redis://localhost:6379/"
   },
-  clerk: {
-    secretKey: "sk_test_example",
-    jwtAudience: "firmcode-api",
-    webhookSecret: null,
-    defaultOrganization: {
-      id: "org_3EGsxXDTl8pWEfV6da6oENrYhRr",
-      name: "Firmcode AI",
-      role: "org:developer"
+  auth: {
+    provider: "insforge",
+    insforge: {
+      baseUrl: "https://h35yzuga.eu-central.insforge.app"
+    },
+    defaultWorkspace: {
+      id: "",
+      name: "Firmcode AI"
     }
   },
   github: {
@@ -653,6 +654,9 @@ const testConfig: ApiRuntimeConfig = {
   },
   codebaseScan: {
     defaultCadenceHours: 24
+  },
+  storage: {
+    provider: "database"
   }
 };
 
@@ -681,13 +685,21 @@ INSERT INTO workspaces (id, clerk_org_id, name) VALUES
 ('${WORKSPACE_ID}', 'org_firmcode', 'Firmcode'),
 ('${OTHER_WORKSPACE_ID}', 'org_other', 'Other');
 
-INSERT INTO workspace_memberships (workspace_id, clerk_user_id, role, active) VALUES
-('${WORKSPACE_ID}', '${OWNER_USER_ID}', 'owner', true),
-('${WORKSPACE_ID}', '${ADMIN_USER_ID}', 'admin', true),
-('${WORKSPACE_ID}', '${DEVELOPER_USER_ID}', 'developer', true),
-('${WORKSPACE_ID}', '${VIEWER_USER_ID}', 'viewer', true),
-('${WORKSPACE_ID}', '${UNCONNECTED_USER_ID}', 'owner', true),
-('${OTHER_WORKSPACE_ID}', '${OWNER_USER_ID}', 'owner', true);
+INSERT INTO user_profiles (id, identity_provider, provider_user_id) VALUES
+('${OWNER_USER_ID}', 'insforge', '${OWNER_USER_ID}'),
+('${ADMIN_USER_ID}', 'insforge', '${ADMIN_USER_ID}'),
+('${DEVELOPER_USER_ID}', 'insforge', '${DEVELOPER_USER_ID}'),
+('${VIEWER_USER_ID}', 'insforge', '${VIEWER_USER_ID}'),
+('${UNCONNECTED_USER_ID}', 'insforge', '${UNCONNECTED_USER_ID}')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO workspace_memberships (workspace_id, clerk_user_id, user_id, role, active) VALUES
+('${WORKSPACE_ID}', '${OWNER_USER_ID}', '${OWNER_USER_ID}', 'admin', true),
+('${WORKSPACE_ID}', '${ADMIN_USER_ID}', '${ADMIN_USER_ID}', 'admin', true),
+('${WORKSPACE_ID}', '${DEVELOPER_USER_ID}', '${DEVELOPER_USER_ID}', 'developer', true),
+('${WORKSPACE_ID}', '${VIEWER_USER_ID}', '${VIEWER_USER_ID}', 'developer', true),
+('${WORKSPACE_ID}', '${UNCONNECTED_USER_ID}', '${UNCONNECTED_USER_ID}', 'admin', true),
+('${OTHER_WORKSPACE_ID}', '${OWNER_USER_ID}', '${OWNER_USER_ID}', 'admin', true);
 
 INSERT INTO github_oauth_connections (
   clerk_user_id,

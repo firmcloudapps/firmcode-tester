@@ -19,6 +19,7 @@ describe("dashboard auth context helpers", () => {
       async findActiveMembership() {
         return {
           workspaceId: "workspace-from-header",
+          userId: "user-from-header",
           clerkUserId: "user-from-header",
           role: "admin"
         };
@@ -31,20 +32,22 @@ describe("dashboard auth context helpers", () => {
     ).rejects.toThrow(UnauthorizedException);
   });
 
-  it("uses only guard-populated Clerk context for production service auth", () => {
+  it("uses only guard-populated provider context for production service auth", () => {
     process.env.NODE_ENV = "production";
     const auth: DashboardRequestContext = {
       workspaceId: "workspace-from-token",
-      clerkUserId: "user-from-token",
-      clerkOrgId: "org_from_token",
+      userId: "user-from-token",
+      orgId: "org_from_token",
       sessionId: "sess_from_token",
       role: "developer",
       capabilities: [],
-      clerkCapabilities: []
+      billingCapabilities: [],
+      provider: "insforge"
     };
 
     expect(toDashboardServiceAuth(auth, "user-from-header")).toEqual({
       workspaceId: "workspace-from-token",
+      userId: "user-from-token",
       clerkUserId: "user-from-token"
     });
   });

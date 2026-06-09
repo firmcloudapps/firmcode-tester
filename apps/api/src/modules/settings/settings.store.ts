@@ -327,13 +327,15 @@ INSERT INTO workspace_audit_events (
   id,
   workspace_id,
   actor_clerk_user_id,
+  actor_user_id,
   target_clerk_user_id,
+  target_user_id,
   event_type,
   previous_role,
   next_role,
   source,
   metadata_json
-) VALUES ($1, $2, $3, $4, 'membership_role_changed', $5, $6, $7, '{}'::jsonb)
+) VALUES ($1, $2, $3, $3, $4, $4, 'membership_role_changed', $5, $6, $7, '{}'::jsonb)
 `,
       [
         this.uuidFactory(),
@@ -408,7 +410,7 @@ function toMember(row: MemberRow, currentUserId: string): WorkspaceSettingsMembe
 }
 
 function isElevatedRole(role: DashboardWorkspaceRole | null): boolean {
-  return role === "owner" || role === "admin";
+  return role === "admin";
 }
 
 function toIsoString(value: Date | string | null): string {

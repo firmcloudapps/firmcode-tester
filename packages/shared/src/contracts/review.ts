@@ -255,7 +255,7 @@ export interface GitHubRepositorySyncResponse {
   repository: RepositoryListItem;
 }
 
-export const DASHBOARD_WORKSPACE_ROLES = ["owner", "admin", "developer", "viewer"] as const;
+export const DASHBOARD_WORKSPACE_ROLES = ["admin", "developer"] as const;
 
 export type DashboardWorkspaceRole = (typeof DASHBOARD_WORKSPACE_ROLES)[number];
 

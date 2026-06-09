@@ -65,7 +65,7 @@ describe("repository automation configuration dashboard API", () => {
     await pool.end();
   });
 
-  it("fetches the typed repository configuration for an owner", async () => {
+  it("fetches the typed repository configuration for a developer", async () => {
     const configuration = await controller.getRepositoryConfiguration(REPOSITORY_ID, WORKSPACE_ID, OWNER_USER_ID);
 
     expect(configuration).toMatchObject({
@@ -85,23 +85,23 @@ describe("repository automation configuration dashboard API", () => {
     expect(configuration.updatedAt).toEqual(expect.any(String));
   });
 
-  it("allows lower workspace roles to read repository configuration without mutating it", async () => {
+  it("allows developers to read repository configuration", async () => {
     const developerConfiguration = await controller.getRepositoryConfiguration(REPOSITORY_ID, WORKSPACE_ID, DEVELOPER_USER_ID);
-    const viewerConfiguration = await controller.getRepositoryConfiguration(REPOSITORY_ID, WORKSPACE_ID, VIEWER_USER_ID);
+    const additionalDeveloperConfiguration = await controller.getRepositoryConfiguration(REPOSITORY_ID, WORKSPACE_ID, VIEWER_USER_ID);
 
     expect(developerConfiguration).toMatchObject({
       repositoryId: REPOSITORY_ID,
       automationEnabled: true,
       severityThreshold: "medium"
     });
-    expect(viewerConfiguration).toMatchObject({
+    expect(additionalDeveloperConfiguration).toMatchObject({
       repositoryId: REPOSITORY_ID,
       automationEnabled: true,
       severityThreshold: "medium"
     });
   });
 
-  it("allows owners, admins, and developers to disable and enable repository automation", async () => {
+  it("allows developers to disable and enable repository automation", async () => {
     const disabled = await controller.updateRepositoryConfiguration(
       REPOSITORY_ID,
       { automationEnabled: false },
@@ -112,7 +112,7 @@ describe("repository automation configuration dashboard API", () => {
       REPOSITORY_ID,
       { automationEnabled: true },
       WORKSPACE_ID,
-      ADMIN_USER_ID
+      OWNER_USER_ID
     );
     const repositoryRows = await pool.query<{ enabled: boolean }>("SELECT enabled FROM repositories WHERE id = $1", [
       REPOSITORY_ID
@@ -124,7 +124,7 @@ describe("repository automation configuration dashboard API", () => {
     });
     expect(enabled).toMatchObject({
       automationEnabled: true,
-      updatedByClerkUserId: ADMIN_USER_ID
+      updatedByClerkUserId: OWNER_USER_ID
     });
     expect(repositoryRows.rows).toEqual([{ enabled: true }]);
     expect(scanQueue.jobs).toHaveLength(1);
@@ -136,7 +136,7 @@ describe("repository automation configuration dashboard API", () => {
     });
   });
 
-  it("allows owner, admin, and developer roles to manually enqueue one active scan while viewers are read-only", async () => {
+  it("allows developers to manually enqueue one active scan while Admin remains workspace-management only", async () => {
     const ownerResponse = await controller.enqueueCodebaseScan(REPOSITORY_ID, WORKSPACE_ID, OWNER_USER_ID);
     const duplicateResponse = await controller.enqueueCodebaseScan(REPOSITORY_ID, WORKSPACE_ID, DEVELOPER_USER_ID);
     const scanRows = await pool.query<{ count: string }>(
@@ -162,10 +162,7 @@ describe("repository automation configuration dashboard API", () => {
     expect(scanRows.rows).toEqual([{ count: "1" }]);
     expect(scanQueue.jobs).toHaveLength(1);
 
-    await expect(controller.enqueueCodebaseScan(REPOSITORY_ID, WORKSPACE_ID, ADMIN_USER_ID)).resolves.toMatchObject({
-      duplicate: true
-    });
-    await expect(controller.enqueueCodebaseScan(REPOSITORY_ID, WORKSPACE_ID, VIEWER_USER_ID)).rejects.toThrow(
+    await expect(controller.enqueueCodebaseScan(REPOSITORY_ID, WORKSPACE_ID, ADMIN_USER_ID)).rejects.toThrow(
       ForbiddenException
     );
   });
@@ -233,7 +230,7 @@ describe("repository automation configuration dashboard API", () => {
     ).rejects.toThrow(BadRequestException);
   });
 
-  it("enforces developer repository configuration capabilities while keeping viewers read-only", async () => {
+  it("enforces developer repository configuration capabilities while keeping admins workspace-scoped", async () => {
     await expect(controller.getRepositoryConfiguration(REPOSITORY_ID, WORKSPACE_ID, undefined)).rejects.toThrow(
       UnauthorizedException
     );
@@ -244,7 +241,7 @@ describe("repository automation configuration dashboard API", () => {
       updatedByClerkUserId: DEVELOPER_USER_ID
     });
     await expect(
-      controller.updateRepositoryConfiguration(REPOSITORY_ID, { automationEnabled: false }, WORKSPACE_ID, VIEWER_USER_ID)
+      controller.updateRepositoryConfiguration(REPOSITORY_ID, { automationEnabled: false }, WORKSPACE_ID, ADMIN_USER_ID)
     ).rejects.toThrow(ForbiddenException);
     await expect(
       controller.updateRepositoryConfiguration(OTHER_REPOSITORY_ID, { automationEnabled: false }, WORKSPACE_ID, OWNER_USER_ID)
@@ -260,6 +257,7 @@ const testConfig = {
   port: 3001,
   corsAllowedOrigins: [],
   database: {
+    provider: "neon" as const,
     url: "postgres://firmcode:secret@localhost:5432/firmcode",
     ssl: false,
     redactedUrl: "postgres://firmcode:REDACTED@localhost:5432/firmcode"
@@ -268,14 +266,14 @@ const testConfig = {
     redisUrl: "redis://localhost:6379",
     redactedRedisUrl: "redis://localhost:6379/"
   },
-  clerk: {
-    secretKey: "sk_test_example",
-    jwtAudience: "firmcode-api",
-    webhookSecret: null,
-    defaultOrganization: {
-      id: "org_3EGsxXDTl8pWEfV6da6oENrYhRr",
-      name: "Firmcode AI",
-      role: "org:developer"
+  auth: {
+    provider: "insforge" as const,
+    insforge: {
+      baseUrl: "https://h35yzuga.eu-central.insforge.app"
+    },
+    defaultWorkspace: {
+      id: "",
+      name: "Firmcode AI"
     }
   },
   github: null,
@@ -299,6 +297,9 @@ const testConfig = {
   },
   codebaseScan: {
     defaultCadenceHours: 24
+  },
+  storage: {
+    provider: "database" as const
   }
 };
 
@@ -321,11 +322,18 @@ INSERT INTO workspaces (id, clerk_org_id, name) VALUES
 ('${WORKSPACE_ID}', 'org_firmcode', 'Firmcode'),
 ('${OTHER_WORKSPACE_ID}', 'org_other', 'Other');
 
-INSERT INTO workspace_memberships (workspace_id, clerk_user_id, role, active) VALUES
-('${WORKSPACE_ID}', '${OWNER_USER_ID}', 'owner', true),
-('${WORKSPACE_ID}', '${ADMIN_USER_ID}', 'admin', true),
-('${WORKSPACE_ID}', '${DEVELOPER_USER_ID}', 'developer', true),
-('${WORKSPACE_ID}', '${VIEWER_USER_ID}', 'viewer', true);
+INSERT INTO user_profiles (id, identity_provider, provider_user_id) VALUES
+('${OWNER_USER_ID}', 'insforge', '${OWNER_USER_ID}'),
+('${ADMIN_USER_ID}', 'insforge', '${ADMIN_USER_ID}'),
+('${DEVELOPER_USER_ID}', 'insforge', '${DEVELOPER_USER_ID}'),
+('${VIEWER_USER_ID}', 'insforge', '${VIEWER_USER_ID}')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO workspace_memberships (workspace_id, clerk_user_id, user_id, role, active) VALUES
+('${WORKSPACE_ID}', '${OWNER_USER_ID}', '${OWNER_USER_ID}', 'developer', true),
+('${WORKSPACE_ID}', '${ADMIN_USER_ID}', '${ADMIN_USER_ID}', 'admin', true),
+('${WORKSPACE_ID}', '${DEVELOPER_USER_ID}', '${DEVELOPER_USER_ID}', 'developer', true),
+('${WORKSPACE_ID}', '${VIEWER_USER_ID}', '${VIEWER_USER_ID}', 'developer', true);
 
 INSERT INTO github_installations (
   id,

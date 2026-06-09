@@ -27,8 +27,10 @@ const EXPECTED_TABLES = [
   "review_run_retries",
   "review_runs",
   "schema_migrations",
+  "user_profiles",
   "workspace_audit_events",
   "workspace_memberships",
+  "workspace_roles",
   "workspaces"
 ];
 
@@ -176,7 +178,10 @@ ORDER BY table_name
       "009_codebase_scan_dashboard_configuration",
       "010_workspace_membership_audit",
       "011_review_policy_workspace_controls",
-      "012_repository_access_scope"
+      "012_repository_access_scope",
+      "013_generalize_identity_columns",
+      "014_database_managed_auth",
+      "015_admin_developer_roles_only"
     ]);
     expect(secondRunMigrationIds).toEqual([]);
     expect(tables.rows.map((row) => row.table_name)).toEqual(EXPECTED_TABLES);
@@ -192,7 +197,50 @@ ORDER BY table_name
       { id: "009_codebase_scan_dashboard_configuration" },
       { id: "010_workspace_membership_audit" },
       { id: "011_review_policy_workspace_controls" },
-      { id: "012_repository_access_scope" }
+      { id: "012_repository_access_scope" },
+      { id: "013_generalize_identity_columns" },
+      { id: "014_database_managed_auth" },
+      { id: "015_admin_developer_roles_only" }
+    ]);
+  });
+
+  it("creates database-managed auth profiles, roles, and canonical user memberships", async () => {
+    await runDatabaseMigrations(pool);
+
+    await pool.query(
+      `
+INSERT INTO user_profiles (id, identity_provider, provider_user_id, email)
+VALUES ('usr_insforge_1', 'insforge', 'usr_insforge_1', 'kelly@example.com');
+
+INSERT INTO workspaces (id, identity_provider, identity_provider_org_id, name)
+VALUES ('00000000-0000-4000-8000-000000000101', 'insforge', 'org_insforge_1', 'Firmcode');
+
+INSERT INTO workspace_memberships (workspace_id, user_id, role, active)
+VALUES ('00000000-0000-4000-8000-000000000101', 'usr_insforge_1', 'admin', true);
+`
+    );
+
+    const membership = await pool.query<{ user_id: string; role: string; email: string | null }>(
+      `
+SELECT wm.user_id, wm.role, up.email
+FROM workspace_memberships wm
+JOIN user_profiles up ON up.id = wm.user_id
+WHERE wm.workspace_id = $1
+`,
+      ["00000000-0000-4000-8000-000000000101"]
+    );
+    const roles = await pool.query<{ role: string }>("SELECT role FROM workspace_roles ORDER BY role");
+
+    expect(membership.rows).toEqual([
+      {
+        user_id: "usr_insforge_1",
+        role: "admin",
+        email: "kelly@example.com"
+      }
+    ]);
+    expect(roles.rows).toEqual([
+      { role: "admin" },
+      { role: "developer" }
     ]);
   });
 

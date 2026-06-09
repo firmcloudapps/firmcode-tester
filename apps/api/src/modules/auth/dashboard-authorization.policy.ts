@@ -2,7 +2,7 @@ export const DASHBOARD_APP_ROLES = ["admin", "developer"] as const;
 
 export type DashboardAppRole = (typeof DASHBOARD_APP_ROLES)[number];
 
-export type DashboardRole = DashboardAppRole | "owner" | "viewer";
+export type DashboardRole = DashboardAppRole;
 
 export const DASHBOARD_CAPABILITIES = [
   "retry_review_run",
@@ -54,11 +54,9 @@ export function roleHasDashboardCapability(
 
 export function normalizeDashboardAppRole(role: string | null | undefined): DashboardAppRole | null {
   switch (role?.toLowerCase()) {
-    case "owner":
     case "admin":
       return "admin";
     case "developer":
-    case "member":
       return "developer";
     default:
       return null;

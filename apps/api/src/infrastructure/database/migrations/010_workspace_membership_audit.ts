@@ -16,8 +16,8 @@ CREATE TABLE IF NOT EXISTS workspace_audit_events (
   metadata_json jsonb NOT NULL DEFAULT '{}'::jsonb,
   created_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT workspace_audit_events_event_type_check CHECK (event_type IN ('membership_role_changed')),
-  CONSTRAINT workspace_audit_events_previous_role_check CHECK (previous_role IS NULL OR previous_role IN ('owner', 'admin', 'developer', 'viewer')),
-  CONSTRAINT workspace_audit_events_next_role_check CHECK (next_role IS NULL OR next_role IN ('owner', 'admin', 'developer', 'viewer'))
+  CONSTRAINT workspace_audit_events_previous_role_check CHECK (previous_role IS NULL OR previous_role IN ('admin', 'developer')),
+  CONSTRAINT workspace_audit_events_next_role_check CHECK (next_role IS NULL OR next_role IN ('admin', 'developer'))
 );
 
 CREATE INDEX IF NOT EXISTS workspace_audit_events_workspace_created_idx

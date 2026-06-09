@@ -9,8 +9,8 @@ describe("runtime environment diagnostics", () => {
       GITHUB_WEBHOOK_SECRET: "super-secret",
       GITHUB_CLIENT_ID: "",
       GITHUB_CLIENT_SECRET: undefined,
-      CLERK_SECRET_KEY: "sk_test_example",
-      CLERK_JWT_AUDIENCE: "firmcode-api",
+      INSFORGE_BASE_URL: "https://h35yzuga.eu-central.insforge.app",
+      INSFORGE_SERVICE_KEY: "insforge-service-secret",
       REDIS_URL: "\"redis://redis:6379\""
     });
 
@@ -38,7 +38,11 @@ describe("runtime environment diagnostics", () => {
       state: "missing"
     });
     expect(diagnostics).toContainEqual({
-      variable: "CLERK_JWT_AUDIENCE",
+      variable: "INSFORGE_BASE_URL",
+      state: "present"
+    });
+    expect(diagnostics).toContainEqual({
+      variable: "INSFORGE_SERVICE_KEY",
       state: "present"
     });
     expect(diagnostics).toContainEqual({
@@ -47,5 +51,6 @@ describe("runtime environment diagnostics", () => {
       hint: "redis"
     });
     expect(JSON.stringify(diagnostics)).not.toContain("super-secret");
+    expect(JSON.stringify(diagnostics)).not.toContain("insforge-service-secret");
   });
 });

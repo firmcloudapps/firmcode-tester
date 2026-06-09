@@ -376,11 +376,15 @@ function dashboardAuth(
 ): DashboardRequestContext {
   return {
     workspaceId: WORKSPACE_ID,
+    userId: DEVELOPER_USER_ID,
+    orgId: "org_firmcode",
     clerkUserId: DEVELOPER_USER_ID,
     clerkOrgId: "org_firmcode",
     sessionId: "sess_test",
     role: "developer",
     capabilities: ["retry_review_run", "trigger_codebase_scan", "manage_codebase_scan_findings"],
+    billingCapabilities: [],
+    provider: "insforge",
     clerkCapabilities: [],
     ...overrides
   };
@@ -392,10 +396,16 @@ async function seedDashboardData(pool: PgPoolLike): Promise<void> {
 INSERT INTO workspaces (id, clerk_org_id, name) VALUES
 ('${WORKSPACE_ID}', 'org_firmcode', 'Firmcode');
 
-INSERT INTO workspace_memberships (workspace_id, clerk_user_id, role, active) VALUES
-('${WORKSPACE_ID}', '${ADMIN_USER_ID}', 'admin', true),
-('${WORKSPACE_ID}', '${DEVELOPER_USER_ID}', 'developer', true),
-('${WORKSPACE_ID}', '${VIEWER_USER_ID}', 'viewer', true);
+INSERT INTO user_profiles (id, identity_provider, provider_user_id) VALUES
+('${ADMIN_USER_ID}', 'insforge', '${ADMIN_USER_ID}'),
+('${DEVELOPER_USER_ID}', 'insforge', '${DEVELOPER_USER_ID}'),
+('${VIEWER_USER_ID}', 'insforge', '${VIEWER_USER_ID}')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO workspace_memberships (workspace_id, clerk_user_id, user_id, role, active) VALUES
+('${WORKSPACE_ID}', '${ADMIN_USER_ID}', '${ADMIN_USER_ID}', 'admin', true),
+('${WORKSPACE_ID}', '${DEVELOPER_USER_ID}', '${DEVELOPER_USER_ID}', 'developer', true),
+('${WORKSPACE_ID}', '${VIEWER_USER_ID}', '${VIEWER_USER_ID}', 'developer', true);
 
 INSERT INTO github_oauth_connections (clerk_user_id, github_user_id, github_login, scopes_json) VALUES
 ('${DEVELOPER_USER_ID}', 701, 'kelly', '[]'),

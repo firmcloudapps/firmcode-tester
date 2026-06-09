@@ -69,7 +69,7 @@ function scanJob(overrides: Partial<CodebaseScanJobInput> = {}): CodebaseScanJob
     commitSha: null,
     trigger: "manual",
     correlationId: "correlation-1",
-    requestedByClerkUserId: "user-1",
+    requestedByUserId: "user-1",
     ...overrides
   };
 }

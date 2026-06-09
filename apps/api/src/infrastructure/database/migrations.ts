@@ -11,6 +11,8 @@ import { workspaceMembershipAuditMigration } from "./migrations/010_workspace_me
 import { reviewPolicyWorkspaceControlsMigration } from "./migrations/011_review_policy_workspace_controls";
 import { repositoryAccessScopeMigration } from "./migrations/012_repository_access_scope";
 import { generalizeIdentityColumnsMigration } from "./migrations/013_generalize_identity_columns";
+import { databaseManagedAuthMigration } from "./migrations/014_database_managed_auth";
+import { adminDeveloperRolesOnlyMigration } from "./migrations/015_admin_developer_roles_only";
 
 export interface DatabaseQueryResult<Row = unknown> {
   readonly rows: Row[];
@@ -39,7 +41,9 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigration[] = [
   workspaceMembershipAuditMigration,
   reviewPolicyWorkspaceControlsMigration,
   repositoryAccessScopeMigration,
-  generalizeIdentityColumnsMigration
+  generalizeIdentityColumnsMigration,
+  databaseManagedAuthMigration,
+  adminDeveloperRolesOnlyMigration
 ];
 
 interface AppliedMigrationRow {

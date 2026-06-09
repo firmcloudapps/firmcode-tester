@@ -12,9 +12,18 @@ describe("dashboard authorization policy", () => {
     expect(DASHBOARD_APP_ROLES).toEqual(["admin", "developer"]);
   });
 
-  it("allows Admin to use every dashboard capability", () => {
+  it("limits Admin to workspace administration capabilities", () => {
+    const allowed: readonly DashboardCapability[] = [
+      "manage_billing",
+      "manage_github_installations",
+      "manage_sensitive_settings",
+      "manage_review_policies"
+    ];
+
+    expect(DASHBOARD_ROLE_CAPABILITY_MATRIX.admin).toEqual(allowed);
+
     for (const capability of DASHBOARD_CAPABILITIES) {
-      expect(roleHasDashboardCapability("admin", capability)).toBe(true);
+      expect(roleHasDashboardCapability("admin", capability)).toBe(allowed.includes(capability));
     }
   });
 
@@ -24,7 +33,7 @@ describe("dashboard authorization policy", () => {
       "trigger_codebase_scan",
       "manage_codebase_scan_findings",
       "manage_repository_configuration",
-      "manage_github_installations"
+      "access_raw_artifacts"
     ];
 
     expect(DASHBOARD_ROLE_CAPABILITY_MATRIX.developer).toEqual(allowed);
@@ -34,18 +43,18 @@ describe("dashboard authorization policy", () => {
     }
   });
 
-  it("allows Clerk-managed billing capability without broadening the workspace role", () => {
+  it("allows external billing capability without broadening the workspace role", () => {
     expect(roleHasDashboardCapability("developer", "manage_billing")).toBe(false);
-    expect(roleHasDashboardCapability("developer", "access_raw_artifacts")).toBe(false);
+    expect(roleHasDashboardCapability("developer", "access_raw_artifacts")).toBe(true);
     expect(roleHasDashboardCapability("developer", "manage_billing", { hasClerkBillingCapability: true })).toBe(true);
     expect(roleHasDashboardCapability("developer", "manage_sensitive_settings", { hasClerkBillingCapability: true })).toBe(false);
   });
 
-  it("normalizes trusted Clerk and legacy metadata into the simplified role model", () => {
-    expect(normalizeDashboardAppRole("owner")).toBe("admin");
+  it("accepts only the database-owned Admin and Developer roles", () => {
+    expect(normalizeDashboardAppRole("owner")).toBeNull();
     expect(normalizeDashboardAppRole("org:owner")).toBeNull();
     expect(normalizeDashboardAppRole("admin")).toBe("admin");
-    expect(normalizeDashboardAppRole("member")).toBe("developer");
+    expect(normalizeDashboardAppRole("member")).toBeNull();
     expect(normalizeDashboardAppRole("developer")).toBe("developer");
     expect(normalizeDashboardAppRole("viewer")).toBeNull();
   });

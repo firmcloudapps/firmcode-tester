@@ -17,6 +17,30 @@ describe("web InsForge auth config", () => {
     });
   });
 
+  it("accepts server InsForge env names for SSR session checks", () => {
+    expect(
+      loadWebInsForgeAuthRenderConfig({
+        INSFORGE_BASE_URL: "https://firmcode.eu-central.insforge.app",
+        INSFORGE_ANON_KEY: "anon_server_key"
+      })
+    ).toMatchObject({
+      baseUrl: "https://firmcode.eu-central.insforge.app",
+      anonKey: "anon_server_key"
+    });
+  });
+
+  it("accepts the official public InsForge URL alias", () => {
+    expect(
+      loadWebInsForgeAuthRenderConfig({
+        NEXT_PUBLIC_INSFORGE_URL: "https://firmcode.us-east.insforge.app",
+        NEXT_PUBLIC_INSFORGE_ANON_KEY: "anon_test_key"
+      })
+    ).toMatchObject({
+      baseUrl: "https://firmcode.us-east.insforge.app",
+      anonKey: "anon_test_key"
+    });
+  });
+
   it("accepts explicit public auth routes", () => {
     const config = loadWebInsForgeAuthRenderConfig({
       NEXT_PUBLIC_INSFORGE_BASE_URL: "https://firmcode.eu-central.insforge.app",
@@ -39,6 +63,12 @@ describe("web InsForge auth config", () => {
       hasInsForgeConfig({
         NEXT_PUBLIC_INSFORGE_BASE_URL: "https://firmcode.eu-central.insforge.app",
         NEXT_PUBLIC_INSFORGE_ANON_KEY: "anon_test_key"
+      })
+    ).toBe(true);
+    expect(
+      hasInsForgeConfig({
+        INSFORGE_BASE_URL: "https://firmcode.eu-central.insforge.app",
+        INSFORGE_ANON_KEY: "anon_server_key"
       })
     ).toBe(true);
   });

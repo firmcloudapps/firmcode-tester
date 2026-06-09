@@ -26,11 +26,12 @@ export interface DashboardWorkspaceResolver {
 interface WorkspaceRow {
   readonly id: string;
   readonly clerk_org_id?: string | null;
+  readonly identity_provider?: string | null;
 }
 
 interface MembershipRow {
   readonly workspace_id: string;
-  readonly clerk_user_id: string;
+  readonly clerk_user_id?: string | null;
   readonly user_id?: string | null;
   readonly role: DashboardRole;
   readonly active?: boolean;
@@ -53,6 +54,8 @@ export class PostgresDashboardWorkspaceResolver implements DashboardWorkspaceRes
     const userId = input.token.userId;
     const orgId = input.token.orgId;
 
+    await this.ensureUserProfile(input.token);
+
     if (input.selectedWorkspaceId !== null) {
       const membership = await this.findActiveMembership(input.selectedWorkspaceId, userId);
 
@@ -74,7 +77,7 @@ export class PostgresDashboardWorkspaceResolver implements DashboardWorkspaceRes
         userId,
         role: resolveOrganizationRole(input.token),
         source: resolveOrganizationRoleSource(input.token),
-        syncExistingRole: hasExplicitTrustedRole(input.token),
+        syncExistingRole: false,
         metadata: {
           orgId,
           orgRole: input.token.orgRole,
@@ -169,7 +172,7 @@ LIMIT 1
         userId,
         role: resolvePersonalRole(token),
         source: resolvePersonalRoleSource(token),
-        syncExistingRole: hasExplicitFirmcodeRole(token),
+        syncExistingRole: false,
         metadata: {
           orgId: null,
           orgRole: null,
@@ -193,7 +196,7 @@ VALUES ($1, NULL, NULL, $2)
       userId,
       role: resolvePersonalRole(token),
       source: resolvePersonalRoleSource(token),
-      syncExistingRole: hasExplicitFirmcodeRole(token),
+      syncExistingRole: false,
       metadata: {
         orgId: null,
         orgRole: null,
@@ -256,11 +259,11 @@ RETURNING workspace_id, clerk_user_id, user_id, role
     const result = await this.database.query<MembershipRow>(
       `
 INSERT INTO workspace_memberships (workspace_id, clerk_user_id, user_id, role, active)
-VALUES ($1, CASE WHEN $4 = 'clerk' THEN $2 ELSE NULL END, CASE WHEN $4 = 'insforge' THEN $2 ELSE NULL END, $3, true)
-ON CONFLICT (workspace_id, clerk_user_id) DO NOTHING
+VALUES ($1, $2, $2, $3, true)
+ON CONFLICT (workspace_id, user_id) DO NOTHING
 RETURNING workspace_id, clerk_user_id, user_id, role
 `,
-      [input.workspaceId, input.userId, input.role, input.metadata.provider ?? 'clerk']
+      [input.workspaceId, input.userId, input.role]
     );
 
     if (result.rows[0] === undefined) {
@@ -322,10 +325,6 @@ WHERE wm.workspace_id = $1
       return;
     }
 
-    const provider = input.metadata.provider ?? 'clerk';
-    const actorClerkUserId = provider === 'clerk' ? input.userId : null;
-    const actorUserId = provider === 'insforge' ? input.userId : input.userId; // Store both when possible
-
     await this.database.query(
       `
 INSERT INTO workspace_audit_events (
@@ -345,12 +344,53 @@ INSERT INTO workspace_audit_events (
       [
         this.uuidFactory(),
         input.workspaceId,
-        actorClerkUserId,
-        actorUserId,
+        input.userId,
+        input.userId,
         input.previousRole,
         input.nextRole,
         input.source,
         JSON.stringify(input.metadata)
+      ]
+    );
+  }
+
+  private async ensureUserProfile(token: VerifiedToken): Promise<void> {
+    const metadata = {
+      provider: token.provider,
+      orgId: token.orgId,
+      orgRole: token.orgRole,
+      firmcodeRole: token.firmcodeRole
+    };
+
+    await this.database.query(
+      `
+INSERT INTO user_profiles (
+  id,
+  identity_provider,
+  provider_user_id,
+  email,
+  email_verified,
+  metadata_json,
+  last_seen_at
+) VALUES ($1, $2, $1, $3, $4, $5::jsonb, now())
+ON CONFLICT (id) DO UPDATE
+SET identity_provider = EXCLUDED.identity_provider,
+    provider_user_id = EXCLUDED.provider_user_id,
+    email = COALESCE(EXCLUDED.email, user_profiles.email),
+    email_verified = CASE
+      WHEN user_profiles.email_verified THEN true
+      ELSE EXCLUDED.email_verified
+    END,
+    metadata_json = EXCLUDED.metadata_json,
+    last_seen_at = now(),
+    updated_at = now()
+`,
+      [
+        token.userId,
+        token.provider,
+        token.email ?? null,
+        token.emailVerified ?? false,
+        JSON.stringify(metadata)
       ]
     );
   }
@@ -386,10 +426,6 @@ function resolveOrganizationRoleSource(token: VerifiedToken): string {
   return normalizeFirmcodeRole(token.firmcodeRole) !== null ? "token_firmcode_role_metadata" : "default_developer";
 }
 
-function hasExplicitTrustedRole(token: VerifiedToken): boolean {
-  return normalizeClerkOrganizationRole(token.orgRole) !== null || normalizeFirmcodeRole(token.firmcodeRole) !== null;
-}
-
 function hasExplicitFirmcodeRole(token: VerifiedToken): boolean {
   return normalizeFirmcodeRole(token.firmcodeRole) !== null;
 }
@@ -398,13 +434,9 @@ function normalizeClerkOrganizationRole(role: string | null): DashboardRole | nu
   switch (role?.toLowerCase()) {
     case "org:admin":
     case "admin":
-    case "org:owner":
-    case "owner":
       return "admin";
     case "org:developer":
     case "developer":
-    case "org:member":
-    case "member":
       return "developer";
     default:
       return null;
@@ -413,11 +445,9 @@ function normalizeClerkOrganizationRole(role: string | null): DashboardRole | nu
 
 function normalizeFirmcodeRole(role: string | null): DashboardRole | null {
   switch (role?.toLowerCase()) {
-    case "owner":
     case "admin":
       return "admin";
     case "developer":
-    case "member":
       return "developer";
     default:
       return null;
@@ -425,16 +455,18 @@ function normalizeFirmcodeRole(role: string | null): DashboardRole | null {
 }
 
 function isElevatedRole(role: DashboardRole | null): boolean {
-  return role === "owner" || role === "admin";
+  return role === "admin";
 }
 
 function toResolvedWorkspace(token: VerifiedToken, membership: MembershipRow): ResolvedDashboardWorkspace {
   const userId = membership.user_id ?? membership.clerk_user_id ?? token.userId;
+  const membershipIncludesWorkspaceOrg =
+    Object.prototype.hasOwnProperty.call(membership, "identity_provider_org_id") ||
+    Object.prototype.hasOwnProperty.call(membership, "clerk_org_id");
 
-  // Determine orgId from membership or fall back to token
   const orgId = membership.identity_provider_org_id
     ?? membership.clerk_org_id
-    ?? token.orgId
+    ?? (membershipIncludesWorkspaceOrg ? null : token.orgId)
     ?? null;
 
   return {

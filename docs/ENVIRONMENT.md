@@ -10,8 +10,9 @@ Firmcode should use typed configuration validation in every runtime. Missing req
 | `APP_URL` | yes | Public web app URL. The API uses this to build the GitHub OAuth callback URL. |
 | `API_URL` | yes | Public API URL for webhooks and server-side dashboard calls. The Vercel web app uses this before `NEXT_PUBLIC_API_URL` when fetching Nest API data. |
 | `NEXT_PUBLIC_API_URL` | web | Public API URL fallback for the Vercel dashboard and local simple setups. Keep it pointed at the API, not the web frontend. |
-| `FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN` | tests only | Explicit web unit-test fixture token used to avoid live Clerk calls. This must not be set in production. |
-| `FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID` | tests only | Optional workspace selector fixture sent only with a Clerk/test bearer token outside production. This must not be used as caller identity. |
+| `FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN` | tests only | Explicit web unit-test fixture bearer token used to avoid live InsForge calls. This must not be set in production. |
+| `FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN` | tests only | Deprecated alias for `FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN`, retained only for old isolated tests. |
+| `FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID` | tests only | Optional workspace selector fixture sent only with a test bearer token outside production. This must not be used as caller identity. |
 | `CORS_ALLOWED_ORIGINS` | api | Comma-separated Vercel production, Vercel preview, and local web origins. |
 | `VERCEL_URL` | Vercel | Auto-provided Vercel deployment URL, useful for preview handling. |
 | `LOG_LEVEL` | no | `debug`, `info`, `warn`, or `error`. Default `info`. |
@@ -50,54 +51,43 @@ DATABASE_SSL=true
 REDIS_URL=redis://redis:6379
 ```
 
-## Clerk
+## InsForge Auth
 
 | Variable | Required | Description |
 | --- | --- | --- |
-| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | web | Clerk publishable key. |
-| `CLERK_SECRET_KEY` | api/web server | Clerk secret key for server-side auth. |
-| `CLERK_WEBHOOK_SECRET` | api | Clerk webhook signing secret if syncing users/orgs. |
-| `CLERK_BILLING_PORTAL_URL` | web | Clerk-managed subscription portal or account billing entry point shown from the dashboard Billing page. |
-| `NEXT_PUBLIC_CLERK_SIGN_IN_URL` | web | Clerk sign-in route. Use `/sign-in` locally and in production unless Clerk hosted pages require a different URL. |
-| `NEXT_PUBLIC_CLERK_SIGN_UP_URL` | web | Clerk sign-up route. Use `/sign-up` locally and in production unless Clerk hosted pages require a different URL. |
-| `NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL` | web | Post sign-in fallback destination. Use `/auth/redirect` so role-based routing can send Admins to `/dashboard/admin` and Developers to `/dashboard/developer`. |
-| `NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL` | web | Post sign-up fallback destination. Use `/auth/redirect` so role-based routing can send Admins to `/dashboard/admin` and Developers to `/dashboard/developer`. |
-| `NEXT_PUBLIC_CLERK_ORGANIZATIONS_ENABLED` | web | Optional team-workspace UI flag. Defaults to disabled; set to `true` only when the Clerk instance supports optional organizations without forcing every signup to create one. |
-| `CLERK_JWT_AUDIENCE` | api/web server | Audience/template used for Clerk session tokens sent from Vercel web to the Coolify API. Required for production API token verification. |
-| `CLERK_ISSUER` | api | Optional expected Clerk issuer when not inferred by the Clerk backend SDK. |
+| `AUTH_PROVIDER` | api/web | Must be `insforge`. |
+| `NEXT_PUBLIC_AUTH_PROVIDER` | web | Must be `insforge` for client-rendered auth surfaces. |
+| `INSFORGE_BASE_URL` | api/web server | InsForge backend URL used by server-side session checks. |
+| `INSFORGE_ANON_KEY` | api/web server | InsForge anon key used by server-side SDK clients. |
+| `NEXT_PUBLIC_INSFORGE_BASE_URL` | web | Public InsForge backend URL used by the browser SDK. |
+| `NEXT_PUBLIC_INSFORGE_URL` | web | Official SDK alias for the public InsForge backend URL. Keep it equal to `NEXT_PUBLIC_INSFORGE_BASE_URL`. |
+| `NEXT_PUBLIC_INSFORGE_ANON_KEY` | web | Public InsForge anon key used by the browser SDK. |
+| `INSFORGE_SERVICE_KEY` | api | Service key for server-owned InsForge operations, if enabled. Never expose this as `NEXT_PUBLIC_*`. |
+| `NEXT_PUBLIC_INSFORGE_SIGN_IN_URL` | web | Optional sign-in route override. Defaults to `/sign-in`. |
+| `NEXT_PUBLIC_INSFORGE_SIGN_UP_URL` | web | Optional sign-up route override. Defaults to `/sign-up`. |
+| `NEXT_PUBLIC_INSFORGE_AFTER_SIGN_IN_URL` | web | Optional post-sign-in destination. Defaults to `/auth/redirect`. |
+| `NEXT_PUBLIC_INSFORGE_AFTER_SIGN_UP_URL` | web | Optional post-sign-up destination. Defaults to `/auth/redirect`. |
+| `FIRMCODE_DEFAULT_WORKSPACE_ID` | api | Optional default workspace ID for InsForge-authenticated users. Leave empty to create/resolve personal workspaces. |
+| `FIRMCODE_DEFAULT_WORKSPACE_NAME` | api | Display name for the default workspace. Defaults to `Firmcode AI`. |
 
-Clerk owns SaaS sign-in, sign-up, sessions, user profile, organizations/workspaces where enabled, member lifecycle where enabled, and Billing. Firmcode should validate Clerk session tokens in the API, map Clerk user/org IDs to internal workspaces, cache only the plan/capability/usage metadata needed for app authorization and display, and route subscription management to Clerk Billing instead of storing payment state locally.
+InsForge owns SaaS sign-in, sign-up, sessions, user profile, OAuth, and email verification. Firmcode validates InsForge JWTs in the API, maps InsForge user/org IDs to internal workspaces, and caches only the metadata needed for authorization and display.
 
 The production dashboard authentication flow is:
 
-1. Next.js middleware requires a Clerk session before rendering dashboard pages or dashboard route handlers.
-2. Web server code reads Clerk auth state with `auth()` and obtains a Clerk session token for `CLERK_JWT_AUDIENCE`.
-3. Web-to-API calls send `Authorization: Bearer <Clerk session token>`.
-4. The NestJS API verifies the token with Clerk, derives the Clerk user and organization claims, resolves the Firmcode workspace/membership, and then applies role/capability checks.
-5. After successful sign-in or sign-up, Clerk sends the browser to `/auth/redirect`, which adds the user to the configured default Clerk organization as `org:developer`, resolves the verified workspace role through the dashboard API, and routes Admins to `/dashboard/admin` and Developers to `/dashboard/developer`.
-6. The API must ignore client-provided user identity headers. Web tests may use `FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN` as an isolated bearer-token fixture, but production and normal local development must use Clerk sessions. Any legacy workspace/user shortcut is gated to `NODE_ENV=test` for direct controller tests only; setting `FIRMCODE_DASHBOARD_*` or sending `x-firmcode-user-id` is not a supported runtime authentication path.
+1. The browser signs in with the InsForge SDK and receives an access token.
+2. The web app stores the access token in the `insforge_access_token` cookie for Next.js route handlers and server components.
+3. Web-to-API calls send `Authorization: Bearer <InsForge access token>`.
+4. The NestJS API verifies the InsForge token, derives the user/org claims, resolves the Firmcode workspace/membership, and then applies role/capability checks.
+5. After successful sign-in or sign-up, the browser goes to `/auth/redirect`, which calls `/api/settings` with the bearer token and routes Admins to `/dashboard/admin` and Developers to `/dashboard/developer`.
+6. The API must ignore client-provided user identity headers. Web tests may use `FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN` as an isolated bearer-token fixture, but production and normal local development must use InsForge sessions. Any legacy workspace/user shortcut is gated to `NODE_ENV=test` for direct controller tests only; setting `FIRMCODE_DASHBOARD_*` or sending `x-firmcode-user-id` is not a supported runtime authentication path.
 
-Required Clerk dashboard configuration:
+Required InsForge dashboard configuration:
 
-- Allowed application URLs:
-  - local dashboard, for example `http://localhost:3000`
-  - Vercel production dashboard URL
-  - Vercel preview URLs if previews are enabled
-- Sign-in URL: `/sign-in`
-- Sign-up URL: `/sign-up`
-- After sign-in URL: `/auth/redirect`
-- After sign-up URL: `/auth/redirect`
-- Organization settings optional. For the default SaaS signup, Clerk must allow personal accounts and must not require a `choose-organization` task or force new users to create an organization. Firmcode server-side signup repair adds users to the configured default organization instead. Set `NEXT_PUBLIC_CLERK_ORGANIZATIONS_ENABLED=true` only after that Clerk instance supports optional organization switching.
-- Clerk webhook endpoint: configure `https://<api-host>/webhooks/clerk` with the `user.created` event so all newly created Clerk users are added to the default organization even if they do not complete the browser redirect.
-- Default Clerk organization:
-  - `FIRMCODE_DEFAULT_CLERK_ORGANIZATION_ID=org_3EGsxXDTl8pWEfV6da6oENrYhRr`
-  - `FIRMCODE_DEFAULT_CLERK_ORGANIZATION_NAME=Firmcode AI`
-  - `FIRMCODE_DEFAULT_CLERK_ORGANIZATION_ROLE=org:developer`
-- Clerk webhook endpoint configured only after the API endpoint exists and `CLERK_WEBHOOK_SECRET` is set.
-- Clerk organization roles are the source of truth for organization workspace authorization. Firmcode maps Clerk `org:admin`/`admin` and legacy `org:owner`/`owner` to Admin, and maps `org:member`/`member` plus `org:developer`/`developer` to Developer. Optional JWT role metadata (`firmcode_role`, `org_firmcode_role`, `firmcode.role`, `organization_metadata.firmcode_role`, `public_metadata.firmcode_role`, or `metadata.firmcode_role`) is only a fallback when no recognized Clerk organization role is present.
-- Personal workspace fallback is reserved for explicitly constructed tests and legacy paths; normal signups are assigned to the configured default Clerk organization. Promote users from the Clerk dashboard by setting trusted user metadata, for example `public_metadata.firmcode_role = "admin"` or `firmcode.role = "admin"`, and expose it in the session token as one of the supported claims above.
-
-Clerk webhook sync boundary: the API accepts signed `user.created` deliveries at `/webhooks/clerk` and adds the new user to the configured default organization. The active workspace is also repaired at request time for signed-in users. Organization deletion, membership removal, and elevated role audit sync are still support/admin operations; request-time repair will not reactivate inactive memberships.
+- Allowed redirect URLs include local, production, and preview dashboard origins.
+- Email/password authentication is enabled.
+- Google OAuth is enabled if the dashboard should show the Google sign-in action.
+- Link-based email verification redirect URLs include `/sign-in`.
+- User profiles and workspace roles are stored in the Firmcode database. Token metadata may help seed a brand-new membership, but existing roles must be changed through the database-backed settings/support/admin path.
 
 ## GitHub App
 
@@ -120,7 +110,7 @@ If **Request user authorization (OAuth) during installation** is enabled, config
 https://firmcode.firmoncloud.com/api/auth/github/callback
 ```
 
-GitHub redirects there with a `code` after installation. Firmcode completes OAuth for the signed-in Clerk user and discovers accessible app installations through the user access token.
+GitHub redirects there with a `code` after installation. Firmcode completes OAuth for the signed-in InsForge user and discovers accessible app installations through the user access token.
 
 If OAuth during installation is disabled, configure the GitHub App setup URL to the dashboard installation callback route so GitHub can return `installation_id` to Firmcode after install/update:
 
@@ -176,7 +166,7 @@ Keep `APP_URL=https://firmcode.firmoncloud.com` on the API service and `API_URL=
 | `CODEBASE_SCAN_LLM_ENABLED` | no | Enables optional LLM recommendations from redacted deterministic scan evidence. Defaults to `false`. |
 | `CODEBASE_SCAN_LLM_MODEL` | no | Model name for optional codebase scan LLM recommendations. Defaults to `LLM_REVIEW_MODEL` when set. |
 
-Repository-level dashboard configuration is persisted in PostgreSQL separately from environment defaults. Developers and Admins can fetch and update repository automation and review policy fields through the dashboard API; updates are workspace-scoped, preserve unspecified fields, and record update timestamps plus the Clerk user ID that made the change.
+Repository-level dashboard configuration is persisted in PostgreSQL separately from environment defaults. Developers and Admins can fetch and update repository automation and review policy fields through the dashboard API; updates are workspace-scoped, preserve unspecified fields, and record update timestamps plus the authenticated user ID that made the change.
 
 Workspace and repository Rules / Policies settings are also persisted in PostgreSQL through `GET /api/rules` and `PATCH /api/rules`. These policies cover review preferences, comment limits and severity thresholds, category enablement, prompt instructions, ignored paths, generated-file patterns, Semgrep settings, Tree-sitter/LLM/CI toggles, and infrastructure/security toggles. Repository-level policy mutations are available to Developers and Admins; global workspace/billing/retention policy mutations require Admin. Prompt instructions that look like secrets or tokens are rejected rather than stored.
 
@@ -210,10 +200,10 @@ Implementation should add:
 
 No secrets should be committed.
 
-The API validates `NODE_ENV`, `DATABASE_URL`, `DATABASE_SSL`, `CLERK_SECRET_KEY`, `CLERK_JWT_AUDIENCE`, and GitHub App credentials during startup. GitHub private keys may be raw PEM, escaped-newline PEM, or base64-encoded PEM. The web package validates Clerk publishable key, sign-in/sign-up URLs, after-auth redirects, API URL, and billing portal configuration. The dashboard provider boundary must use `ClerkProvider` from `@clerk/nextjs`; a no-op provider is acceptable only before Task 9.0 is started and must not satisfy release criteria.
+The API validates `NODE_ENV`, database settings, InsForge auth settings, and GitHub App credentials during startup. GitHub private keys may be raw PEM, escaped-newline PEM, or base64-encoded PEM. The web package reads InsForge public base URL/anon key settings, sign-in/sign-up URLs, after-auth redirects, and API URL.
 
 ## Deployment Targets
 
-- Local and Vercel web need `NEXT_PUBLIC_API_URL`, Clerk publishable key, and any public dashboard config.
-- Coolify API needs `DATABASE_URL`, `REDIS_URL`, Clerk secret, GitHub App credentials, CORS origins, and webhook secret.
+- Local and Vercel web need `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_INSFORGE_BASE_URL`, `NEXT_PUBLIC_INSFORGE_URL`, `NEXT_PUBLIC_INSFORGE_ANON_KEY`, and any public dashboard config.
+- Coolify API needs `DATABASE_URL`, `REDIS_URL`, `INSFORGE_BASE_URL`, GitHub App credentials, CORS origins, and webhook secret.
 - Coolify worker needs `DATABASE_URL`, `REDIS_URL`, LLM credentials, Semgrep settings, Tree-sitter settings, and GitHub App credentials if publishing from worker.

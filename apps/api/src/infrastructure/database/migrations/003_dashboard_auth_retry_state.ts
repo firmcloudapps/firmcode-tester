@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS workspace_memberships (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (workspace_id, clerk_user_id),
-  CONSTRAINT workspace_memberships_role_check CHECK (role IN ('owner', 'admin', 'developer', 'viewer'))
+  CONSTRAINT workspace_memberships_role_check CHECK (role IN ('admin', 'developer'))
 );
 
 ALTER TABLE github_installations

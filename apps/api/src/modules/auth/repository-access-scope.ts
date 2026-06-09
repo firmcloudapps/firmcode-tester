@@ -3,7 +3,7 @@ import { normalizeDashboardAppRole, type DashboardRole } from "./dashboard-autho
 /**
  * Repository visibility scope for dashboard data queries.
  *
- * `restrictToClerkUserId === null` means full workspace visibility (admins/owners).
+ * `restrictToClerkUserId === null` means full workspace visibility.
  * A non-null value restricts repository visibility to explicit grants or repos
  * where the user's connected GitHub login authored PR activity.
  *
@@ -40,7 +40,7 @@ export function resolveRepositoryAccessScope(input: {
   const appRole = normalizeDashboardAppRole(input.role ?? undefined);
 
   if (appRole === "admin") {
-    // Platform owner: no access to customer code data.
+    // Platform admin: no access to customer code data.
     return NO_REPOSITORY_ACCESS_SCOPE;
   }
 

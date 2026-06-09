@@ -6,27 +6,27 @@ This runbook covers common operational issues for Firmcode.
 
 Symptoms:
 
-- Dashboard redirects repeatedly between Firmcode and Clerk.
+- Dashboard redirects repeatedly between Firmcode and `/sign-in`.
 - Signed-in users see a generic dashboard error.
 - Protected API calls return `401`.
 - GitHub OAuth start returns an auth/setup error.
 
 Check:
 
-- Vercel web env vars: `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `CLERK_JWT_AUDIENCE`, sign-in/sign-up URLs, and `NEXT_PUBLIC_API_URL`.
-- Coolify API env vars: `CLERK_SECRET_KEY`, `CLERK_JWT_AUDIENCE`, `CORS_ALLOWED_ORIGINS`, and public API URL.
-- Clerk dashboard allowed origins and redirect URLs include the deployed Vercel domain and preview domain if used.
-- The web route handler sends `Authorization: Bearer <Clerk token>` to the API.
-- The API auth guard validates the expected token audience/issuer.
+- Vercel web env vars: `NEXT_PUBLIC_INSFORGE_BASE_URL`, `NEXT_PUBLIC_INSFORGE_URL`, `NEXT_PUBLIC_INSFORGE_ANON_KEY`, `INSFORGE_BASE_URL`, `INSFORGE_ANON_KEY`, after-auth URLs, and `NEXT_PUBLIC_API_URL`.
+- Coolify API env vars: `AUTH_PROVIDER=insforge`, `INSFORGE_BASE_URL`, `CORS_ALLOWED_ORIGINS`, and public API URL.
+- InsForge allowed redirect URLs include the deployed Vercel domain and preview domain if used.
+- The web route handler sends `Authorization: Bearer <InsForge access token>` to the API.
+- The API auth guard validates the InsForge access token and resolves a workspace.
 
 Action:
 
-- Fix Clerk redirect/origin configuration before changing app code.
-- If only API calls fail, compare the token audience/template used by web with the audience expected by the API.
+- Fix InsForge redirect/origin configuration before changing app code.
+- If `/auth/redirect` returns to `/sign-in` after a successful login, confirm the web server can read `INSFORGE_BASE_URL` and `INSFORGE_ANON_KEY` for SSR session validation.
 - Confirm server logs include a correlation ID and auth error class, but do not log token contents.
 - Treat production fallback to `FIRMCODE_DASHBOARD_CLERK_USER_ID` or `x-firmcode-user-id` as a security incident; remove the bypass and redeploy.
 - If a dashboard API succeeds only when `FIRMCODE_DASHBOARD_*` or `x-firmcode-user-id` is present, roll back or disable the affected route. Those values are never production auth; only `NODE_ENV=test` controller tests may use legacy workspace/user shortcuts.
-- For billing failures, inspect the resolved workspace role and Clerk billing capability claims. Do not accept a caller-provided billing capability header as proof.
+- For billing failures, inspect the resolved workspace role and InsForge billing capability claims. Do not accept a caller-provided billing capability header as proof.
 
 ## Workspace Or Role Mapping Failure
 
@@ -39,17 +39,16 @@ Symptoms:
 
 Check:
 
-- Clerk organization membership and organization role for the user.
-- Firmcode `workspaces` row for the Clerk organization or personal workspace.
-- Firmcode `workspace_memberships` row for the Clerk user.
-- Role mapping metadata if explicit Firmcode roles are configured in Clerk.
-- Clerk webhook delivery history for user, organization, or membership sync events.
+- InsForge user/org claims for the user.
+- Firmcode `workspaces` row for the InsForge organization or personal workspace.
+- Firmcode `workspace_memberships` row for the InsForge user.
+- Role mapping metadata if explicit Firmcode roles are configured in InsForge.
 
 Action:
 
-- Re-run the workspace/membership sync job or replay the relevant Clerk webhook.
+- Re-run the workspace/membership sync job or trigger request-time workspace resolution.
 - For first-login failures, trigger the request-time workspace ensure path by signing out and back in.
-- Correct role metadata in Clerk, then replay membership sync.
+- Correct role metadata in InsForge, then sign out and back in.
 - Do not manually grant database roles in production unless the change is recorded as an audited break-glass action.
 
 ## Cross-Workspace Access Suspected
@@ -383,7 +382,7 @@ Check:
 - Vercel project root points to `apps/web`.
 - build command and output settings.
 - `NEXT_PUBLIC_API_URL`.
-- Clerk publishable key and redirect URLs.
+- InsForge public base URL, anon key, and redirect URLs.
 - API CORS allows the Vercel domain.
 - preview deployment origin is allowed if using previews.
 

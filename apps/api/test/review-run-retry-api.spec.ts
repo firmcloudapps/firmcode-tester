@@ -87,18 +87,12 @@ describe("review run retry dashboard API", () => {
     });
   });
 
-  it("allows Owner, Admin, and Developer roles to retry failed review runs while Viewer remains read-only", async () => {
-    await expect(controller.retryReviewRun(ACTIVE_FAILED_RUN_ID, WORKSPACE_ID, OWNER_USER_ID)).resolves.toMatchObject({
+  it("allows Developer roles to retry failed review runs while Admin remains workspace-management only", async () => {
+    await expect(controller.retryReviewRun(ACTIVE_FAILED_RUN_ID, WORKSPACE_ID, DEVELOPER_USER_ID)).resolves.toMatchObject({
       reason: "retry_queued"
     });
 
-    await resetRetryState(pool);
-
-    await expect(controller.retryReviewRun(ACTIVE_FAILED_RUN_ID, WORKSPACE_ID, ADMIN_USER_ID)).resolves.toMatchObject({
-      reason: "retry_queued"
-    });
-
-    await expect(controller.retryReviewRun(ACTIVE_FAILED_RUN_ID, WORKSPACE_ID, VIEWER_USER_ID)).rejects.toThrow(
+    await expect(controller.retryReviewRun(ACTIVE_FAILED_RUN_ID, WORKSPACE_ID, ADMIN_USER_ID)).rejects.toThrow(
       ForbiddenException
     );
   });
@@ -152,7 +146,7 @@ describe("review run retry dashboard API", () => {
     await expect(controller.retryReviewRun(OTHER_WORKSPACE_FAILED_RUN_ID, WORKSPACE_ID, DEVELOPER_USER_ID)).rejects.toThrow(
       NotFoundException
     );
-    await expect(controller.retryReviewRun(ACTIVE_FAILED_RUN_ID, WORKSPACE_ID, VIEWER_USER_ID)).rejects.toThrow(
+    await expect(controller.retryReviewRun(ACTIVE_FAILED_RUN_ID, WORKSPACE_ID, ADMIN_USER_ID)).rejects.toThrow(
       ForbiddenException
     );
     expect(queue.jobs).toHaveLength(0);
@@ -166,11 +160,18 @@ INSERT INTO workspaces (id, clerk_org_id, name) VALUES
 ('${WORKSPACE_ID}', 'org_firmcode', 'Firmcode'),
 ('${OTHER_WORKSPACE_ID}', 'org_other', 'Other');
 
-INSERT INTO workspace_memberships (workspace_id, clerk_user_id, role, active) VALUES
-('${WORKSPACE_ID}', '${OWNER_USER_ID}', 'owner', true),
-('${WORKSPACE_ID}', '${ADMIN_USER_ID}', 'admin', true),
-('${WORKSPACE_ID}', '${DEVELOPER_USER_ID}', 'developer', true),
-('${WORKSPACE_ID}', '${VIEWER_USER_ID}', 'viewer', true);
+INSERT INTO user_profiles (id, identity_provider, provider_user_id) VALUES
+('${OWNER_USER_ID}', 'insforge', '${OWNER_USER_ID}'),
+('${ADMIN_USER_ID}', 'insforge', '${ADMIN_USER_ID}'),
+('${DEVELOPER_USER_ID}', 'insforge', '${DEVELOPER_USER_ID}'),
+('${VIEWER_USER_ID}', 'insforge', '${VIEWER_USER_ID}')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO workspace_memberships (workspace_id, clerk_user_id, user_id, role, active) VALUES
+('${WORKSPACE_ID}', '${OWNER_USER_ID}', '${OWNER_USER_ID}', 'admin', true),
+('${WORKSPACE_ID}', '${ADMIN_USER_ID}', '${ADMIN_USER_ID}', 'admin', true),
+('${WORKSPACE_ID}', '${DEVELOPER_USER_ID}', '${DEVELOPER_USER_ID}', 'developer', true),
+('${WORKSPACE_ID}', '${VIEWER_USER_ID}', '${VIEWER_USER_ID}', 'developer', true);
 
 INSERT INTO github_oauth_connections (clerk_user_id, github_user_id, github_login, scopes_json) VALUES
 ('${DEVELOPER_USER_ID}', 701, 'kelly', '[]');

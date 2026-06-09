@@ -1,7 +1,8 @@
 import { ForbiddenException, UnauthorizedException, type ExecutionContext } from "@nestjs/common";
+import type { ApiRuntimeConfig } from "@firmcode/shared";
 import type { DashboardAuthenticatedRequest } from "../src/modules/auth/dashboard-auth.context";
 import { DashboardAuthGuard } from "../src/modules/auth/dashboard-auth.guard";
-import type { ClerkTokenVerifier, VerifiedClerkToken } from "../src/modules/auth/clerk-token-verifier";
+import type { TokenVerifier, VerifiedToken } from "../src/modules/auth/token-verifier";
 import type {
   DashboardWorkspaceResolver,
   ResolvedDashboardWorkspace
@@ -39,25 +40,26 @@ describe("DashboardAuthGuard", () => {
     );
   });
 
-  it("rejects valid-looking tokens without a Clerk session", async () => {
+  it("accepts valid tokens when the provider omits a session id", async () => {
+    const request = createRequest({ authorization: "Bearer sessionless" });
     const guard = createGuard({
       verifier: {
         async verify() {
           return {
-            clerkUserId: "user_sessionless",
-            clerkOrgId: null,
+            userId: "user_sessionless",
+            orgId: null,
             sessionId: null,
             orgRole: null,
             firmcodeRole: null,
-            billingCapabilities: []
+            billingCapabilities: [],
+            provider: "insforge"
           };
         }
       }
     });
 
-    await expect(guard.canActivate(createHttpContext({ authorization: "Bearer sessionless" }))).rejects.toBeInstanceOf(
-      UnauthorizedException
-    );
+    await expect(guard.canActivate(createHttpContext(request.headers, request))).resolves.toBe(true);
+    expect(request.dashboardAuth?.sessionId).toBeNull();
   });
 
   it("rejects expired bearer tokens", async () => {
@@ -98,8 +100,8 @@ describe("DashboardAuthGuard", () => {
     expect(request.headers["x-firmcode-workspace-id"]).toBeUndefined();
     expect(request).toMatchObject({
       dashboardAuth: {
-        clerkUserId: "user_personal",
-        clerkOrgId: null,
+        userId: "user_personal",
+        orgId: null,
         workspaceId: "00000000-0000-4000-8000-000000000101",
         role: "developer",
         capabilities: expect.arrayContaining(["retry_review_run", "trigger_codebase_scan", "manage_codebase_scan_findings"])
@@ -113,12 +115,13 @@ describe("DashboardAuthGuard", () => {
       verifier: {
         async verify() {
           return {
-            clerkUserId: "user_admin",
-            clerkOrgId: "org_firmcode",
+            userId: "user_admin",
+            orgId: "org_firmcode",
             sessionId: "sess_org",
             orgRole: "org:admin",
             firmcodeRole: null,
-            billingCapabilities: ["org:billing:manage"]
+            billingCapabilities: ["org:billing:manage"],
+            provider: "insforge"
           };
         }
       }
@@ -131,8 +134,8 @@ describe("DashboardAuthGuard", () => {
     expect(request.headers["x-firmcode-clerk-billing-capability"]).toBeUndefined();
     expect(request).toMatchObject({
       dashboardAuth: {
-        clerkUserId: "user_admin",
-        clerkOrgId: "org_firmcode",
+        userId: "user_admin",
+        orgId: "org_firmcode",
         workspaceId: "00000000-0000-4000-8000-000000000202",
         role: "admin",
         capabilities: expect.arrayContaining(["manage_billing", "manage_github_installations"])
@@ -186,36 +189,37 @@ describe("DashboardAuthGuard", () => {
     );
   });
 
-  it("uses the verified Clerk subject even when a workspace selector header is present", async () => {
+  it("uses the verified provider subject even when a workspace selector header is present", async () => {
     const request = createRequest({
       authorization: "Bearer personal-token",
       "x-firmcode-workspace-id": "00000000-0000-4000-8000-000000000404"
     });
-    const resolverCalls: Array<{ clerkUserId: string; selectedWorkspaceId: string | null }> = [];
+    const resolverCalls: Array<{ userId: string; selectedWorkspaceId: string | null }> = [];
     const guard = createGuard({
       verifier: {
         async verify() {
           return {
-            clerkUserId: "user_verified",
-            clerkOrgId: null,
+            userId: "user_verified",
+            orgId: null,
             sessionId: "sess_verified",
             orgRole: null,
             firmcodeRole: null,
-            billingCapabilities: []
+            billingCapabilities: [],
+            provider: "insforge"
           };
         }
       },
       resolver: {
         async resolve(input) {
           resolverCalls.push({
-            clerkUserId: input.token.clerkUserId,
+            userId: input.token.userId,
             selectedWorkspaceId: input.selectedWorkspaceId
           });
 
           return {
             workspaceId: input.selectedWorkspaceId ?? "00000000-0000-4000-8000-000000000101",
-            clerkUserId: input.token.clerkUserId,
-            clerkOrgId: null,
+            userId: input.token.userId,
+            orgId: null,
             sessionId: input.token.sessionId,
             role: "developer",
             billingCapabilities: []
@@ -228,45 +232,46 @@ describe("DashboardAuthGuard", () => {
 
     expect(resolverCalls).toEqual([
       {
-        clerkUserId: "user_verified",
+        userId: "user_verified",
         selectedWorkspaceId: "00000000-0000-4000-8000-000000000404"
       }
     ]);
     expect(request.dashboardAuth).toMatchObject({
-      clerkUserId: "user_verified",
+      userId: "user_verified",
       workspaceId: "00000000-0000-4000-8000-000000000404"
     });
   });
 });
 
 function createGuard(overrides: {
-  verifier?: ClerkTokenVerifier;
+  verifier?: TokenVerifier;
   resolver?: DashboardWorkspaceResolver;
 } = {}): DashboardAuthGuard {
-  return new DashboardAuthGuard(overrides.verifier ?? new FakeVerifier(), overrides.resolver ?? new FakeWorkspaceResolver());
+  return new DashboardAuthGuard(testConfig, overrides.verifier ?? new FakeVerifier(), overrides.resolver ?? new FakeWorkspaceResolver());
 }
 
-class FakeVerifier implements ClerkTokenVerifier {
-  async verify(): Promise<VerifiedClerkToken> {
+class FakeVerifier implements TokenVerifier {
+  async verify(): Promise<VerifiedToken> {
     return {
-      clerkUserId: "user_personal",
-      clerkOrgId: null,
+      userId: "user_personal",
+      orgId: null,
       sessionId: "sess_personal",
       orgRole: null,
       firmcodeRole: null,
-      billingCapabilities: []
+      billingCapabilities: [],
+      provider: "insforge"
     };
   }
 }
 
 class FakeWorkspaceResolver implements DashboardWorkspaceResolver {
-  async resolve(input: { token: VerifiedClerkToken; selectedWorkspaceId: string | null }): Promise<ResolvedDashboardWorkspace> {
-    const isOrganization = input.token.clerkOrgId !== null;
+  async resolve(input: { token: VerifiedToken; selectedWorkspaceId: string | null }): Promise<ResolvedDashboardWorkspace> {
+    const isOrganization = input.token.orgId !== null;
 
     return {
       workspaceId: input.selectedWorkspaceId ?? (isOrganization ? "00000000-0000-4000-8000-000000000202" : "00000000-0000-4000-8000-000000000101"),
-      clerkUserId: input.token.clerkUserId,
-      clerkOrgId: input.token.clerkOrgId,
+      userId: input.token.userId,
+      orgId: input.token.orgId,
       sessionId: input.token.sessionId,
       role: isOrganization ? "admin" : "developer",
       billingCapabilities: input.token.billingCapabilities
@@ -288,3 +293,5 @@ function createHttpContext(
 function createRequest(headers: Record<string, string | string[] | undefined>): DashboardAuthenticatedRequest {
   return { headers };
 }
+
+const testConfig = {} as ApiRuntimeConfig;

@@ -202,6 +202,7 @@ const testConfig: ApiRuntimeConfig = {
   port: 3001,
   corsAllowedOrigins: [],
   database: {
+    provider: "neon",
     url: "postgres://firmcode:secret@localhost:5432/firmcode",
     ssl: false,
     redactedUrl: "postgres://firmcode:REDACTED@localhost:5432/firmcode"
@@ -210,14 +211,14 @@ const testConfig: ApiRuntimeConfig = {
     redisUrl: "redis://localhost:6379",
     redactedRedisUrl: "redis://localhost:6379/"
   },
-  clerk: {
-    secretKey: "sk_test_example",
-    jwtAudience: "firmcode-api",
-    webhookSecret: null,
-    defaultOrganization: {
-      id: "org_3EGsxXDTl8pWEfV6da6oENrYhRr",
-      name: "Firmcode AI",
-      role: "org:developer"
+  auth: {
+    provider: "insforge",
+    insforge: {
+      baseUrl: "https://h35yzuga.eu-central.insforge.app"
+    },
+    defaultWorkspace: {
+      id: "",
+      name: "Firmcode AI"
     }
   },
   github: null,
@@ -241,6 +242,9 @@ const testConfig: ApiRuntimeConfig = {
   },
   codebaseScan: {
     defaultCadenceHours: 24
+  },
+  storage: {
+    provider: "database"
   }
 };
 
@@ -250,10 +254,16 @@ async function seedSettingsData(pool: PgPoolLike): Promise<void> {
 INSERT INTO workspaces (id, clerk_org_id, name) VALUES
 ('${WORKSPACE_ID}', 'org_firmcode', 'Firmcode');
 
-INSERT INTO workspace_memberships (workspace_id, clerk_user_id, role, active) VALUES
-('${WORKSPACE_ID}', '${ADMIN_USER_ID}', 'admin', true),
-('${WORKSPACE_ID}', '${SUPPORT_ADMIN_USER_ID}', 'admin', true),
-('${WORKSPACE_ID}', '${DEVELOPER_USER_ID}', 'developer', true);
+INSERT INTO user_profiles (id, identity_provider, provider_user_id) VALUES
+('${ADMIN_USER_ID}', 'insforge', '${ADMIN_USER_ID}'),
+('${SUPPORT_ADMIN_USER_ID}', 'insforge', '${SUPPORT_ADMIN_USER_ID}'),
+('${DEVELOPER_USER_ID}', 'insforge', '${DEVELOPER_USER_ID}')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO workspace_memberships (workspace_id, clerk_user_id, user_id, role, active) VALUES
+('${WORKSPACE_ID}', '${ADMIN_USER_ID}', '${ADMIN_USER_ID}', 'admin', true),
+('${WORKSPACE_ID}', '${SUPPORT_ADMIN_USER_ID}', '${SUPPORT_ADMIN_USER_ID}', 'admin', true),
+('${WORKSPACE_ID}', '${DEVELOPER_USER_ID}', '${DEVELOPER_USER_ID}', 'developer', true);
 
 INSERT INTO github_installations (
   id,
