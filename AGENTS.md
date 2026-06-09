@@ -16,7 +16,7 @@ Firmcode reviews GitHub pull requests by combining deterministic static analysis
 
 Keep the MVP simple: Docker Compose, PostgreSQL, Redis, NestJS API, BullMQ jobs, Python AI worker, and Next.js dashboard.
 
-Auth is handled by **InsForge** (migrated from Clerk). Do not reintroduce Clerk.
+Auth is handled by **InsForge** (migrated from the previous auth provider). Do not reintroduce the previous auth provider.
 
 ## Reference Repository Policy
 
@@ -104,58 +104,27 @@ pytest apps/worker/tests
 
 If a command does not exist yet, add or update the relevant package script as part of the implementation task.
 
-## Auth Migration: Clerk → InsForge (Completed)
+## Auth Migration: Previous Provider → InsForge (Completed)
 
-The codebase has been fully migrated from Clerk to InsForge. All Clerk packages, modules, and references have been removed.
+Authentication is now InsForge-only. Do not add packages, webhooks, middleware, environment variables, or request-context fields for the previous auth provider.
 
-### What Changed
+Current auth rules:
 
-**Deleted**
-- `apps/api/src/modules/webhooks/clerk/` — entire Clerk webhook module removed
-- `apps/api/src/modules/auth/clerk-token-verifier.ts` — replaced by `insforge-token-verifier.ts`
-- All `@clerk/*` npm dependencies
+- API token verification uses `InsForgeTokenVerifier` through `TOKEN_VERIFIER`.
+- Dashboard request context fields are `userId`, `orgId`, `billingCapabilities`, `provider`, `workspaceId`, `role`, and `capabilities`.
+- Database-managed user identity lives in `user_profiles`.
+- Workspace memberships use `workspace_memberships.user_id`.
+- Workspace roles live in `workspace_roles` and are limited to `admin` and `developer`.
+- Public DTOs and worker contracts use `userId`, `updatedByUserId`, and `requestedByUserId`.
+- Repository access scope uses `restrictToUserId` and maps to `repository_access.user_id`.
+- Migration `016_remove_legacy_identity_columns` removes provider-specific identity columns from existing databases.
 
-**API: Auth module (`apps/api/src/modules/auth/`)**
-- `dashboard-auth.module.ts` — now provides only `InsForgeTokenVerifier` as `TOKEN_VERIFIER`; removed `CLERK_TOKEN_VERIFIER` provider and Clerk factory
-- `dashboard-auth.guard.ts` — removed deprecated `clerkUserId`, `clerkOrgId`, `clerkCapabilities` fields from `DashboardRequestContext` construction
-- `dashboard-auth.context.ts` — `DashboardRequestContext` uses generic `userId`, `orgId`, `billingCapabilities`, `provider: string`; deprecated Clerk fields removed
-- `workspace-resolver.ts` — replaced `DefaultClerkOrganizationConfig` with `DefaultWorkspaceConfig`; removed Clerk-specific SQL columns from audit queries; removed `readDefaultOrganizationRole` helper
+Rules for future work:
 
-**API: Service & store renames**
-
-| File | Change |
-|---|---|
-| `review-runs.controller.ts` | `clerkUserId` → `userId` in `hasMembershipCapability` and retry call |
-| `findings.controller.ts` | `clerkUserId` → `userId` in `hasDashboardCapability` |
-| `ci-failures.controller.ts` | `clerkUserId` → `userId` in `hasMembershipCapability` |
-| `codebase-scans.controller.ts` | `clerkUserId` → `userId` in `hasMembershipCapability` |
-| `repositories.controller.ts` | `clerkUserId` → `userId` in `hasMembershipCapability` |
-| `review-run-retry.service.ts` | `ReviewRunRetryRequest.clerkUserId` → `userId` |
-| `review-runs.store.ts` | `CreateRetryReviewRunInput.clerkUserId` → `userId` |
-| `billing.service.ts` | `WorkspaceBillingRequestContext.clerkUserId` → `userId`; billing source/plan values updated to InsForge literals |
-| `rules.service.ts` | `RulesRequestContext.clerkUserId` → `userId` |
-| `rules.store.ts` | `RulesPolicyUpdate.updatedByClerkUserId` → `updatedByUserId` |
-| `github.service.ts` | `GitHubDashboardContext.clerkUserId` → `userId`; all method calls updated |
-| `github.store.ts` | `CreateOAuthStateInput`, `ConsumeOAuthStateInput`, `OAuthStateRecord`, `UpsertOAuthConnectionInput` — `clerkUserId` → `userId` |
-| `repositories.store.ts` | `RepositoryConfigurationUpdate.updatedByClerkUserId` → `updatedByUserId` |
-| `repository-configuration.service.ts` | `RepositoryConfigurationRequestContext.clerkUserId` → `userId` |
-| `codebase-scan-enqueue.service.ts` | `ManualCodebaseScanRequest.clerkUserId` → `userId`; `requestedByClerkUserId` → `requestedByUserId` |
-| `main.ts` | Removed `/webhooks/clerk` body-parser middleware |
-| `app.module.ts` | Removed `ClerkWebhookModule` import and usage |
-
-**Shared package (`packages/shared/src/contracts/`)**
-
-| File | Change |
-|---|---|
-| `review.ts` | `ReviewPolicy.updatedByClerkUserId` → `updatedByUserId`; `RepositoryReviewConfiguration.updatedByClerkUserId` → `updatedByUserId`; `WorkspaceBillingResponse.source` widened from `"clerk"` literal to `string`; plan status widened from `"managed_by_clerk"` to `string` |
-| `worker.ts` | `WorkerCodebaseScanJobInput.requestedByClerkUserId` → `requestedByUserId`; JSON schema `required` array and `properties` updated to match |
-
-### Rules for Future Work
-
-- Always use `userId` (never `clerkUserId`) when referencing an authenticated user.
-- Always use `DashboardMembership.userId` (the `clerkUserId` field is a deprecated alias kept only for backward-compatible SQL queries).
-- `findActiveMembership` accepts both `userId` and `clerkUserId` in its input for DB compatibility — always pass `userId`.
-- The `RepositoryAccessScope.restrictToClerkUserId` field name is intentionally kept as-is (maps to the `clerk_user_id` DB column); do not rename it without a DB migration.
+- Always use `userId` for authenticated users.
+- Do not add provider-specific identity aliases back into TypeScript contracts.
+- Do not reintroduce auth-provider webhooks; profile, membership, and role state is database-managed.
+- Keep InsForge SDK usage in application code and InsForge CLI usage for backend/schema/infrastructure work.
 
 ## Definition Of Done
 
@@ -318,7 +287,7 @@ This project uses [InsForge](https://insforge.dev): an all-in-one, open-source P
   - `insforge`: app code with the `@insforge/sdk` client (database CRUD, auth, storage, edge functions, realtime, AI, email, and Stripe payments).
   - `insforge-cli`: backend and infrastructure via the `insforge` CLI (projects, SQL, migrations, RLS policies, storage buckets, functions, secrets, payment setup, schedules, deploys).
   - `insforge-debug`: diagnosing failures (SDK/HTTP errors, RLS denials, auth and OAuth issues) and running security or performance audits.
-  - `insforge-integrations`: wiring external auth providers (Clerk, Auth0, WorkOS, Better Auth, etc.) for JWT-based RLS, or the OKX x402 payment facilitator.
+  - `insforge-integrations`: wiring external auth providers (InsForge, Auth0, WorkOS, Better Auth, etc.) for JWT-based RLS, or the OKX x402 payment facilitator.
   - `find-skills`: discovering additional skills on demand.
 - **Credentials:** app code reads keys from `.env.local`; the CLI reads `.insforge/project.json`. Never hardcode or commit keys.
 

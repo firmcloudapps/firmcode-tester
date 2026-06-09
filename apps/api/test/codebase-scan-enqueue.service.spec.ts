@@ -176,7 +176,7 @@ function deterministicCorrelationId(): () => string {
 async function seedScanData(pool: PgPoolLike): Promise<void> {
   await pool.query(
     `
-INSERT INTO workspaces (id, clerk_org_id, name) VALUES
+INSERT INTO workspaces (id, identity_provider_org_id, name) VALUES
 ('${WORKSPACE_ID}', 'org_firmcode', 'Firmcode');
 
 INSERT INTO github_installations (

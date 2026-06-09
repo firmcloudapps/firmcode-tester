@@ -97,7 +97,7 @@ export interface WorkspaceRepositoryRecord {
 
 interface OAuthStateRow {
   readonly workspace_id: string;
-  readonly clerk_user_id: string;
+  readonly user_id: string;
   readonly redirect_uri: string;
   readonly expires_at: Date | string;
 }
@@ -224,11 +224,11 @@ export class PostgresGitHubDashboardStore implements GitHubDashboardStore {
 INSERT INTO github_oauth_states (
   state_hash,
   workspace_id,
-  clerk_user_id,
+  user_id,
   redirect_uri,
   expires_at
 ) VALUES ($1, $2, $3, $4, $5)
-RETURNING workspace_id, clerk_user_id, redirect_uri, expires_at
+RETURNING workspace_id, user_id, redirect_uri, expires_at
 `,
       [hashSecret(input.state), input.workspaceId, input.userId, input.redirectUri, input.expiresAt]
     );
@@ -243,10 +243,10 @@ UPDATE github_oauth_states
 SET consumed_at = now()
 WHERE state_hash = $1
   AND workspace_id = $2
-  AND clerk_user_id = $3
+  AND user_id = $3
   AND consumed_at IS NULL
   AND expires_at > now()
-RETURNING workspace_id, clerk_user_id, redirect_uri, expires_at
+RETURNING workspace_id, user_id, redirect_uri, expires_at
 `,
       [hashSecret(input.state), input.workspaceId, input.userId]
     );
@@ -265,7 +265,7 @@ SELECT
   connected_at,
   updated_at
 FROM github_oauth_connections
-WHERE clerk_user_id = $1
+WHERE user_id = $1
 `,
       [userId]
     );
@@ -278,7 +278,7 @@ WHERE clerk_user_id = $1
       `
 DELETE FROM github_oauth_connections
 WHERE github_user_id = $1
-  AND clerk_user_id <> $2
+  AND user_id <> $2
 `,
       [input.user.githubUserId, input.userId]
     );
@@ -286,7 +286,7 @@ WHERE github_user_id = $1
     const result = await this.database.query<OAuthConnectionRow>(
       `
 INSERT INTO github_oauth_connections (
-  clerk_user_id,
+  user_id,
   github_user_id,
   github_login,
   github_name,
@@ -294,7 +294,7 @@ INSERT INTO github_oauth_connections (
   scopes_json,
   token_hash
 ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-ON CONFLICT (clerk_user_id) DO UPDATE
+ON CONFLICT (user_id) DO UPDATE
 SET github_user_id = EXCLUDED.github_user_id,
     github_login = EXCLUDED.github_login,
     github_name = EXCLUDED.github_name,
@@ -454,9 +454,9 @@ RETURNING *
   private async grantRepositoryAccess(repositoryId: string, userId: string): Promise<void> {
     await this.database.query(
       `
-INSERT INTO repository_access (repository_id, clerk_user_id, granted_by_clerk_user_id)
+INSERT INTO repository_access (repository_id, user_id, granted_by_user_id)
 VALUES ($1, $2, $2)
-ON CONFLICT (repository_id, clerk_user_id) DO NOTHING
+ON CONFLICT (repository_id, user_id) DO NOTHING
 `,
       [repositoryId, userId]
     );
@@ -504,7 +504,7 @@ export function toRepositorySyncResponse(repository: RepositoryListItem): GitHub
 function toOAuthStateRecord(row: OAuthStateRow): OAuthStateRecord {
   return {
     workspaceId: row.workspace_id,
-    userId: row.clerk_user_id,
+    userId: row.user_id,
     redirectUri: row.redirect_uri,
     expiresAt: toDate(row.expires_at)
   };

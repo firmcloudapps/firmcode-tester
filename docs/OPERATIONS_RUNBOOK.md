@@ -24,7 +24,7 @@ Action:
 - Fix InsForge redirect/origin configuration before changing app code.
 - If `/auth/redirect` returns to `/sign-in` after a successful login, confirm the web server can read `INSFORGE_BASE_URL` and `INSFORGE_ANON_KEY` for SSR session validation.
 - Confirm server logs include a correlation ID and auth error class, but do not log token contents.
-- Treat production fallback to `FIRMCODE_DASHBOARD_CLERK_USER_ID` or `x-firmcode-user-id` as a security incident; remove the bypass and redeploy.
+- Treat production fallback to `FIRMCODE_DASHBOARD_USER_ID` or `x-firmcode-user-id` as a security incident; remove the bypass and redeploy.
 - If a dashboard API succeeds only when `FIRMCODE_DASHBOARD_*` or `x-firmcode-user-id` is present, roll back or disable the affected route. Those values are never production auth; only `NODE_ENV=test` controller tests may use legacy workspace/user shortcuts.
 - For billing failures, inspect the resolved workspace role and InsForge billing capability claims. Do not accept a caller-provided billing capability header as proof.
 

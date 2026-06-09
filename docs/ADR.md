@@ -61,11 +61,11 @@ Rationale:
 - NeonDB reduces operational burden for managed environments.
 - Local PostgreSQL keeps development reproducible.
 
-## ADR-006: Clerk For Auth And Billing
+## ADR-006: InsForge For Auth And Billing
 
 Status: Accepted
 
-Decision: Use Clerk for authentication, user/session management, organizations where enabled, and billing/subscription management.
+Decision: Use InsForge for authentication, user/session management, organizations where enabled, and billing/subscription management.
 
 Rationale:
 
@@ -117,7 +117,7 @@ Decision: Use Docker-first local development with Docker Compose. Deploy the Nex
 Rationale:
 
 - Catches Dockerfile, dependency, networking, environment, worker, and startup issues early.
-- Uses Vercel where it is strongest: Next.js dashboard hosting, previews, and Clerk frontend integration.
+- Uses Vercel where it is strongest: Next.js dashboard hosting, previews, and InsForge frontend integration.
 - Uses Coolify where it is strongest: long-running API/worker containers, queues, Semgrep, Tree-sitter, and GitHub webhook handling.
 - Keeps local development and personal MVP deployment simple.
 - Avoids operational complexity before product behavior is stable.
@@ -153,25 +153,25 @@ Implications:
 - Local web development uses `npm run dev --workspace @firmcode/web` and `NEXT_PUBLIC_API_URL=http://localhost:3001`.
 - This supersedes ADR-005's local PostgreSQL allowance and ADR-010's earlier local full-stack web Compose implication.
 
-## ADR-012: Clerk Session Tokens For Dashboard API Authentication
+## ADR-012: InsForge Session Tokens For Dashboard API Authentication
 
 Status: Accepted
 
-Decision: Protect the dashboard with Clerk end to end. The Next.js web app uses `@clerk/nextjs` for sign-in, sign-up, session middleware, user menu, and organization switching. The web app sends Clerk session bearer tokens to the NestJS API. The API verifies those tokens server-side, resolves the Clerk user and active organization to a Firmcode workspace membership, and then enforces the simplified Admin/Developer role model plus resource ownership.
+Decision: Protect the dashboard with InsForge end to end. The Next.js web app uses `@insforge/sdk` for sign-in, sign-up, session middleware, user menu, and organization switching. The web app sends InsForge session bearer tokens to the NestJS API. The API verifies those tokens server-side, resolves the InsForge user and active organization to a Firmcode workspace membership, and then enforces the simplified Admin/Developer role model plus resource ownership.
 
 Rationale:
 
 - The dashboard is a SaaS surface containing private repository metadata, review artifacts, findings, CI details, billing state, and account settings.
 - Trusting web-provided user/workspace headers is not authentication and allows impersonation if exposed beyond isolated local tests.
-- Clerk already owns identity, session, organization, member, and billing workflows, so Firmcode should consume verified Clerk claims instead of duplicating identity logic.
-- Firmcode still needs application authorization because Clerk identity alone does not prove repository, review run, finding, artifact, policy, or GitHub installation ownership.
+- InsForge already owns identity, session, organization, member, and billing workflows, so Firmcode should consume verified InsForge claims instead of duplicating identity logic.
+- Firmcode still needs application authorization because InsForge identity alone does not prove repository, review run, finding, artifact, policy, or GitHub installation ownership.
 
 Implications:
 
-- `apps/web` must include real Clerk provider wiring, protected routes, sign-in/sign-up pages, `UserButton`, and organization switching where enabled.
-- `apps/api` must include a shared Clerk auth guard and request context for all dashboard APIs.
+- `apps/web` must include real InsForge provider wiring, protected routes, sign-in/sign-up pages, `UserButton`, and organization switching where enabled.
+- `apps/api` must include a shared InsForge auth guard and request context for all dashboard APIs.
 - Production API controllers must never derive caller identity from `x-firmcode-user-id` or environment-provided dashboard user IDs.
 - Optional workspace selector headers or params are allowed only after token verification and membership checks.
 - Every dashboard list endpoint must be tenant-scoped; global dashboard lists are not allowed.
-- GitHub webhooks remain unauthenticated by Clerk and continue to use GitHub signature verification and installation ownership checks.
+- GitHub webhooks remain unauthenticated by InsForge and continue to use GitHub signature verification and installation ownership checks.
 - Tests must cover missing/invalid/expired tokens, first-login workspace resolution, role denial, cross-workspace denial, and spoofed-header rejection.

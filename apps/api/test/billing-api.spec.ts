@@ -40,20 +40,20 @@ describe("billing dashboard API", () => {
     await pool.end();
   });
 
-  it("allows Admin roles to load Clerk-managed billing context", async () => {
+  it("allows Admin roles to load InsForge-managed billing context", async () => {
     await expect(controller.getWorkspaceBilling(WORKSPACE_ID, ADMIN_USER_ID, undefined)).resolves.toMatchObject({
       workspace: { role: "admin", canManageBilling: true },
-      plan: { status: "managed_by_clerk" }
+      plan: { status: "active" }
     });
   });
 
-  it("allows Clerk-managed billing capability even when the workspace role is not elevated", async () => {
+  it("allows InsForge-managed billing capability even when the workspace role is not elevated", async () => {
     await expect(controller.getWorkspaceBilling(WORKSPACE_ID, DEVELOPER_USER_ID, "manage_billing")).resolves.toMatchObject({
       workspace: { role: "developer", canManageBilling: true }
     });
   });
 
-  it("denies Developers without Clerk billing capability", async () => {
+  it("denies Developers without billing capability", async () => {
     await expect(controller.getWorkspaceBilling(WORKSPACE_ID, DEVELOPER_USER_ID, undefined)).rejects.toThrow(
       ForbiddenException
     );
@@ -62,7 +62,7 @@ describe("billing dashboard API", () => {
     );
   });
 
-  it("does not let spoofed billing capability headers elevate a verified Clerk developer context", async () => {
+  it("does not let spoofed billing capability headers elevate a verified authenticated developer context", async () => {
     await expect(
       controller.getWorkspaceBilling(dashboardAuth({ role: "developer" }), undefined, "manage_billing")
     ).rejects.toThrow(ForbiddenException);
@@ -86,7 +86,7 @@ function dashboardAuth(overrides: Partial<DashboardRequestContext> = {}): Dashbo
 async function seedBillingData(pool: PgPoolLike): Promise<void> {
   await pool.query(
     `
-INSERT INTO workspaces (id, clerk_org_id, name) VALUES
+INSERT INTO workspaces (id, identity_provider_org_id, name) VALUES
 ('${WORKSPACE_ID}', 'org_firmcode', 'Firmcode');
 
 INSERT INTO user_profiles (id, identity_provider, provider_user_id) VALUES
@@ -94,9 +94,9 @@ INSERT INTO user_profiles (id, identity_provider, provider_user_id) VALUES
 ('${DEVELOPER_USER_ID}', 'insforge', '${DEVELOPER_USER_ID}')
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO workspace_memberships (workspace_id, clerk_user_id, user_id, role, active) VALUES
-('${WORKSPACE_ID}', '${ADMIN_USER_ID}', '${ADMIN_USER_ID}', 'admin', true),
-('${WORKSPACE_ID}', '${DEVELOPER_USER_ID}', '${DEVELOPER_USER_ID}', 'developer', true);
+INSERT INTO workspace_memberships (workspace_id, user_id, role, active) VALUES
+('${WORKSPACE_ID}', '${ADMIN_USER_ID}', 'admin', true),
+('${WORKSPACE_ID}', '${DEVELOPER_USER_ID}', 'developer', true);
 
 INSERT INTO github_installations (id, installation_id, account_login, account_type, workspace_id) VALUES
 ('00000000-0000-4000-8000-000000000201', 101, 'openclaw', 'Organization', '${WORKSPACE_ID}');

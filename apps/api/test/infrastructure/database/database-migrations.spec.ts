@@ -181,7 +181,8 @@ ORDER BY table_name
       "012_repository_access_scope",
       "013_generalize_identity_columns",
       "014_database_managed_auth",
-      "015_admin_developer_roles_only"
+      "015_admin_developer_roles_only",
+      "016_remove_legacy_identity_columns"
     ]);
     expect(secondRunMigrationIds).toEqual([]);
     expect(tables.rows.map((row) => row.table_name)).toEqual(EXPECTED_TABLES);
@@ -200,7 +201,8 @@ ORDER BY table_name
       { id: "012_repository_access_scope" },
       { id: "013_generalize_identity_columns" },
       { id: "014_database_managed_auth" },
-      { id: "015_admin_developer_roles_only" }
+      { id: "015_admin_developer_roles_only" },
+      { id: "016_remove_legacy_identity_columns" }
     ]);
   });
 

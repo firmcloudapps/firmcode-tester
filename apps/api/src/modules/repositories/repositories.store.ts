@@ -195,7 +195,7 @@ interface RepositoryConfigurationRow {
   readonly ci_explanation_enabled: boolean;
   readonly infrastructure_review_enabled: boolean;
   readonly dry_run_enabled: boolean;
-  readonly updated_by_clerk_user_id: string | null;
+  readonly updated_by_user_id: string | null;
   readonly created_at: Date | string | null;
   readonly updated_at: Date | string | null;
 }
@@ -775,8 +775,8 @@ SELECT
   'configuration_updated' AS kind,
   'Review configuration updated' AS title,
   CASE
-    WHEN rc.updated_by_clerk_user_id IS NULL THEN 'Repository review configuration was initialized.'
-    ELSE 'Repository review configuration was updated by ' || rc.updated_by_clerk_user_id || '.'
+    WHEN rc.updated_by_user_id IS NULL THEN 'Repository review configuration was initialized.'
+    ELSE 'Repository review configuration was updated by ' || rc.updated_by_user_id || '.'
   END AS detail,
   rc.updated_at AS created_at
 FROM repository_review_configurations rc
@@ -1000,7 +1000,7 @@ GROUP BY repository_id
     const result = await this.database.query<RepositoryConfigurationRow>(
       `
 UPDATE repository_review_configurations
-SET updated_by_clerk_user_id = $2,
+SET updated_by_user_id = $2,
     updated_at = now()
     ${assignments.sql}
 WHERE repository_id = $1
@@ -1310,7 +1310,7 @@ function toRepositoryReviewConfiguration(row: RepositoryConfigurationRow): Repos
     ciExplanationEnabled: row.ci_explanation_enabled,
     infrastructureReviewEnabled: row.infrastructure_review_enabled,
     dryRunEnabled: row.dry_run_enabled,
-    updatedByUserId: row.updated_by_clerk_user_id,
+    updatedByUserId: row.updated_by_user_id,
     createdAt: toRequiredIsoString(row.created_at),
     updatedAt: toRequiredIsoString(row.updated_at)
   };

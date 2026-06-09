@@ -3,7 +3,7 @@
 ```text
 Read AGENTS.md first and follow it strictly.
 Relevant planning docs: docs/TASKS.md Task 9.2, docs/TASK_PROMPTS.md Task 9.2, docs/DASHBOARD_DESIGN.md, docs/DASHBOARD_PROMPTS.md, docs/AUTHORIZATION.md.
-Code context requirement: Before implementing, inspect existing Next.js routes, dashboard components, typed DTOs, API clients, tests, Tailwind patterns, and Clerk integration. Follow current UI primitives and do not create a parallel design system.
+Code context requirement: Before implementing, inspect existing Next.js routes, dashboard components, typed DTOs, API clients, tests, Tailwind patterns, and InsForge integration. Follow current UI primitives and do not create a parallel design system.
 
 Add dashboard controls for retrying failed review runs and enabling/disabling repository automation. Place retry actions where users already inspect failed review runs. Place repository automation controls where repository list/detail or configuration UI expects them. Controls must prevent duplicate clicks while a request is pending, show success and error states, and refresh or optimistically update typed state consistently with existing dashboard patterns.
 

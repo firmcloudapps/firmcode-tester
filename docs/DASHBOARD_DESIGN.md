@@ -10,8 +10,8 @@ Copy-ready prompts for implementing and QAing the dashboard live in `docs/DASHBO
 
 - Framework: Next.js with TypeScript.
 - Styling: Tailwind CSS.
-- Authentication: Clerk.
-- Billing: Clerk Billing.
+- Authentication: InsForge.
+- Billing: InsForge Billing.
 - Database: NeonDB PostgreSQL.
 - UI posture: developer dashboard first, responsive, dense but breathable.
 
@@ -66,7 +66,7 @@ Top Bar
 ├── Global search
 ├── GitHub install/connect action
 ├── Notifications
-└── Clerk user menu
+└── InsForge user menu
 
 Left Sidebar
 ├── Review
@@ -87,7 +87,7 @@ Left Sidebar
 - Shows current workspace or organization.
 - Provides global search across repositories, PRs, findings, and review runs.
 - Includes GitHub App install/connect CTA when no installation exists.
-- Uses Clerk user menu for identity and account controls.
+- Uses InsForge user menu for identity and account controls.
 - Keeps height compact, around 56-64px.
 
 ### Sidebar
@@ -135,20 +135,20 @@ Behavior notes:
 - Run/retry controls must respect role capabilities and duplicate-click protection.
 - The page should support a manual refresh/sync action, but it must be disabled until the sync API is implemented.
 
-## Clerk Responsibilities
+## InsForge Responsibilities
 
-Clerk should own:
+InsForge should own:
 
 - Sign in and sign up.
 - Session management.
 - User profile menu.
-- Organization/workspace switcher if Clerk Organizations are enabled.
-- Member management if using Clerk Organizations.
-- Billing checkout, subscription management, and customer portal via Clerk Billing.
+- Organization/workspace switcher if InsForge Organizations are enabled.
+- Member management if using InsForge Organizations.
+- Billing checkout, subscription management, and customer portal via InsForge Billing.
 
-The Next.js app should wrap the dashboard in a Clerk provider boundary. Until `@clerk/nextjs` is installed, the boundary remains a no-op scaffold so the rest of the dashboard can compile while the environment and route contracts are tested.
+The Next.js app should wrap the dashboard in a InsForge provider boundary. Until `@insforge/sdk` is installed, the boundary remains a no-op scaffold so the rest of the dashboard can compile while the environment and route contracts are tested.
 
-For the complete MVP, the no-op boundary must be replaced by a real `ClerkProvider`, Clerk middleware, sign-in/sign-up pages, `UserButton`, and `OrganizationSwitcher` where enabled. Dashboard pages and route handlers must be inaccessible without a Clerk session. The web app must call the API with a Clerk bearer token; static env-based user/workspace headers are a test-only scaffold and do not satisfy the dashboard authentication requirement.
+For the complete MVP, the no-op boundary must be replaced by a real `InsForge SDK auth boundary`, InsForge auth checks, sign-in/sign-up pages, `UserButton`, and `workspace switcher` where enabled. Dashboard pages and route handlers must be inaccessible without a InsForge session. The web app must call the API with a InsForge bearer token; static env-based user/workspace headers are a test-only scaffold and do not satisfy the dashboard authentication requirement.
 
 ## Authentication Page Design
 
@@ -163,7 +163,7 @@ Desktop
 │   ├── Short product line
 │   └── Compact setup/security cues
 └── Auth panel
-    └── Clerk SignIn or SignUp component
+    └── InsForge SignIn or SignUp component
 
 Mobile
 └── Stacked auth panel with compact wordmark above it
@@ -173,18 +173,18 @@ Design requirements:
 
 - Use the same light-mode tokens as the dashboard: `bg-shell`, `bg-surface`, `border`, `text-primary`, `text-secondary`, and `accent`.
 - Keep the auth panel constrained to roughly 400-460px wide.
-- Use 6-8px radius on custom containers and configure Clerk component appearance to match the dashboard controls.
+- Use 6-8px radius on custom containers and configure InsForge component appearance to match the dashboard controls.
 - Keep copy short and operational: users are signing into a PR review workspace, not reading a sales page.
-- Include links between sign-in and sign-up through Clerk's built-in routing.
-- Include a safe loading/skeleton state if Clerk is still mounting.
-- Show Clerk-managed errors in the panel without custom secret-revealing text.
+- Include links between sign-in and sign-up through InsForge's built-in routing.
+- Include a safe loading/skeleton state if InsForge is still mounting.
+- Show InsForge-managed errors in the panel without custom secret-revealing text.
 - Avoid decorative gradient blobs, oversized hero treatment, stock imagery, or a split marketing hero.
 - The pages must be responsive, keyboard-accessible, and visually checked at mobile and desktop sizes.
 
-Firmcode should store Clerk-linked metadata:
+Firmcode should store InsForge-linked metadata:
 
-- `clerk_user_id`
-- `clerk_org_id`
+- `user_id`
+- `identity_provider_org_id`
 - Internal workspace ID.
 - Workspace role and capability metadata needed for app authorization.
 - Required GitHub OAuth identity metadata, such as GitHub user ID, login, avatar URL, scopes, and connection timestamp. Do not expose OAuth access tokens.
@@ -572,11 +572,11 @@ Tabs:
 General | GitHub App | Members | API Keys | Data Retention | Notifications
 ```
 
-Clerk owns identity and membership UI where possible. Firmcode owns GitHub installation mapping, retention policy, notifications, and review configuration.
+InsForge owns identity and membership UI where possible. Firmcode owns GitHub installation mapping, retention policy, notifications, and review configuration.
 
 ## 9. Billing
 
-Purpose: lightweight billing and usage view backed by Clerk Billing.
+Purpose: lightweight billing and usage view backed by InsForge Billing.
 
 Content:
 
@@ -586,9 +586,9 @@ Content:
 - AI tokens.
 - Repositories monitored.
 - Seats.
-- Manage subscription button through Clerk.
+- Manage subscription button through InsForge.
 
-The manage subscription action should link to `CLERK_BILLING_PORTAL_URL`, which is expected to be a Clerk-managed billing portal or account billing entry point. Firmcode should not implement custom checkout or subscription mutation screens for the MVP.
+The manage subscription action should link to `INSFORGE_BILLING_PORTAL_URL`, which is expected to be a InsForge-managed billing portal or account billing entry point. Firmcode should not implement custom checkout or subscription mutation screens for the MVP.
 
 ## MVP Page Priority
 

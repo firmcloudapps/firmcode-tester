@@ -7,12 +7,12 @@ Code context requirement: Before implementing, inspect the Next.js app route tre
 
 Create a route-readiness guard for dashboard navigation. Active internal links and primary actions must map to implemented app routes. Planned destinations must be disabled controls with accessible labels/titles rather than active links.
 
-Add tests that enumerate dashboard nav/action definitions and fail when an active internal route is missing. Keep external Clerk/GitHub URLs explicitly marked as external and validated separately from internal routes.
+Add tests that enumerate dashboard nav/action definitions and fail when an active internal route is missing. Keep external InsForge/GitHub URLs explicitly marked as external and validated separately from internal routes.
 
 Testing requirements:
 - Add route manifest or component tests for sidebar links, topbar actions, overview links, repository row actions, settings actions, and billing actions.
 - Add regression tests for disabled planned actions.
-- Add tests that distinguish internal routes from external Clerk/GitHub URLs.
+- Add tests that distinguish internal routes from external InsForge/GitHub URLs.
 
 Acceptance criteria:
 - No active dashboard link points at an unimplemented internal route.

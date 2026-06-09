@@ -58,11 +58,11 @@ export class PostgresDashboardAuthStore implements DashboardAuthStore {
       `
 SELECT
   workspace_id,
-  COALESCE(user_id, clerk_user_id) AS user_id,
+  user_id,
   role
 FROM workspace_memberships
 WHERE workspace_id = $1
-  AND (user_id = $2 OR clerk_user_id = $2)
+  AND user_id = $2
   AND active = true
 `,
       [input.workspaceId, input.userId]

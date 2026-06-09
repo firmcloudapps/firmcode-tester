@@ -39,8 +39,8 @@ Confirm each route renders inside the full-width light dashboard shell, marks th
 - Findings: filter controls wrap cleanly, the findings list scrolls horizontally only inside its bordered surface on small screens, severity/status badges remain readable, and detail content does not overlap links or evidence snippets.
 - CI Failures: mobile cards replace the dense table on narrow screens, redacted log excerpts remain collapsed by default, and related artifact controls are disabled when raw access is not allowed.
 - Rules / Policies: form controls keep labels, validation text, and disabled read-only state visible without horizontal page overflow.
-- Settings: General, GitHub App, Members, API Keys, Data Retention, and Notifications tabs fit without text overlap; Clerk-owned internal fallbacks render disabled until route-ready.
-- Billing: the Clerk-managed billing entry point is active only for authorized users with an external Clerk billing URL; otherwise Manage Subscription is disabled with an explanatory title.
+- Settings: General, GitHub App, Members, API Keys, Data Retention, and Notifications tabs fit without text overlap; InsForge-owned internal fallbacks render disabled until route-ready.
+- Billing: the InsForge-managed billing entry point is active only for authorized users with an external InsForge billing URL; otherwise Manage Subscription is disabled with an explanatory title.
 
 ## Automated Coverage
 

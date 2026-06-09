@@ -159,7 +159,7 @@ Neither Compose file runs PostgreSQL or the Next.js dashboard. PostgreSQL is Neo
 8. Confirm `/auth/redirect` routes signed-in users to the role-appropriate dashboard.
 9. Confirm direct API requests without a valid InsForge token return `401`.
 
-Production must not rely on `FIRMCODE_DASHBOARD_WORKSPACE_ID`, `FIRMCODE_DASHBOARD_CLERK_USER_ID`, or other user-identity headers as authentication.
+Production must not rely on `FIRMCODE_DASHBOARD_WORKSPACE_ID`, `FIRMCODE_DASHBOARD_USER_ID`, or other user-identity headers as authentication.
 
 ## CORS Policy
 

@@ -39,7 +39,7 @@ SELECT
   (
     SELECT COUNT(
       DISTINCT CASE
-        WHEN wm.user_id IS NULL OR wm.user_id = '' THEN wm.clerk_user_id
+        WHEN wm.user_id IS NULL OR wm.user_id = '' THEN wm.user_id
         ELSE wm.user_id
       END
     )

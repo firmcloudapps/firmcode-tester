@@ -131,7 +131,7 @@ describe("DashboardAuthGuard", () => {
 
     expect(request.headers["x-firmcode-user-id"]).toBeUndefined();
     expect(request.headers["x-firmcode-workspace-id"]).toBeUndefined();
-    expect(request.headers["x-firmcode-clerk-billing-capability"]).toBeUndefined();
+    expect(request.headers["x-firmcode-billing-capability"]).toBeUndefined();
     expect(request).toMatchObject({
       dashboardAuth: {
         userId: "user_admin",

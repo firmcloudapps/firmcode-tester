@@ -166,10 +166,10 @@ export class PostgresSettingsStore implements SettingsStore {
   async getWorkspaceMember(input: WorkspaceMemberLookup): Promise<WorkspaceSettingsMember | null> {
     const result = await this.database.query<MemberRow>(
       `
-SELECT COALESCE(user_id, clerk_user_id) AS resolved_user_id, role, active, created_at, updated_at
+SELECT user_id AS resolved_user_id, role, active, created_at, updated_at
 FROM workspace_memberships
 WHERE workspace_id = $1
-  AND (clerk_user_id = $2 OR user_id = $2)
+  AND user_id = $2
 `,
       [input.workspaceId, input.targetUserId]
     );
@@ -183,8 +183,7 @@ WHERE workspace_id = $1
 SELECT COUNT(*) AS count
 FROM workspace_memberships
 WHERE workspace_id = $1
-  AND (clerk_user_id <> $2 OR clerk_user_id IS NULL)
-  AND (user_id IS NULL OR user_id <> $2)
+  AND user_id <> $2
   AND role = 'admin'
   AND active = true
 `,
@@ -202,8 +201,8 @@ UPDATE workspace_memberships
 SET role = $3,
     updated_at = now()
 WHERE workspace_id = $1
-  AND (clerk_user_id = $2 OR user_id = $2)
-RETURNING COALESCE(user_id, clerk_user_id) AS resolved_user_id, role, active, created_at, updated_at
+  AND user_id = $2
+RETURNING user_id AS resolved_user_id, role, active, created_at, updated_at
 `,
       [input.workspaceId, input.targetUserId, input.role]
     );
@@ -231,8 +230,8 @@ UPDATE workspace_memberships
 SET active = $3,
     updated_at = now()
 WHERE workspace_id = $1
-  AND (clerk_user_id = $2 OR user_id = $2)
-RETURNING COALESCE(user_id, clerk_user_id) AS resolved_user_id, role, active, created_at, updated_at
+  AND user_id = $2
+RETURNING user_id AS resolved_user_id, role, active, created_at, updated_at
 `,
       [input.workspaceId, input.targetUserId, input.active]
     );
@@ -257,7 +256,7 @@ RETURNING COALESCE(user_id, clerk_user_id) AS resolved_user_id, role, active, cr
       `
 SELECT
   id,
-  COALESCE(identity_provider_org_id, clerk_org_id) AS identity_workspace_id,
+  identity_provider_org_id AS identity_workspace_id,
   name
 FROM workspaces
 WHERE id = $1
@@ -294,7 +293,7 @@ ORDER BY gi.updated_at DESC
   private async loadMembers(workspaceId: string, currentUserId: string): Promise<WorkspaceSettingsMember[]> {
     const result = await this.database.query<MemberRow>(
       `
-SELECT COALESCE(user_id, clerk_user_id) AS resolved_user_id, role, active, created_at, updated_at
+SELECT user_id AS resolved_user_id, role, active, created_at, updated_at
 FROM workspace_memberships
 WHERE workspace_id = $1
 ORDER BY active DESC, role ASC, created_at ASC
@@ -326,16 +325,14 @@ ORDER BY active DESC, role ASC, created_at ASC
 INSERT INTO workspace_audit_events (
   id,
   workspace_id,
-  actor_clerk_user_id,
   actor_user_id,
-  target_clerk_user_id,
   target_user_id,
   event_type,
   previous_role,
   next_role,
   source,
   metadata_json
-) VALUES ($1, $2, $3, $3, $4, $4, 'membership_role_changed', $5, $6, $7, '{}'::jsonb)
+) VALUES ($1, $2, $3, $4, 'membership_role_changed', $5, $6, $7, '{}'::jsonb)
 `,
       [
         this.uuidFactory(),

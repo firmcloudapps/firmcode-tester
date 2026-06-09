@@ -3,9 +3,9 @@
 Ensure you read the existing code on this task before you make any change
 Read AGENTS.md first and follow it strictly.
 Relevant planning docs: docs/TASKS.md Task 9.0 and Task 9.5, docs/TASK_PROMPTS.md Task 9.0 and Task 9.5, docs/PRD.md, docs/DASHBOARD_DESIGN.md, docs/DASHBOARD_PROMPTS.md, docs/AUTHORIZATION.md, docs/ENVIRONMENT.md, docs/DEPLOYMENT.md.
-Code context requirement: Before implementing, inspect the current dashboard shell, topbar Connect GitHub action, settings GitHub App tab, Next.js route tree, Clerk auth helpers, environment config, and tests.
+Code context requirement: Before implementing, inspect the current dashboard shell, topbar Connect GitHub action, settings GitHub App tab, Next.js route tree, InsForge auth helpers, environment config, and tests.
 
-Implement the authenticated GitHub OAuth plus GitHub App installation entry point. This task depends on the complete Clerk auth foundation: /github/installations, OAuth start, and OAuth callback routes must require a signed-in Clerk user and resolved workspace membership. Add or complete /github/installations so Connect GitHub routes to a real page or route that shows required GitHub OAuth account status, current GitHub App setup status, installation instructions, configured GitHub App install URL, missing-config state, and safe retry/error states. Every signed-in Developer can connect GitHub OAuth and add/sync repositories where plan limits allow. Admins can do the same and additionally manage billing, member access, global settings, and support/safety controls. If the app shell exposes a PR Review navigation item, it should lead to this setup/status workspace or another implemented route, not a placeholder.
+Implement the authenticated GitHub OAuth plus GitHub App installation entry point. This task depends on the complete InsForge auth foundation: /github/installations, OAuth start, and OAuth callback routes must require a signed-in InsForge user and resolved workspace membership. Add or complete /github/installations so Connect GitHub routes to a real page or route that shows required GitHub OAuth account status, current GitHub App setup status, installation instructions, configured GitHub App install URL, missing-config state, and safe retry/error states. Every signed-in Developer can connect GitHub OAuth and add/sync repositories where plan limits allow. Admins can do the same and additionally manage billing, member access, global settings, and support/safety controls. If the app shell exposes a PR Review navigation item, it should lead to this setup/status workspace or another implemented route, not a placeholder.
 
 The page must not expose private keys, webhook secrets, OAuth client secrets, OAuth access tokens, installation tokens, or raw GitHub payloads. If GitHub App or OAuth environment variables are missing, show a disabled state with actionable setup copy for local development.
 
@@ -15,8 +15,8 @@ Testing requirements:
 - Add or update environment/config tests if install URL derivation depends on config validation.
 
 Acceptance criteria:
-- /github/installations exists and is Clerk-authenticated.
-- OAuth routes bind state to the verified Clerk user/workspace, not env-provided user headers.
+- /github/installations exists and is InsForge-authenticated.
+- OAuth routes bind state to the verified InsForge user/workspace, not env-provided user headers.
 - GitHub OAuth connection is presented as a required per-user step before GitHub-backed workflows.
 - Connect GitHub and PR Review reach real implemented destinations or explicit disabled states.
 - Missing config is handled without leaking secrets.

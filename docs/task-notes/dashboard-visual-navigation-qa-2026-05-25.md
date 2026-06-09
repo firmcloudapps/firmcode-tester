@@ -47,7 +47,7 @@ Browser smoke covered desktop `1440x900` and mobile `390x844` for:
 
 Checks performed:
 
-- Dashboard shell rendered with Clerk-authenticated scaffold.
+- Dashboard shell rendered with InsForge-authenticated scaffold.
 - Active sidebar/mobile navigation state was present for each route.
 - No route rendered a framework 404 page.
 - No body-level horizontal overflow was detected at desktop or mobile widths.

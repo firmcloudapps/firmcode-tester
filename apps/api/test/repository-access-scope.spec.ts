@@ -28,7 +28,7 @@ describe("repository access scope", () => {
     await pool.end();
   });
 
-  it("admins see all repositories in a workspace", async () => {
+  it("admins do not read customer repository code by default", async () => {
     await seedWorkspaceWithRepositories(pool, {
       workspaceId: WORKSPACE_ID,
       repoIds: [REPOSITORY_A_ID, REPOSITORY_B_ID],
@@ -39,8 +39,7 @@ describe("repository access scope", () => {
     const adminScope = resolveRepositoryAccessScope({ role: "admin", userId: "admin-1" });
     const result = await store.listRepositories({ workspaceId: WORKSPACE_ID, accessScope: adminScope });
 
-    expect(result.repositories).toHaveLength(2);
-    expect(result.repositories.map((r) => r.id)).toEqual(expect.arrayContaining([REPOSITORY_A_ID, REPOSITORY_B_ID]));
+    expect(result.repositories).toHaveLength(0);
   });
 
   it("developers only see repositories they were backfilled to access", async () => {
@@ -54,7 +53,7 @@ describe("repository access scope", () => {
     });
     // Dev gets access only to repo-a
     await pool.query(
-      `INSERT INTO repository_access (repository_id, clerk_user_id, granted_by_clerk_user_id)
+      `INSERT INTO repository_access (repository_id, user_id, granted_by_user_id)
        VALUES ($1, 'dev-1', 'admin-1')`,
       [REPOSITORY_A_ID]
     );
@@ -165,8 +164,8 @@ async function seedWorkspaceWithRepositories(
       [membership.userId]
     );
     await pool.query(
-      `INSERT INTO workspace_memberships (workspace_id, clerk_user_id, user_id, role, active)
-       VALUES ($1, $2, $2, $3, true)`,
+      `INSERT INTO workspace_memberships (workspace_id, user_id, role, active)
+       VALUES ($1, $2, $3, true)`,
       [input.workspaceId, membership.userId, membership.role]
     );
   }

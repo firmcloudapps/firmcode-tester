@@ -119,7 +119,7 @@ describe("GitHub OAuth, installation, and repository sync API", () => {
 
     const callback = await controller.completeOAuth("oauth-code", state ?? "", WORKSPACE_ID, UNCONNECTED_USER_ID);
     const rows = await pool.query<{ token_hash: string | null; github_login: string }>(
-      "SELECT token_hash, github_login FROM github_oauth_connections WHERE clerk_user_id = $1",
+      "SELECT token_hash, github_login FROM github_oauth_connections WHERE user_id = $1",
       [UNCONNECTED_USER_ID]
     );
 
@@ -142,11 +142,11 @@ describe("GitHub OAuth, installation, and repository sync API", () => {
     expect(JSON.stringify(callback)).not.toContain("gho_plaintext_secret");
   });
 
-  it("rebinds a GitHub account to the current Clerk user when it was connected under another user", async () => {
+  it("rebinds a GitHub account to the current user when it was connected under another user", async () => {
     await pool.query(
       `
 INSERT INTO github_oauth_connections (
-  clerk_user_id,
+  user_id,
   github_user_id,
   github_login,
   github_name,
@@ -161,12 +161,12 @@ INSERT INTO github_oauth_connections (
     const state = new URL(start.authorizationUrl).searchParams.get("state") ?? "";
     const callback = await controller.completeOAuth("oauth-code", state, WORKSPACE_ID, UNCONNECTED_USER_ID);
 
-    const rows = await pool.query<{ clerk_user_id: string }>(
-      "SELECT clerk_user_id FROM github_oauth_connections WHERE github_user_id = 701"
+    const rows = await pool.query<{ user_id: string }>(
+      "SELECT user_id FROM github_oauth_connections WHERE github_user_id = 701"
     );
 
     expect(callback).toMatchObject({ connected: true, user: { githubUserId: 701, login: "octo-user" } });
-    expect(rows.rows).toEqual([{ clerk_user_id: UNCONNECTED_USER_ID }]);
+    expect(rows.rows).toEqual([{ user_id: UNCONNECTED_USER_ID }]);
   });
 
   it("maps accessible GitHub App installations when OAuth completes", async () => {
@@ -254,7 +254,7 @@ ORDER BY full_name
     const callback = await controller.completeOAuth("oauth-code", state, WORKSPACE_ID, UNCONNECTED_USER_ID);
 
     const rows = await pool.query<{ github_login: string }>(
-      "SELECT github_login FROM github_oauth_connections WHERE clerk_user_id = $1",
+      "SELECT github_login FROM github_oauth_connections WHERE user_id = $1",
       [UNCONNECTED_USER_ID]
     );
 
@@ -273,7 +273,7 @@ ORDER BY full_name
     const callback = await controller.completeOAuth("oauth-code", undefined, WORKSPACE_ID, UNCONNECTED_USER_ID, "installation");
 
     const rows = await pool.query<{ github_login: string }>(
-      "SELECT github_login FROM github_oauth_connections WHERE clerk_user_id = $1",
+      "SELECT github_login FROM github_oauth_connections WHERE user_id = $1",
       [UNCONNECTED_USER_ID]
     );
 
@@ -296,7 +296,7 @@ ORDER BY full_name
 
     const start = await controller.startOAuth(WORKSPACE_ID, UNCONNECTED_USER_ID);
     const state = new URL(start.authorizationUrl).searchParams.get("state") ?? "";
-    await pool.query("UPDATE workspace_memberships SET role = 'developer' WHERE clerk_user_id = $1", [UNCONNECTED_USER_ID]);
+    await pool.query("UPDATE workspace_memberships SET role = 'developer' WHERE user_id = $1", [UNCONNECTED_USER_ID]);
     await controller.completeOAuth("oauth-code", state, WORKSPACE_ID, UNCONNECTED_USER_ID);
 
     const installationRows = await pool.query<{ installation_id: string | number }>(
@@ -408,10 +408,13 @@ ORDER BY full_name
     expect(scanQueue.schedules).toHaveLength(0);
   });
 
-  it("allows Developer installation sync and denies cross-workspace or missing installation sync attempts", async () => {
-    await expect(controller.syncInstallations({ installationId: 301 }, WORKSPACE_ID, DEVELOPER_USER_ID)).resolves.toMatchObject({
+  it("allows Admin installation sync and denies developer, cross-workspace, or missing installation sync attempts", async () => {
+    await expect(controller.syncInstallations({ installationId: 301 }, WORKSPACE_ID, ADMIN_USER_ID)).resolves.toMatchObject({
       syncedRepositoryCount: 2
     });
+    await expect(controller.syncInstallations({ installationId: 301 }, WORKSPACE_ID, DEVELOPER_USER_ID)).rejects.toThrow(
+      ForbiddenException
+    );
     await expect(controller.syncRepository(REPOSITORY_ID, WORKSPACE_ID, DEVELOPER_USER_ID)).rejects.toThrow(ForbiddenException);
     await expect(controller.syncRepository(OTHER_REPOSITORY_ID, WORKSPACE_ID, OWNER_USER_ID)).rejects.toThrow(
       NotFoundException
@@ -681,7 +684,7 @@ function deterministicCorrelationId(): () => string {
 async function seedGitHubDashboardData(pool: PgPoolLike): Promise<void> {
   await pool.query(
     `
-INSERT INTO workspaces (id, clerk_org_id, name) VALUES
+INSERT INTO workspaces (id, identity_provider_org_id, name) VALUES
 ('${WORKSPACE_ID}', 'org_firmcode', 'Firmcode'),
 ('${OTHER_WORKSPACE_ID}', 'org_other', 'Other');
 
@@ -693,16 +696,16 @@ INSERT INTO user_profiles (id, identity_provider, provider_user_id) VALUES
 ('${UNCONNECTED_USER_ID}', 'insforge', '${UNCONNECTED_USER_ID}')
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO workspace_memberships (workspace_id, clerk_user_id, user_id, role, active) VALUES
-('${WORKSPACE_ID}', '${OWNER_USER_ID}', '${OWNER_USER_ID}', 'admin', true),
-('${WORKSPACE_ID}', '${ADMIN_USER_ID}', '${ADMIN_USER_ID}', 'admin', true),
-('${WORKSPACE_ID}', '${DEVELOPER_USER_ID}', '${DEVELOPER_USER_ID}', 'developer', true),
-('${WORKSPACE_ID}', '${VIEWER_USER_ID}', '${VIEWER_USER_ID}', 'developer', true),
-('${WORKSPACE_ID}', '${UNCONNECTED_USER_ID}', '${UNCONNECTED_USER_ID}', 'admin', true),
-('${OTHER_WORKSPACE_ID}', '${OWNER_USER_ID}', '${OWNER_USER_ID}', 'admin', true);
+INSERT INTO workspace_memberships (workspace_id, user_id, role, active) VALUES
+('${WORKSPACE_ID}', '${OWNER_USER_ID}', 'admin', true),
+('${WORKSPACE_ID}', '${ADMIN_USER_ID}', 'admin', true),
+('${WORKSPACE_ID}', '${DEVELOPER_USER_ID}', 'developer', true),
+('${WORKSPACE_ID}', '${VIEWER_USER_ID}', 'developer', true),
+('${WORKSPACE_ID}', '${UNCONNECTED_USER_ID}', 'admin', true),
+('${OTHER_WORKSPACE_ID}', '${OWNER_USER_ID}', 'admin', true);
 
 INSERT INTO github_oauth_connections (
-  clerk_user_id,
+  user_id,
   github_user_id,
   github_login,
   github_name,

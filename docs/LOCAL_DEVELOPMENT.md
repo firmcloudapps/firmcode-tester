@@ -71,7 +71,7 @@ The expected local auth flow is:
 Configured default or personal workspace signups resolve to Developer by default. For local Admin testing, update the database-backed `workspace_memberships.role` row after the user has signed in and `user_profiles`/membership rows have been created.
 9. Connect GitHub OAuth from `/dashboard/developer` or `/github/installations` before using GitHub-backed workflows.
 
-Do not use dashboard user or workspace environment shims for normal local development. Web-to-API calls should use InsForge sessions. `FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN`, its deprecated `FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN` alias, and `FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID` are reserved for isolated web unit tests only.
+Do not use dashboard user or workspace environment shims for normal local development. Web-to-API calls should use InsForge sessions. `FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN`, its deprecated `FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN` alias, and `FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID` are reserved for isolated web unit tests only.
 
 ## Docker-First Workflow
 
@@ -109,7 +109,7 @@ Before merging implementation work, verify:
 - Signed-in dashboard requests include an InsForge bearer token when calling the API.
 - API protected routes return `401` without a token and tenant-scoped data with a valid token.
 - A user cannot access another workspace by changing request headers or IDs.
-- `x-firmcode-user-id` and `FIRMCODE_DASHBOARD_*` do not authenticate any production or normal local request; only `FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN` and its deprecated `FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN` alias are allowed for isolated web unit tests.
+- `x-firmcode-user-id` and `FIRMCODE_DASHBOARD_*` do not authenticate any production or normal local request; only `FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN` and its deprecated `FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN` alias are allowed for isolated web unit tests.
 - GitHub OAuth start/callback routes redirect to sign-in or return `401` unless an InsForge session token is present.
 - Billing management is denied unless the resolved role is Admin or the token carries the billing capability.
 - API image builds.

@@ -11,7 +11,7 @@ Firmcode should use typed configuration validation in every runtime. Missing req
 | `API_URL` | yes | Public API URL for webhooks and server-side dashboard calls. The Vercel web app uses this before `NEXT_PUBLIC_API_URL` when fetching Nest API data. |
 | `NEXT_PUBLIC_API_URL` | web | Public API URL fallback for the Vercel dashboard and local simple setups. Keep it pointed at the API, not the web frontend. |
 | `FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN` | tests only | Explicit web unit-test fixture bearer token used to avoid live InsForge calls. This must not be set in production. |
-| `FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN` | tests only | Deprecated alias for `FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN`, retained only for old isolated tests. |
+| `FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN` | tests only | Deprecated alias for `FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN`, retained only for old isolated tests. |
 | `FIRMCODE_TEST_DASHBOARD_WORKSPACE_ID` | tests only | Optional workspace selector fixture sent only with a test bearer token outside production. This must not be used as caller identity. |
 | `CORS_ALLOWED_ORIGINS` | api | Comma-separated Vercel production, Vercel preview, and local web origins. |
 | `VERCEL_URL` | Vercel | Auto-provided Vercel deployment URL, useful for preview handling. |

@@ -129,16 +129,16 @@ describe("settings dashboard API", () => {
       ADMIN_USER_ID
     );
     const audits = await pool.query<{
-      actor_clerk_user_id: string;
-      target_clerk_user_id: string;
+      actor_user_id: string;
+      target_user_id: string;
       previous_role: string | null;
       next_role: string | null;
       source: string;
     }>(
       `
-SELECT actor_clerk_user_id, target_clerk_user_id, previous_role, next_role, source
+SELECT actor_user_id, target_user_id, previous_role, next_role, source
 FROM workspace_audit_events
-WHERE target_clerk_user_id = $1
+WHERE target_user_id = $1
 ORDER BY created_at, id
 `,
       [DEVELOPER_USER_ID]
@@ -149,22 +149,22 @@ ORDER BY created_at, id
     expect(restored).toMatchObject({ userId: DEVELOPER_USER_ID, role: "admin", active: true });
     expect(audits.rows).toEqual([
       {
-        actor_clerk_user_id: ADMIN_USER_ID,
-        target_clerk_user_id: DEVELOPER_USER_ID,
+        actor_user_id: ADMIN_USER_ID,
+        target_user_id: DEVELOPER_USER_ID,
         previous_role: "developer",
         next_role: "admin",
         source: "settings_member_role"
       },
       {
-        actor_clerk_user_id: ADMIN_USER_ID,
-        target_clerk_user_id: DEVELOPER_USER_ID,
+        actor_user_id: ADMIN_USER_ID,
+        target_user_id: DEVELOPER_USER_ID,
         previous_role: "admin",
         next_role: null,
         source: "settings_member_suspended"
       },
       {
-        actor_clerk_user_id: ADMIN_USER_ID,
-        target_clerk_user_id: DEVELOPER_USER_ID,
+        actor_user_id: ADMIN_USER_ID,
+        target_user_id: DEVELOPER_USER_ID,
         previous_role: null,
         next_role: "admin",
         source: "settings_member_restored"
@@ -251,7 +251,7 @@ const testConfig: ApiRuntimeConfig = {
 async function seedSettingsData(pool: PgPoolLike): Promise<void> {
   await pool.query(
     `
-INSERT INTO workspaces (id, clerk_org_id, name) VALUES
+INSERT INTO workspaces (id, identity_provider_org_id, name) VALUES
 ('${WORKSPACE_ID}', 'org_firmcode', 'Firmcode');
 
 INSERT INTO user_profiles (id, identity_provider, provider_user_id) VALUES
@@ -260,10 +260,10 @@ INSERT INTO user_profiles (id, identity_provider, provider_user_id) VALUES
 ('${DEVELOPER_USER_ID}', 'insforge', '${DEVELOPER_USER_ID}')
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO workspace_memberships (workspace_id, clerk_user_id, user_id, role, active) VALUES
-('${WORKSPACE_ID}', '${ADMIN_USER_ID}', '${ADMIN_USER_ID}', 'admin', true),
-('${WORKSPACE_ID}', '${SUPPORT_ADMIN_USER_ID}', '${SUPPORT_ADMIN_USER_ID}', 'admin', true),
-('${WORKSPACE_ID}', '${DEVELOPER_USER_ID}', '${DEVELOPER_USER_ID}', 'developer', true);
+INSERT INTO workspace_memberships (workspace_id, user_id, role, active) VALUES
+('${WORKSPACE_ID}', '${ADMIN_USER_ID}', 'admin', true),
+('${WORKSPACE_ID}', '${SUPPORT_ADMIN_USER_ID}', 'admin', true),
+('${WORKSPACE_ID}', '${DEVELOPER_USER_ID}', 'developer', true);
 
 INSERT INTO github_installations (
   id,

@@ -2,7 +2,7 @@
 
 Firmcode uses InsForge for identity and sessions. Firmcode owns application authorization, workspace membership, roles, GitHub OAuth connection state, GitHub installation access rules, and audit events in its PostgreSQL database.
 
-Clerk has been removed from the active auth path. Remaining `clerk_*` column names are compatibility aliases for historical data and should not be used as the source of truth for new authorization logic.
+InsForge has been removed from the active auth path. Remaining `insforge_*` column names are compatibility aliases for historical data and should not be used as the source of truth for new authorization logic.
 
 ## Request Flow
 
@@ -29,7 +29,7 @@ The database-owned auth model is:
 - `workspace_memberships`: the tenant membership and role assignment table. `user_id` is required and references the authenticated user profile. `role` references `workspace_roles`.
 - `workspace_audit_events`: records elevated role grants/removals and other security-sensitive workspace changes using canonical `actor_user_id` and `target_user_id`.
 
-Compatibility columns such as `workspace_memberships.clerk_user_id`, `workspaces.clerk_org_id`, and `workspace_audit_events.actor_clerk_user_id` may remain nullable while historical queries are cleaned up. New code should write and read the generic `user_id`, `orgId`, and `provider` fields.
+Compatibility columns such as `workspace_memberships.user_id`, `workspaces.identity_provider_org_id`, and `workspace_audit_events.actor_user_id` may remain nullable while historical queries are cleaned up. New code should write and read the generic `user_id`, `orgId`, and `provider` fields.
 
 ## Role Rules
 
@@ -42,7 +42,7 @@ Firmcode currently supports these workspace roles:
 
 Roles are database-owned. InsForge token role metadata may seed a newly created membership when explicitly handled by the resolver, but an existing `workspace_memberships.role` row must not be silently overwritten by token claims. Admin promotion, demotion, suspension, or restore should happen through a trusted settings/support/admin path and must write audit events.
 
-The removed Clerk-era roles are normalized during migration: `owner` becomes `admin`, and `viewer` becomes `developer`. New rows must use only `admin` or `developer`.
+The removed InsForge-era roles are normalized during migration: `owner` becomes `admin`, and `viewer` becomes `developer`. New rows must use only `admin` or `developer`.
 
 ## Permission Rules
 

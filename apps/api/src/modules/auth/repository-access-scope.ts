@@ -71,11 +71,11 @@ export function buildRepositoryAccessClause(
   }
 
   return {
-    sql: `(${repositoryAlias}.id IN (SELECT ra.repository_id FROM repository_access ra WHERE ra.clerk_user_id = $${nextParamIndex}) OR ${repositoryAlias}.id IN (
+    sql: `(${repositoryAlias}.id IN (SELECT ra.repository_id FROM repository_access ra WHERE ra.user_id = $${nextParamIndex}) OR ${repositoryAlias}.id IN (
       SELECT pr_scope.repository_id
       FROM pull_requests pr_scope
       JOIN github_oauth_connections goc_scope ON lower(goc_scope.github_login) = lower(pr_scope.author_login)
-      WHERE goc_scope.clerk_user_id = $${nextParamIndex}
+      WHERE goc_scope.user_id = $${nextParamIndex}
     ))`,
     values: [scope.restrictToUserId]
   };
@@ -98,7 +98,7 @@ export function buildOwnPullRequestActivityClause(
     sql: `lower(${pullRequestAlias}.author_login) IN (
       SELECT lower(goc_scope.github_login)
       FROM github_oauth_connections goc_scope
-      WHERE goc_scope.clerk_user_id = $${nextParamIndex}
+      WHERE goc_scope.user_id = $${nextParamIndex}
     )`,
     values: [scope.restrictToUserId ?? ""]
   };

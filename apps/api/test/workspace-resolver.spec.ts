@@ -259,7 +259,7 @@ describe("PostgresDashboardWorkspaceResolver", () => {
     ).rejects.toBeInstanceOf(ForbiddenException);
 
     const membership = await pool.query<{ active: boolean }>(
-      "SELECT active FROM workspace_memberships WHERE workspace_id = $1 AND clerk_user_id = $2",
+      "SELECT active FROM workspace_memberships WHERE workspace_id = $1 AND user_id = $2",
       ["00000000-0000-4000-8000-000000000201", "user_inactive"]
     );
     expect(membership.rows[0]).toEqual({ active: false });
@@ -352,7 +352,7 @@ ORDER BY created_at, id
 
   async function insertWorkspace(id: string, orgId: string | null, name: string): Promise<void> {
     await pool.query(
-      "INSERT INTO workspaces (id, clerk_org_id, name) VALUES ($1, $2, $3)",
+      "INSERT INTO workspaces (id, identity_provider_org_id, name) VALUES ($1, $2, $3)",
       [id, orgId, name]
     );
   }
@@ -368,7 +368,7 @@ ORDER BY created_at, id
       [userId]
     );
     await pool.query(
-      "INSERT INTO workspace_memberships (workspace_id, clerk_user_id, user_id, role, active) VALUES ($1, $2, $2, $3, $4)",
+      "INSERT INTO workspace_memberships (workspace_id, user_id, role, active) VALUES ($1, $2, $3, $4)",
       [workspaceId, userId, role, active]
     );
   }

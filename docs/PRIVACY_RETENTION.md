@@ -26,7 +26,7 @@ Firmcode processes sensitive repository data. Treat all diffs, file contents, PR
 - Truncate redacted CI logs to the configured byte limit before storage or LLM use.
 - Redact secret-like literals from codebase scan evidence before writing artifacts, findings, prompts, or review enrichment payloads.
 - Store codebase scan artifacts only through the approved artifact metadata model: storage key, digest, size, retention expiry, redaction flag, and non-sensitive metrics. Do not persist GitHub App installation tokens, OAuth tokens, private repository content, raw secrets, unredacted prompts, or raw LLM responses in `codebase_scan_runs` or `codebase_scan_findings`.
-- Never log GitHub App private keys, installation tokens, Clerk secrets, LLM keys, webhook signatures, or database URLs.
+- Never log GitHub App private keys, installation tokens, InsForge secrets, LLM keys, webhook signatures, or database URLs.
 - Store raw CI logs only when needed for debugging and always behind retention controls.
 - Show collapsed raw logs by default in the dashboard.
 
@@ -36,7 +36,7 @@ Firmcode processes sensitive repository data. Treat all diffs, file contents, PR
 - Repository disable stops new reviews but can retain historical findings until retention expires.
 - Repository disable stops scheduled codebase scans. Existing unresolved codebase findings may remain visible to authorized users until resolved, suppressed, false-positive, or retention cleanup removes them.
 - Repository deletion request should remove raw artifacts immediately and metadata/findings within a bounded cleanup window.
-- Clerk user/org deletion webhook should trigger workspace access cleanup and data deletion workflow.
+- InsForge user/org deletion webhook should trigger workspace access cleanup and data deletion workflow.
 
 ## LLM Data Handling
 

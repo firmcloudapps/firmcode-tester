@@ -107,9 +107,9 @@ describe("pull requests dashboard API", () => {
 
   it("does not expose teammate PRs even when the developer has repository access", async () => {
     await pool.query(
-      `INSERT INTO repository_access (repository_id, clerk_user_id, granted_by_clerk_user_id)
+      `INSERT INTO repository_access (repository_id, user_id, granted_by_user_id)
        VALUES ('00000000-0000-4000-8000-000000000202', $1, NULL)
-       ON CONFLICT (repository_id, clerk_user_id) DO NOTHING`,
+       ON CONFLICT (repository_id, user_id) DO NOTHING`,
       [VIEWER_USER_ID]
     );
 
@@ -249,7 +249,7 @@ describe("pull requests dashboard API", () => {
 async function seedPullRequestDashboardData(pool: PgPoolLike): Promise<void> {
   await pool.query(
     `
-INSERT INTO workspaces (id, clerk_org_id, name) VALUES
+INSERT INTO workspaces (id, identity_provider_org_id, name) VALUES
 ('${WORKSPACE_ID}', 'org_firmcode', 'Firmcode'),
 ('${OTHER_WORKSPACE_ID}', 'org_other', 'Other');
 
@@ -258,11 +258,11 @@ INSERT INTO user_profiles (id, identity_provider, provider_user_id) VALUES
 ('${OTHER_VIEWER_USER_ID}', 'insforge', '${OTHER_VIEWER_USER_ID}')
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO workspace_memberships (workspace_id, clerk_user_id, user_id, role, active) VALUES
-('${WORKSPACE_ID}', '${VIEWER_USER_ID}', '${VIEWER_USER_ID}', 'developer', true),
-('${OTHER_WORKSPACE_ID}', '${OTHER_VIEWER_USER_ID}', '${OTHER_VIEWER_USER_ID}', 'developer', true);
+INSERT INTO workspace_memberships (workspace_id, user_id, role, active) VALUES
+('${WORKSPACE_ID}', '${VIEWER_USER_ID}', 'developer', true),
+('${OTHER_WORKSPACE_ID}', '${OTHER_VIEWER_USER_ID}', 'developer', true);
 
-INSERT INTO github_oauth_connections (clerk_user_id, github_user_id, github_login, scopes_json) VALUES
+INSERT INTO github_oauth_connections (user_id, github_user_id, github_login, scopes_json) VALUES
 ('${VIEWER_USER_ID}', 701, 'kelly', '[]'),
 ('${OTHER_VIEWER_USER_ID}', 702, 'mallory', '[]');
 
@@ -333,7 +333,7 @@ INSERT INTO repositories (
   true
 );
 
-INSERT INTO repository_access (repository_id, clerk_user_id, granted_by_clerk_user_id) VALUES
+INSERT INTO repository_access (repository_id, user_id, granted_by_user_id) VALUES
 ('00000000-0000-4000-8000-000000000201', '${VIEWER_USER_ID}', NULL),
 ('00000000-0000-4000-8000-000000000203', '${OTHER_VIEWER_USER_ID}', NULL);
 

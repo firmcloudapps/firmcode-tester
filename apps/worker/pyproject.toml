@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "firmcode-worker"
 version = "0.1.0"
 description = "Python worker package for Firmcode review pipeline stages."
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = [
   "bullmq>=2.19.0",
   "PyJWT[crypto]>=2.8.0",

@@ -94,7 +94,7 @@ describe("rules and policies dashboard API", () => {
         billingChangesRequireAdmin: true,
         supportSafetyOverridesEnabled: false
       },
-      updatedByClerkUserId: null
+      updatedByUserId: null
     });
     expect(response.permissions.canManagePolicies).toBe(true);
     expect(response.permissions.canManageWorkspacePolicies).toBe(true);
@@ -194,7 +194,7 @@ describe("rules and policies dashboard API", () => {
         billingChangesRequireAdmin: true,
         supportSafetyOverridesEnabled: true
       },
-      updatedByClerkUserId: ADMIN_USER_ID
+      updatedByUserId: ADMIN_USER_ID
     });
   });
 
@@ -219,7 +219,7 @@ describe("rules and policies dashboard API", () => {
         severityThreshold: "critical"
       },
       ignoredPaths: ["fixtures/**"],
-      updatedByClerkUserId: OWNER_USER_ID
+      updatedByUserId: OWNER_USER_ID
     });
     expect(response.repositoryPolicies).toHaveLength(1);
     expect(response.repositoryPolicies[0]).toMatchObject({
@@ -251,7 +251,7 @@ describe("rules and policies dashboard API", () => {
         securityReviewEnabled: false,
         dependencyReviewEnabled: true
       },
-      updatedByClerkUserId: DEVELOPER_USER_ID
+      updatedByUserId: DEVELOPER_USER_ID
     });
   });
 
@@ -347,7 +347,7 @@ describe("rules and policies dashboard API", () => {
 async function seedRulesData(pool: PgPoolLike): Promise<void> {
   await pool.query(
     `
-INSERT INTO workspaces (id, clerk_org_id, name) VALUES
+INSERT INTO workspaces (id, identity_provider_org_id, name) VALUES
 ('${WORKSPACE_ID}', 'org_firmcode', 'Firmcode'),
 ('${OTHER_WORKSPACE_ID}', 'org_other', 'Other');
 
@@ -358,11 +358,11 @@ INSERT INTO user_profiles (id, identity_provider, provider_user_id) VALUES
 ('${VIEWER_USER_ID}', 'insforge', '${VIEWER_USER_ID}')
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO workspace_memberships (workspace_id, clerk_user_id, user_id, role, active) VALUES
-('${WORKSPACE_ID}', '${OWNER_USER_ID}', '${OWNER_USER_ID}', 'admin', true),
-('${WORKSPACE_ID}', '${ADMIN_USER_ID}', '${ADMIN_USER_ID}', 'admin', true),
-('${WORKSPACE_ID}', '${DEVELOPER_USER_ID}', '${DEVELOPER_USER_ID}', 'developer', true),
-('${WORKSPACE_ID}', '${VIEWER_USER_ID}', '${VIEWER_USER_ID}', 'developer', true);
+INSERT INTO workspace_memberships (workspace_id, user_id, role, active) VALUES
+('${WORKSPACE_ID}', '${OWNER_USER_ID}', 'admin', true),
+('${WORKSPACE_ID}', '${ADMIN_USER_ID}', 'admin', true),
+('${WORKSPACE_ID}', '${DEVELOPER_USER_ID}', 'developer', true),
+('${WORKSPACE_ID}', '${VIEWER_USER_ID}', 'developer', true);
 
 INSERT INTO github_installations (
   id,
@@ -423,7 +423,7 @@ INSERT INTO repositories (
   true
 );
 
-INSERT INTO repository_access (repository_id, clerk_user_id, granted_by_clerk_user_id) VALUES
+INSERT INTO repository_access (repository_id, user_id, granted_by_user_id) VALUES
 ('${REPOSITORY_ID}', '${DEVELOPER_USER_ID}', '${OWNER_USER_ID}'),
 ('${REPOSITORY_ID}', '${VIEWER_USER_ID}', '${OWNER_USER_ID}');
 `

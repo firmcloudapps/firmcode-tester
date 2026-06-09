@@ -34,7 +34,6 @@ const API_ENV: EnvironmentVariables = {
   DATABASE_URL: "postgresql://firmcode:secret@localhost:5432/firmcode",
   DATABASE_SSL: "false",
   REDIS_URL: "redis://localhost:6379",
-  CLERK_SECRET_KEY: "sk_test_example",
   GITHUB_APP_ID: "12345",
   GITHUB_APP_PRIVATE_KEY: RAW_PRIVATE_KEY,
   GITHUB_WEBHOOK_SECRET: WEBHOOK_SECRET,

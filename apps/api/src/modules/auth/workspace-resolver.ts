@@ -25,17 +25,15 @@ export interface DashboardWorkspaceResolver {
 
 interface WorkspaceRow {
   readonly id: string;
-  readonly clerk_org_id?: string | null;
+  readonly identity_provider_org_id?: string | null;
   readonly identity_provider?: string | null;
 }
 
 interface MembershipRow {
   readonly workspace_id: string;
-  readonly clerk_user_id?: string | null;
   readonly user_id?: string | null;
   readonly role: DashboardRole;
   readonly active?: boolean;
-  readonly clerk_org_id?: string | null;
   readonly identity_provider_org_id?: string | null;
 }
 
@@ -127,7 +125,7 @@ export class PostgresDashboardWorkspaceResolver implements DashboardWorkspaceRes
   private async ensureOrganizationWorkspace(input: { readonly orgId: string; readonly name: string; readonly provider?: "insforge" }): Promise<string> {
     const identityProvider = input.provider ?? "insforge";
     const existing = await this.database.query<WorkspaceRow>(
-      "SELECT id FROM workspaces WHERE identity_provider_org_id = $1 OR clerk_org_id = $1",
+      "SELECT id FROM workspaces WHERE identity_provider_org_id = $1",
       [input.orgId]
     );
 
@@ -138,8 +136,8 @@ export class PostgresDashboardWorkspaceResolver implements DashboardWorkspaceRes
     const workspaceId = this.uuidFactory();
     const result = await this.database.query<WorkspaceRow>(
       `
-INSERT INTO workspaces (id, identity_provider, identity_provider_org_id, clerk_org_id, name)
-VALUES ($1, $2, $3, NULL, $4)
+INSERT INTO workspaces (id, identity_provider, identity_provider_org_id, name)
+VALUES ($1, $2, $3, $4)
 ON CONFLICT (identity_provider_org_id) DO UPDATE SET updated_at = now()
 RETURNING id
 `,
@@ -153,12 +151,11 @@ RETURNING id
     const userId = token.userId;
     const existing = await this.database.query<MembershipRow>(
       `
-SELECT wm.workspace_id, wm.clerk_user_id, wm.user_id, wm.role, w.clerk_org_id, w.identity_provider_org_id
+SELECT wm.workspace_id, wm.user_id, wm.role, w.identity_provider_org_id
 FROM workspace_memberships wm
 JOIN workspaces w ON w.id = wm.workspace_id
-WHERE (wm.clerk_user_id = $1 OR wm.user_id = $1)
+WHERE wm.user_id = $1
   AND wm.active = true
-  AND w.clerk_org_id IS NULL
   AND w.identity_provider_org_id IS NULL
 ORDER BY wm.created_at ASC
 LIMIT 1
@@ -185,8 +182,8 @@ LIMIT 1
     const workspaceId = this.uuidFactory();
     await this.database.query(
       `
-INSERT INTO workspaces (id, clerk_org_id, identity_provider_org_id, name)
-VALUES ($1, NULL, NULL, $2)
+INSERT INTO workspaces (id, identity_provider_org_id, name)
+VALUES ($1, NULL, $2)
 `,
       [workspaceId, "Personal workspace"]
     );
@@ -232,14 +229,13 @@ SET role = $3,
     active = true,
     updated_at = now()
 WHERE workspace_id = $1
-  AND (clerk_user_id = $2 OR user_id = $2)
-RETURNING workspace_id, clerk_user_id, user_id, role
+  AND user_id = $2
+RETURNING workspace_id, user_id, role
 `,
         [input.workspaceId, input.userId, input.role]
       );
       const membership = result.rows[0] ?? {
         workspace_id: input.workspaceId,
-        clerk_user_id: input.userId,
         user_id: input.userId,
         role: input.role
       };
@@ -258,10 +254,10 @@ RETURNING workspace_id, clerk_user_id, user_id, role
 
     const result = await this.database.query<MembershipRow>(
       `
-INSERT INTO workspace_memberships (workspace_id, clerk_user_id, user_id, role, active)
-VALUES ($1, $2, $2, $3, true)
+INSERT INTO workspace_memberships (workspace_id, user_id, role, active)
+VALUES ($1, $2, $3, true)
 ON CONFLICT (workspace_id, user_id) DO NOTHING
-RETURNING workspace_id, clerk_user_id, user_id, role
+RETURNING workspace_id, user_id, role
 `,
       [input.workspaceId, input.userId, input.role]
     );
@@ -285,11 +281,11 @@ RETURNING workspace_id, clerk_user_id, user_id, role
   private async findActiveMembership(workspaceId: string, userId: string): Promise<MembershipRow | null> {
     const result = await this.database.query<MembershipRow>(
       `
-SELECT wm.workspace_id, wm.clerk_user_id, wm.user_id, wm.role, wm.active, w.clerk_org_id, w.identity_provider_org_id
+SELECT wm.workspace_id, wm.user_id, wm.role, wm.active, w.identity_provider_org_id
 FROM workspace_memberships wm
 JOIN workspaces w ON w.id = wm.workspace_id
 WHERE wm.workspace_id = $1
-  AND (wm.clerk_user_id = $2 OR wm.user_id = $2)
+  AND wm.user_id = $2
   AND wm.active = true
 `,
       [workspaceId, userId]
@@ -301,11 +297,11 @@ WHERE wm.workspace_id = $1
   private async findMembership(workspaceId: string, userId: string): Promise<MembershipRow | null> {
     const result = await this.database.query<MembershipRow>(
       `
-SELECT wm.workspace_id, wm.clerk_user_id, wm.user_id, wm.role, wm.active, w.clerk_org_id, w.identity_provider_org_id
+SELECT wm.workspace_id, wm.user_id, wm.role, wm.active, w.identity_provider_org_id
 FROM workspace_memberships wm
 JOIN workspaces w ON w.id = wm.workspace_id
 WHERE wm.workspace_id = $1
-  AND (wm.clerk_user_id = $2 OR wm.user_id = $2)
+  AND wm.user_id = $2
 `,
       [workspaceId, userId]
     );
@@ -330,16 +326,14 @@ WHERE wm.workspace_id = $1
 INSERT INTO workspace_audit_events (
   id,
   workspace_id,
-  actor_clerk_user_id,
   actor_user_id,
-  target_clerk_user_id,
   target_user_id,
   event_type,
   previous_role,
   next_role,
   source,
   metadata_json
-) VALUES ($1, $2, $3, $4, $3, $4, 'membership_role_changed', $5, $6, $7, $8::jsonb)
+) VALUES ($1, $2, $3, $4, 'membership_role_changed', $5, $6, $7, $8::jsonb)
 `,
       [
         this.uuidFactory(),
@@ -459,13 +453,11 @@ function isElevatedRole(role: DashboardRole | null): boolean {
 }
 
 function toResolvedWorkspace(token: VerifiedToken, membership: MembershipRow): ResolvedDashboardWorkspace {
-  const userId = membership.user_id ?? membership.clerk_user_id ?? token.userId;
+  const userId = membership.user_id ?? token.userId;
   const membershipIncludesWorkspaceOrg =
-    Object.prototype.hasOwnProperty.call(membership, "identity_provider_org_id") ||
-    Object.prototype.hasOwnProperty.call(membership, "clerk_org_id");
+    Object.prototype.hasOwnProperty.call(membership, "identity_provider_org_id");
 
   const orgId = membership.identity_provider_org_id
-    ?? membership.clerk_org_id
     ?? (membershipIncludesWorkspaceOrg ? null : token.orgId)
     ?? null;
 

@@ -608,9 +608,8 @@ INSERT INTO review_run_retries (
   original_review_run_id,
   retry_review_run_id,
   retry_delivery_id,
-  created_by_clerk_user_id,
   created_by_user_id
-) VALUES ($1, $2, $3, $4, $5, $5)
+) VALUES ($1, $2, $3, $4, $5)
 `,
         [retryStateId, original.id, retryRunId, retryDeliveryId, input.userId]
       );

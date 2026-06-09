@@ -18,7 +18,6 @@ const API_ENV: EnvironmentVariables = {
   DATABASE_URL: "postgresql://firmcode:secret@localhost:5432/firmcode",
   DATABASE_SSL: "false",
   REDIS_URL: "redis://localhost:6379",
-  CLERK_SECRET_KEY: "sk_test_example",
   GITHUB_APP_ID: "12345",
   GITHUB_APP_PRIVATE_KEY: RAW_PRIVATE_KEY,
   GITHUB_WEBHOOK_SECRET: WEBHOOK_SECRET,
@@ -28,7 +27,7 @@ const API_ENV: EnvironmentVariables = {
 
 const FIXTURE_DIR = join(__dirname, "fixtures", "github-webhooks");
 
-describe("dashboard Clerk guard HTTP integration", () => {
+describe("dashboard auth guard HTTP integration", () => {
   const previousEnv = { ...process.env };
   let app: INestApplication;
 
@@ -43,7 +42,7 @@ describe("dashboard Clerk guard HTTP integration", () => {
     process.env = previousEnv;
   });
 
-  it("rejects protected dashboard routes without a Clerk bearer token before controller logic", async () => {
+  it("rejects protected dashboard routes without a bearer token before controller logic", async () => {
     const response = await dispatchRequest(app, {
       method: "GET",
       url: "/api/repositories",
@@ -56,7 +55,7 @@ describe("dashboard Clerk guard HTTP integration", () => {
     expect(response.status).toBe(401);
   });
 
-  it("does not Clerk-gate GitHub webhooks and still requires GitHub signatures", async () => {
+  it("does not auth-gate GitHub webhooks and still requires GitHub signatures", async () => {
     const rawBody = await readFile(join(FIXTURE_DIR, "pull_request.opened.json"));
     const accepted = await dispatchRequest(app, {
       method: "POST",
@@ -66,7 +65,7 @@ describe("dashboard Clerk guard HTTP integration", () => {
         "content-length": rawBody.length.toString(),
         "x-hub-signature-256": signPayload(rawBody),
         "x-github-event": "pull_request",
-        "x-github-delivery": "http-no-clerk"
+        "x-github-delivery": "http-no-auth"
       },
       body: rawBody
     });

@@ -469,7 +469,7 @@ describe("PostgresCodebaseScanStore", () => {
       }
     });
     const statusEvents = await pool.query(
-      "SELECT previous_status, next_status, actor_clerk_user_id, reason FROM codebase_scan_finding_status_events WHERE finding_id = $1",
+      "SELECT previous_status, next_status, actor_user_id, reason FROM codebase_scan_finding_status_events WHERE finding_id = $1",
       [FIRST_FINDING_ID]
     );
 
@@ -505,7 +505,7 @@ describe("PostgresCodebaseScanStore", () => {
       {
         previous_status: "open",
         next_status: "false_positive",
-        actor_clerk_user_id: "user_owner",
+        actor_user_id: "user_owner",
         reason: "Confirmed generated fixture."
       }
     ]);

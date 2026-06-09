@@ -13,6 +13,7 @@ import { repositoryAccessScopeMigration } from "./migrations/012_repository_acce
 import { generalizeIdentityColumnsMigration } from "./migrations/013_generalize_identity_columns";
 import { databaseManagedAuthMigration } from "./migrations/014_database_managed_auth";
 import { adminDeveloperRolesOnlyMigration } from "./migrations/015_admin_developer_roles_only";
+import { removeLegacyIdentityColumnsMigration } from "./migrations/016_remove_legacy_identity_columns";
 
 export interface DatabaseQueryResult<Row = unknown> {
   readonly rows: Row[];
@@ -43,7 +44,8 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigration[] = [
   repositoryAccessScopeMigration,
   generalizeIdentityColumnsMigration,
   databaseManagedAuthMigration,
-  adminDeveloperRolesOnlyMigration
+  adminDeveloperRolesOnlyMigration,
+  removeLegacyIdentityColumnsMigration
 ];
 
 interface AppliedMigrationRow {

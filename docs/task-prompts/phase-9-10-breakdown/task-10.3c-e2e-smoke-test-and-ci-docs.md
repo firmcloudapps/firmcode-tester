@@ -19,7 +19,7 @@ Acceptance criteria:
 - E2E dry-run smoke test can run in CI/local.
 - Smoke test validates the core outputs, not just process exit.
 - Documentation explains local execution and failure triage.
-- No real GitHub, Clerk, LLM, or billing credentials are required.
+- No real GitHub, InsForge, LLM, or billing credentials are required.
 - Tests pass through the documented local command, or inability to run them is documented with exact command and failure.
 ```
 

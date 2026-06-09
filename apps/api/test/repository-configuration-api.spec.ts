@@ -79,7 +79,7 @@ describe("repository automation configuration dashboard API", () => {
       ciExplanationEnabled: true,
       infrastructureReviewEnabled: true,
       dryRunEnabled: true,
-      updatedByClerkUserId: null
+      updatedByUserId: null
     });
     expect(configuration.createdAt).toEqual(expect.any(String));
     expect(configuration.updatedAt).toEqual(expect.any(String));
@@ -120,11 +120,11 @@ describe("repository automation configuration dashboard API", () => {
 
     expect(disabled).toMatchObject({
       automationEnabled: false,
-      updatedByClerkUserId: DEVELOPER_USER_ID
+      updatedByUserId: DEVELOPER_USER_ID
     });
     expect(enabled).toMatchObject({
       automationEnabled: true,
-      updatedByClerkUserId: OWNER_USER_ID
+      updatedByUserId: OWNER_USER_ID
     });
     expect(repositoryRows.rows).toEqual([{ enabled: true }]);
     expect(scanQueue.jobs).toHaveLength(1);
@@ -208,7 +208,7 @@ describe("repository automation configuration dashboard API", () => {
       severityThreshold: "high",
       semgrepEnabled: false,
       dryRunEnabled: false,
-      updatedByClerkUserId: OWNER_USER_ID
+      updatedByUserId: OWNER_USER_ID
     });
   });
 
@@ -238,7 +238,7 @@ describe("repository automation configuration dashboard API", () => {
       controller.updateRepositoryConfiguration(REPOSITORY_ID, { automationEnabled: false }, WORKSPACE_ID, DEVELOPER_USER_ID)
     ).resolves.toMatchObject({
       automationEnabled: false,
-      updatedByClerkUserId: DEVELOPER_USER_ID
+      updatedByUserId: DEVELOPER_USER_ID
     });
     await expect(
       controller.updateRepositoryConfiguration(REPOSITORY_ID, { automationEnabled: false }, WORKSPACE_ID, ADMIN_USER_ID)
@@ -318,7 +318,7 @@ function deterministicCorrelationId(): () => string {
 async function seedRepositoryConfigurationData(pool: PgPoolLike): Promise<void> {
   await pool.query(
     `
-INSERT INTO workspaces (id, clerk_org_id, name) VALUES
+INSERT INTO workspaces (id, identity_provider_org_id, name) VALUES
 ('${WORKSPACE_ID}', 'org_firmcode', 'Firmcode'),
 ('${OTHER_WORKSPACE_ID}', 'org_other', 'Other');
 
@@ -329,11 +329,11 @@ INSERT INTO user_profiles (id, identity_provider, provider_user_id) VALUES
 ('${VIEWER_USER_ID}', 'insforge', '${VIEWER_USER_ID}')
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO workspace_memberships (workspace_id, clerk_user_id, user_id, role, active) VALUES
-('${WORKSPACE_ID}', '${OWNER_USER_ID}', '${OWNER_USER_ID}', 'developer', true),
-('${WORKSPACE_ID}', '${ADMIN_USER_ID}', '${ADMIN_USER_ID}', 'admin', true),
-('${WORKSPACE_ID}', '${DEVELOPER_USER_ID}', '${DEVELOPER_USER_ID}', 'developer', true),
-('${WORKSPACE_ID}', '${VIEWER_USER_ID}', '${VIEWER_USER_ID}', 'developer', true);
+INSERT INTO workspace_memberships (workspace_id, user_id, role, active) VALUES
+('${WORKSPACE_ID}', '${OWNER_USER_ID}', 'developer', true),
+('${WORKSPACE_ID}', '${ADMIN_USER_ID}', 'admin', true),
+('${WORKSPACE_ID}', '${DEVELOPER_USER_ID}', 'developer', true),
+('${WORKSPACE_ID}', '${VIEWER_USER_ID}', 'developer', true);
 
 INSERT INTO github_installations (
   id,
@@ -388,7 +388,7 @@ INSERT INTO repositories (
   true
 );
 
-INSERT INTO repository_access (repository_id, clerk_user_id, granted_by_clerk_user_id) VALUES
+INSERT INTO repository_access (repository_id, user_id, granted_by_user_id) VALUES
 ('${REPOSITORY_ID}', '${DEVELOPER_USER_ID}', '${OWNER_USER_ID}'),
 ('${REPOSITORY_ID}', '${VIEWER_USER_ID}', '${OWNER_USER_ID}');
 `

@@ -63,7 +63,7 @@ interface ReviewPolicyRow {
   readonly analysis_toggles_json: unknown;
   readonly infrastructure_security_policy_json: unknown;
   readonly workspace_controls_json: unknown;
-  readonly updated_by_clerk_user_id: string | null;
+  readonly updated_by_user_id: string | null;
   readonly created_at: Date | string | null;
   readonly updated_at: Date | string | null;
 }
@@ -164,7 +164,7 @@ SET review_preferences_json = $2::jsonb,
     analysis_toggles_json = $10::jsonb,
     infrastructure_security_policy_json = $11::jsonb,
     workspace_controls_json = $12::jsonb,
-    updated_by_clerk_user_id = $13,
+    updated_by_user_id = $13,
     updated_at = now()
 WHERE id = $1
 `,
@@ -238,7 +238,7 @@ RETURNING
   analysis_toggles_json,
   infrastructure_security_policy_json,
   workspace_controls_json,
-  updated_by_clerk_user_id,
+  updated_by_user_id,
   created_at,
   updated_at
 `,
@@ -336,7 +336,7 @@ SELECT
   rp.analysis_toggles_json,
   rp.infrastructure_security_policy_json,
   rp.workspace_controls_json,
-  rp.updated_by_clerk_user_id,
+  rp.updated_by_user_id,
   rp.created_at,
   rp.updated_at
 FROM review_policies rp
@@ -394,7 +394,7 @@ SELECT
   rp.analysis_toggles_json,
   rp.infrastructure_security_policy_json,
   rp.workspace_controls_json,
-  rp.updated_by_clerk_user_id,
+  rp.updated_by_user_id,
   rp.created_at,
   rp.updated_at
 FROM review_policies rp
@@ -536,7 +536,7 @@ function toReviewPolicy(row: ReviewPolicyRow): ReviewPolicy {
     analysis: mergeDefaults(DEFAULT_ANALYSIS, row.analysis_toggles_json),
     infrastructureSecurity: mergeDefaults(DEFAULT_INFRASTRUCTURE_SECURITY, row.infrastructure_security_policy_json),
     workspaceControls: mergeDefaults(DEFAULT_WORKSPACE_CONTROLS, row.workspace_controls_json),
-    updatedByUserId: row.updated_by_clerk_user_id,
+    updatedByUserId: row.updated_by_user_id,
     createdAt: toRequiredIsoString(row.created_at),
     updatedAt: toRequiredIsoString(row.updated_at)
   };

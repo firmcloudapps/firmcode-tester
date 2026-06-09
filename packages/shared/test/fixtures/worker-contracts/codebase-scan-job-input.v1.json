@@ -8,7 +8,7 @@
   "commitSha": null,
   "trigger": "scheduled",
   "correlationId": "scan-correlation-001",
-  "requestedByClerkUserId": null,
+  "requestedByUserId": null,
   "scanConfig": {
     "ignoredPaths": ["dist/**", "coverage/**"],
     "severityThreshold": "medium",

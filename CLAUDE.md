@@ -79,44 +79,25 @@ The dashboard must follow [docs/DASHBOARD_DESIGN.md](docs/DASHBOARD_DESIGN.md): 
 
 ## Auth Provider: InsForge
 
-The project has been fully migrated from Clerk to InsForge. All authentication is handled exclusively through InsForge. The following rules apply:
+Authentication is InsForge-only. Do not add packages, middleware, webhooks, request fields, or environment variables for the previous auth provider.
 
-- **Do not reintroduce Clerk**. All `@clerk/*` packages have been removed.
-- The active auth provider is configured via `AUTH_PROVIDER=insforge` in environment variables.
-- Token verification uses `InsForgeTokenVerifier` exclusively — see `apps/api/src/modules/auth/insforge-token-verifier.ts`.
-- The `DashboardAuthModule` provides only `InsForgeTokenVerifier` as `TOKEN_VERIFIER`.
-- Dashboard auth context uses generic fields: `userId`, `orgId`, `billingCapabilities`, `provider` — no Clerk-specific fields.
-- Workspace resolution uses `DefaultWorkspaceConfig` (fields: `id`, `name`) — not `DefaultClerkOrganizationConfig`.
+Current rules:
 
-### Auth Refactoring Reference (completed)
+- Token verification uses `InsForgeTokenVerifier`.
+- Dashboard auth context uses generic fields: `userId`, `orgId`, `billingCapabilities`, `provider`, `workspaceId`, `role`, and `capabilities`.
+- Database identity is managed through `user_profiles`, `workspace_memberships.user_id`, and `workspace_roles`.
+- Roles are limited to `admin` and `developer`.
+- Code and contracts use `updatedByUserId`, `requestedByUserId`, and `restrictToUserId`.
+- Existing databases are cleaned by migration `016_remove_legacy_identity_columns`.
 
-| Old (Clerk) | New (InsForge) |
-|---|---|
-| `clerkUserId` | `userId` |
-| `clerkOrgId` | `orgId` |
-| `clerkCapabilities` | `billingCapabilities` |
-| `updatedByClerkUserId` | `updatedByUserId` |
-| `requestedByClerkUserId` | `requestedByUserId` |
-| `DefaultClerkOrganizationConfig` | `DefaultWorkspaceConfig` |
-| `ClerkBackendTokenVerifier` | `InsForgeTokenVerifier` |
-| `ClerkWebhookModule` | deleted |
-| `DashboardRequestContext.clerkUserId/orgId/clerkCapabilities` | removed (deprecated fields deleted) |
-| `WorkspaceBillingResponse.source: "clerk"` | `source: string` (widened) |
-| `ReviewPolicy.updatedByClerkUserId` | `updatedByUserId` |
-| `RepositoryReviewConfiguration.updatedByClerkUserId` | `updatedByUserId` |
-| `WorkerCodebaseScanJobInput.requestedByClerkUserId` | `requestedByUserId` |
+Key files:
 
-### Key Auth Files
+- `apps/api/src/modules/auth/insforge-token-verifier.ts`
+- `apps/api/src/modules/auth/dashboard-auth.module.ts`
+- `apps/api/src/modules/auth/dashboard-auth.guard.ts`
+- `apps/api/src/modules/auth/workspace-resolver.ts`
+- `apps/web/lib/dashboard-auth.ts`
 
-- `apps/api/src/modules/auth/insforge-token-verifier.ts` — Token verification
-- `apps/api/src/modules/auth/dashboard-auth.module.ts` — Module wiring (InsForge only)
-- `apps/api/src/modules/auth/dashboard-auth.guard.ts` — Request guard
-- `apps/api/src/modules/auth/dashboard-auth.context.ts` — `DashboardRequestContext` type
-- `apps/api/src/modules/auth/workspace-resolver.ts` — Workspace/membership resolution
-- `apps/api/src/modules/review-runs/dashboard-auth.store.ts` — `DashboardMembership` + DB queries
-- `apps/web/components/auth/auth-page.tsx` — InsForge login/signup UI
-- `apps/web/components/auth/auth-provider-boundary.tsx` — Auth session boundary
-- `apps/web/middleware.ts` — Next.js middleware (Clerk middleware removed)
 
 ## Implementation Priorities
 

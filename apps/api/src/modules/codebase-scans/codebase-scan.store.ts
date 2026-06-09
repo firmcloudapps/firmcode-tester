@@ -779,7 +779,7 @@ INSERT INTO codebase_scan_finding_status_events (
   finding_id,
   previous_status,
   next_status,
-  actor_clerk_user_id,
+  actor_user_id,
   reason
 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 `,

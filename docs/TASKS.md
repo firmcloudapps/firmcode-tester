@@ -15,7 +15,7 @@ The MVP is scoped as a 10-week build. A solo developer can compress or stretch t
 | 6 | 5 days | LLM review engine and JSON validation |
 | 7 | 4 days | GitHub summary and inline comment publishing |
 | 8 | 4 days | CI/CD failure explanation |
-| 9 | 7 days | Clerk-authenticated Next.js dashboard, role-gated APIs, and SaaS account flows |
+| 9 | 7 days | InsForge-authenticated Next.js dashboard, role-gated APIs, and SaaS account flows |
 | 10 | 5 days | Hardening, observability, privacy, docs, release candidate |
 | 11 | 5 days | Continuous repository scanning, persisted codebase findings, and PR review enrichment |
 
@@ -55,21 +55,21 @@ Tests:
 - Minimal web page or component test passes.
 - Minimal worker pytest passes.
 
-### Task 0.3: Clerk And NeonDB Foundation
+### Task 0.3: InsForge And NeonDB Foundation
 
-Add project-level configuration conventions for Clerk authentication, Clerk Organizations/workspaces, Clerk Billing, and NeonDB/PostgreSQL.
+Add project-level configuration conventions for InsForge authentication, InsForge Organizations/workspaces, InsForge Billing, and NeonDB/PostgreSQL.
 
 Acceptance criteria:
 
-- Environment variables for Clerk and NeonDB are documented.
-- Web app has Clerk provider wiring planned or scaffolded.
+- Environment variables for InsForge and NeonDB are documented.
+- Web app has InsForge provider wiring planned or scaffolded.
 - API/database config uses `DATABASE_URL` compatible with NeonDB.
-- Billing page is defined as Clerk-managed subscription portal entry point.
+- Billing page is defined as InsForge-managed subscription portal entry point.
 - SaaS account-management requirements are documented: sign-up/sign-in, user profile, workspace switcher, member management, billing portal, role mapping, plan/capability metadata, and tenant isolation.
 
 Tests:
 
-- Config validation tests for required Clerk and database variables.
+- Config validation tests for required InsForge and database variables.
 - Database connection smoke test uses PostgreSQL-compatible connection string.
 
 ### Task 0.4: Environment And Local Development Docs
@@ -80,7 +80,7 @@ Acceptance criteria:
 
 - Root `.env.example` documents all required MVP variables.
 - API, web, and worker env examples are present if they have runtime-specific variables.
-- Local setup guide explains Clerk, NeonDB/local Postgres, GitHub App, webhook tunnel, Redis, worker, and dry-run fixture setup.
+- Local setup guide explains InsForge, NeonDB/local Postgres, GitHub App, webhook tunnel, Redis, worker, and dry-run fixture setup.
 - No secrets are committed.
 
 Tests:
@@ -551,31 +551,31 @@ Tests:
 
 ## Phase 9: Dashboard
 
-### Task 9.0: Complete Clerk Authentication Foundation
+### Task 9.0: Complete InsForge Authentication Foundation
 
-Replace the current dashboard auth scaffold and local header shim with a complete Clerk-backed authentication flow.
+Replace the current dashboard auth scaffold and local header shim with a complete InsForge-backed authentication flow.
 
 Acceptance criteria:
 
-- `apps/web` installs and wires `@clerk/nextjs`.
-- The root layout uses a real `ClerkProvider`.
-- Clerk sign-in and sign-up pages exist at `/sign-in/[[...sign-in]]` and `/sign-up/[[...sign-up]]`.
-- Sign-in and sign-up use the dedicated auth-page design from `docs/DASHBOARD_DESIGN.md`: light-mode unauthenticated shell, constrained Clerk panel, compact Firmcode context, responsive mobile layout, and no marketing hero treatment.
+- `apps/web` installs and wires `@insforge/sdk`.
+- The root layout uses a real `InsForge SDK auth boundary`.
+- InsForge sign-in and sign-up pages exist at `/sign-in/[[...sign-in]]` and `/sign-up/[[...sign-up]]`.
+- Sign-in and sign-up use the dedicated auth-page design from `docs/DASHBOARD_DESIGN.md`: light-mode unauthenticated shell, constrained InsForge panel, compact Firmcode context, responsive mobile layout, and no marketing hero treatment.
 - Successful sign-in and sign-up route through a protected `/auth/redirect` handler so authenticated users do not remain on `/sign-in`.
 - `/` renders a public holding page with sign-in and protected dashboard entry points.
 - `/auth/redirect` resolves the verified workspace role and sends Admin or owner-equivalent users to `/dashboard/admin`, Developer or member-equivalent users to `/dashboard/developer`, and unsupported/read-only roles to `/dashboard/developer` without granting extra privileges.
 - Explicit `/dashboard/admin` and `/dashboard/developer` dashboard routes exist with distinct role-specific layouts: Admin uses the dashboard shell for settings and account management, while Developer uses a focused PR Review workspace instead of an Admin view with disabled controls.
 - Next.js middleware protects all dashboard pages and dashboard route handlers.
-- Dashboard shell uses Clerk `UserButton`; `OrganizationSwitcher` is hidden by default and appears only when `NEXT_PUBLIC_CLERK_ORGANIZATIONS_ENABLED=true`.
-- Default signup is repaired into the configured Firmcode AI Clerk organization as `org:developer` and must not force users through Clerk organization creation.
-- The active workspace displayed in the shell comes from Clerk organization/personal workspace state, not static placeholder text.
-- Web server components and route handlers derive the user/session from Clerk `auth()`.
-- Web-to-API requests include `Authorization: Bearer <Clerk session token>`.
-- `FIRMCODE_DASHBOARD_WORKSPACE_ID`, `FIRMCODE_DASHBOARD_CLERK_USER_ID`, and `FIRMCODE_DASHBOARD_CLERK_BILLING_CAPABILITY` are removed from production request flow and kept only as explicit test/local bypass fixtures.
-- `apps/api` installs a Clerk server verification package such as `@clerk/backend`.
-- API dashboard routes use a shared Nest guard that verifies Clerk session/JWT tokens before controller logic runs.
-- API request context includes Clerk user ID, active Clerk organization ID when available, resolved workspace ID, role, and capabilities.
-- Workspace rows and memberships are resolved or created from Clerk organization/user state for first-login flows.
+- Dashboard shell uses InsForge `UserButton`; `workspace switcher` is hidden by default and appears only when `NEXT_PUBLIC_INSFORGE_ORGANIZATIONS_ENABLED=true`.
+- Default signup is repaired into the configured Firmcode AI InsForge organization as `org:developer` and must not force users through InsForge organization creation.
+- The active workspace displayed in the shell comes from InsForge organization/personal workspace state, not static placeholder text.
+- Web server components and route handlers derive the user/session from InsForge `auth()`.
+- Web-to-API requests include `Authorization: Bearer <InsForge session token>`.
+- `FIRMCODE_DASHBOARD_WORKSPACE_ID`, `FIRMCODE_DASHBOARD_USER_ID`, and `FIRMCODE_DASHBOARD_BILLING_CAPABILITY` are removed from production request flow and kept only as explicit test/local bypass fixtures.
+- `apps/api` installs a InsForge server verification package such as `@insforge/sdk`.
+- API dashboard routes use a shared Nest guard that verifies InsForge session/JWT tokens before controller logic runs.
+- API request context includes InsForge user ID, active InsForge organization ID when available, resolved workspace ID, role, and capabilities.
+- Workspace rows and memberships are resolved or created from InsForge organization/user state for first-login flows.
 - New personal or organization workspace memberships default to Developer unless trusted Firmcode role metadata, an internal seed/support flow, or an Admin settings action explicitly grants Admin.
 - Spoofed `x-firmcode-user-id` headers are ignored or rejected in production.
 
@@ -583,14 +583,14 @@ Tests:
 
 - Web route protection tests for authenticated and unauthenticated users.
 - Sign-in/sign-up route rendering tests.
-- Sign-in/sign-up visual or rendered-markup tests for desktop/mobile layout, Clerk appearance hooks, and no dashboard shell leakage.
-- Dashboard account-control tests proving the OrganizationSwitcher is absent by default and present only when organizations are explicitly enabled.
+- Sign-in/sign-up visual or rendered-markup tests for desktop/mobile layout, InsForge appearance hooks, and no dashboard shell leakage.
+- Dashboard account-control tests proving the workspace switcher is absent by default and present only when organizations are explicitly enabled.
 - Role-based auth redirect tests for Admin, owner-equivalent, Developer, member-equivalent, missing session, invalid session, and API failure fallback.
 - Route and component tests proving `/auth/redirect`, `/dashboard/admin`, and `/dashboard/developer` are protected and route-ready.
-- Dashboard shell tests for Clerk user menu, organization switcher, and active workspace display.
+- Dashboard shell tests for InsForge user menu, organization switcher, and active workspace display.
 - API guard tests for missing token, invalid token, expired token, valid personal workspace token, and valid organization token.
-- Tests proving client-provided user headers cannot impersonate another Clerk user.
-- Integration test proving the dashboard can call a protected API route with a Clerk token.
+- Tests proving client-provided user headers cannot impersonate another InsForge user.
+- Integration test proving the dashboard can call a protected API route with a InsForge token.
 
 ### Task 9.1: Repository And Run Views
 
@@ -603,7 +603,7 @@ Acceptance criteria:
 - Repository list shows enabled status and last review.
 - Review run list filters by status, repo, and date.
 - Run detail shows files, findings, artifacts, logs, and published comments.
-- Clerk-authenticated users can access dashboard pages.
+- InsForge-authenticated users can access dashboard pages.
 
 Tests:
 
@@ -635,24 +635,24 @@ Acceptance criteria:
 - Overview includes review activity, security findings, CI failures, repositories monitored, recent review runs, and needs-attention panel.
 - Findings page supports severity, source, category, repository, status, posted inline, and date filters.
 - Settings page includes General, GitHub Account/OAuth, GitHub App, Members, API Keys, Data Retention, and Notifications tabs or equivalent sections.
-- Settings exposes SaaS account-management entry points: Clerk profile, workspace/organization profile, member management where allowed, required GitHub OAuth connection, GitHub App installation status, and explicit disabled states for unavailable account features.
+- Settings exposes SaaS account-management entry points: InsForge profile, workspace/organization profile, member management where allowed, required GitHub OAuth connection, GitHub App installation status, and explicit disabled states for unavailable account features.
 - Settings exposes Firmcode member-management controls for Admins to assign Admin/Developer roles and suspend or restore workspace accounts without trusting client-supplied role data.
-- Billing page displays plan/usage placeholders or counters, role-gated plan capability messaging, and links to Clerk Billing subscription management.
+- Billing page displays plan/usage placeholders or counters, role-gated plan capability messaging, and links to InsForge Billing subscription management.
 - All screens use the approved light-mode Tailwind design.
 
 Tests:
 
 - Component tests cover loading, empty, error, and populated states.
-- Clerk-gated billing/settings access test.
+- InsForge-gated billing/settings access test.
 - Visual smoke check for primary dashboard pages.
 
 ### Task 9.4: App Authorization In Dashboard APIs
 
-Implement Clerk-backed app authorization rules from `docs/AUTHORIZATION.md`.
+Implement InsForge-backed app authorization rules from `docs/AUTHORIZATION.md`.
 
 Acceptance criteria:
 
-- All dashboard controllers use the shared Clerk auth guard/request context from Task 9.0.
+- All dashboard controllers use the shared InsForge auth guard/request context from Task 9.0.
 - Every dashboard API checks workspace membership and resource ownership.
 - Admin/Developer role capabilities are enforced.
 - Billing and sensitive settings require elevated role.
@@ -660,9 +660,9 @@ Acceptance criteria:
 - Tenant isolation is enforced for every SaaS account resource, including workspace settings, members, billing context, GitHub OAuth identity, GitHub installations, repositories, review runs, findings, policies, artifacts, and audit events.
 - Sensitive account and integration actions write audit events.
 - List endpoints are tenant-scoped and require authentication; repository, review-run, finding, pull-request, and CI-failure lists must not expose global data.
-- API controllers no longer trust `x-firmcode-user-id`; user identity comes only from verified Clerk claims.
+- API controllers no longer trust `x-firmcode-user-id`; user identity comes only from verified InsForge claims.
 - Optional workspace selection is accepted only after verifying the authenticated user belongs to that workspace.
-- Missing/invalid Clerk token returns `401`; authenticated users without capability receive `403`; cross-workspace resource lookups return `404` where existence would leak tenant data.
+- Missing/invalid InsForge token returns `401`; authenticated users without capability receive `403`; cross-workspace resource lookups return `404` where existence would leak tenant data.
 
 Tests:
 
@@ -679,7 +679,7 @@ Implement the dashboard GitHub OAuth account connection plus GitHub App install/
 
 Acceptance criteria:
 
-- `/github/installations` is an implemented Clerk-authenticated dashboard page or route that shows installation status, setup instructions, and a GitHub App install entry point.
+- `/github/installations` is an implemented InsForge-authenticated dashboard page or route that shows installation status, setup instructions, and a GitHub App install entry point.
 - Every signed-in Firmcode user must connect a GitHub OAuth account before using GitHub-backed dashboard workflows; OAuth identifies the user, while GitHub App installation tokens remain the only tokens used for repository review, sync, and PR comment publishing.
 - A PR Review workspace is implemented or planned in the same flow, combining provider tabs, required GitHub OAuth account status, GitHub App installation status, repository readiness, enabled state, configure actions, and run/retry actions.
 - GitHub App installation callback/status handling is documented and wired to workspace ownership checks.
@@ -740,7 +740,7 @@ Make dashboard navigation truthful: implemented destinations are active, planned
 Acceptance criteria:
 
 - Sidebar, topbar, overview needs-attention links, repository row actions, settings actions, and billing actions are audited.
-- Active links point only to implemented app routes or external Clerk/GitHub URLs.
+- Active links point only to implemented app routes or external InsForge/GitHub URLs.
 - Planned but unimplemented actions render as disabled controls with accessible labels and titles.
 - Tests fail if a dashboard nav item or primary action points at an unimplemented internal route.
 - Visual QA confirms the full-width brand-refresh layout still works on desktop and mobile after navigation changes.

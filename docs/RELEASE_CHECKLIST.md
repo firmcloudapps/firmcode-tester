@@ -11,8 +11,8 @@ Use this checklist before deploying or enabling real GitHub publishing.
 - `DATABASE_URL` points to NeonDB or intended PostgreSQL.
 - Database SSL is configured for NeonDB.
 - Redis URL is configured.
-- Clerk publishable and secret keys are configured.
-- Clerk webhook secret is configured if syncing users/orgs.
+- InsForge publishable and secret keys are configured.
+- InsForge webhook secret is configured if syncing users/orgs.
 - GitHub App ID, private key, and webhook secret are configured.
 - LLM provider, API key, and model names are configured.
 - Dry-run mode is intentionally set.
@@ -52,28 +52,28 @@ Use this checklist before deploying or enabling real GitHub publishing.
 
 ## Auth And Billing
 
-- `@clerk/nextjs` is installed and the dashboard uses a real `ClerkProvider`.
+- `@insforge/sdk` is installed and the dashboard uses a real `InsForge SDK auth boundary`.
 - `/sign-in` and `/sign-up` routes work.
 - Next.js middleware protects every dashboard page and dashboard API route handler.
-- Unauthenticated dashboard access redirects to Clerk sign-in.
-- Clerk sign-in works on local, Vercel preview if enabled, and production.
-- Clerk user menu works.
-- Clerk organization/workspace switcher works where enabled.
+- Unauthenticated dashboard access redirects to InsForge sign-in.
+- InsForge sign-in works on local, Vercel preview if enabled, and production.
+- InsForge user menu works.
+- InsForge organization/workspace switcher works where enabled.
 - Workspace/org mapping works.
 - First login creates or resolves the expected personal/organization workspace.
-- API dashboard routes verify Clerk bearer tokens server-side.
+- API dashboard routes verify InsForge bearer tokens server-side.
 - Direct API calls without a token return `401`.
-- Expired/invalid Clerk tokens return `401`.
+- Expired/invalid InsForge tokens return `401`.
 - Spoofed user/workspace headers cannot impersonate another user.
-- Production and normal local paths do not use `FIRMCODE_DASHBOARD_*`; only `FIRMCODE_TEST_DASHBOARD_CLERK_SESSION_TOKEN` is present in isolated web tests.
+- Production and normal local paths do not use `FIRMCODE_DASHBOARD_*`; only `FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN` is present in isolated web tests.
 - Dashboard list endpoints return only the resolved workspace's repositories, pull requests, review runs, findings, CI failures, codebase scans, and settings data.
 - Admin/Developer role gates match `docs/AUTHORIZATION.md`.
 - Cross-workspace repository, review run, finding, artifact, settings, billing, GitHub OAuth, and policy access is denied.
 - Billing portal link works.
-- Billing management is limited to Admin or verified Clerk Billing capability.
+- Billing management is limited to Admin or verified InsForge Billing capability.
 - Unauthorized users cannot access dashboard data.
-- Vercel dashboard can call Coolify API with Clerk-authenticated requests.
-- GitHub OAuth connect flow requires a signed-in Clerk user.
+- Vercel dashboard can call Coolify API with InsForge-authenticated requests.
+- GitHub OAuth connect flow requires a signed-in InsForge user.
 - GitHub App install/sync management requires GitHub OAuth plus active Admin or Developer membership and plan allowance.
 
 ## Review Pipeline

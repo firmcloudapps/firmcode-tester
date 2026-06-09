@@ -8,20 +8,20 @@ The product model is closest to CodeRabbit: teams sign up, connect GitHub identi
 
 The included `pr-agent/`, `semgrep/`, and `tree-sitter/` repositories are reference implementations only. Firmcode must not directly integrate their source code. Implementation agents should study their logic and patterns, then build Firmcode-owned modules and tests. See `docs/REFERENCE_ANALYSIS.md`.
 
-The dashboard should be a clean, modern light-mode developer SaaS interface built with TypeScript and Tailwind CSS. Clerk owns authentication and billing. NeonDB is the managed PostgreSQL database. See `docs/DASHBOARD_DESIGN.md`.
+The dashboard should be a clean, modern light-mode developer SaaS interface built with TypeScript and Tailwind CSS. InsForge owns authentication and billing. NeonDB is the managed PostgreSQL database. See `docs/DASHBOARD_DESIGN.md`.
 
 ## 1a. SaaS Product Model
 
 Firmcode must be designed as a multi-tenant SaaS product, not a single-user local tool. Core SaaS requirements:
 
-- Clerk owns sign-up, sign-in, sessions, user profile, organization/workspace switching, member invitations where enabled, and Billing.
-- Every user must authenticate to Firmcode through Clerk and connect GitHub OAuth before using GitHub-backed workflows.
-- The root route `/` must render a public holding page with clear entry points into Clerk sign-in and the protected dashboards.
-- Successful Clerk sign-in/sign-up must route through a protected Firmcode post-auth redirect that resolves the workspace role and sends Admins to `/dashboard/admin` and Developers to `/dashboard/developer`; users must never remain stranded on `/sign-in` after authentication.
+- InsForge owns sign-up, sign-in, sessions, user profile, organization/workspace switching, member invitations where enabled, and Billing.
+- Every user must authenticate to Firmcode through InsForge and connect GitHub OAuth before using GitHub-backed workflows.
+- The root route `/` must render a public holding page with clear entry points into InsForge sign-in and the protected dashboards.
+- Successful InsForge sign-in/sign-up must route through a protected Firmcode post-auth redirect that resolves the workspace role and sends Admins to `/dashboard/admin` and Developers to `/dashboard/developer`; users must never remain stranded on `/sign-in` after authentication.
 - Workspaces are the tenant boundary. Every repository, installation, review run, finding, artifact, policy, usage counter, and audit event must be scoped to one workspace.
-- Admins manage billing, plans, member access where Clerk permits, Firmcode role assignments, workspace account suspension/restoration, global workspace settings, retention, API keys, and support/safety controls.
+- Admins manage billing, plans, member access where InsForge permits, Firmcode role assignments, workspace account suspension/restoration, global workspace settings, retention, API keys, and support/safety controls.
 - Developers are the primary customer users: they connect GitHub accounts, add/sync repositories, enable PR review automation, run/retry analysis, and track reports, findings, and CI explanations for their workspace.
-- Billing and plan enforcement are SaaS concerns. Clerk Billing owns checkout/subscription management; Firmcode stores only the plan/usage/capability metadata needed for authorization, quotas, and display.
+- Billing and plan enforcement are SaaS concerns. InsForge Billing owns checkout/subscription management; Firmcode stores only the plan/usage/capability metadata needed for authorization, quotas, and display.
 - Account management surfaces must include profile access, workspace switcher, member management entry point, Firmcode role assignment, workspace account suspension/restoration, billing portal, GitHub OAuth connection status, GitHub App installation status, data retention, notifications, and API keys or an explicit disabled state.
 - Auditability is required for sensitive actions: OAuth connect/disconnect, GitHub App install/disconnect/rescope, repository enablement changes, policy changes, billing capability changes, raw artifact access, and retry actions.
 - Secrets, OAuth access tokens, installation tokens, private keys, webhook secrets, client secrets, raw payloads, private diffs, and raw CI logs must never appear in dashboard responses unless a role-gated redacted artifact flow explicitly allows safe access.
@@ -51,9 +51,9 @@ Supporting production-planning docs:
 - Run scheduled repository codebase scans after GitHub App installation so existing bugs, security issues, and maintainability risks are persisted and can be referenced in future PR reviews.
 - Post summaries and inline review comments back to GitHub.
 - Provide a local dashboard for review runs, findings, repositories, pull requests, CI failures, rules/policies, settings, billing, and GitHub App setup.
-- Use Clerk for authentication and billing.
+- Use InsForge for authentication and billing.
 - Use NeonDB as the managed PostgreSQL database.
-- Enforce app-level workspace authorization on top of Clerk identity.
+- Enforce app-level workspace authorization on top of InsForge identity.
 - Define privacy, retention, environment, LLM, large-PR, webhook idempotency, and operations behavior before release.
 - Develop and test through Docker Compose so API/worker container issues are found early.
 - Deploy the web dashboard to Vercel and backend/worker services to Coolify Docker containers.
@@ -68,7 +68,7 @@ Supporting production-planning docs:
 - Autonomous code fixes or direct commits.
 - Enterprise SSO.
 - Fine-tuned model training.
-- Building custom auth or billing instead of using Clerk.
+- Building custom auth or billing instead of using InsForge.
 - Directly integrating code from the included reference repositories.
 - Relying on host-only development as the primary integration path.
 
@@ -87,7 +87,7 @@ Supporting production-planning docs:
 - Failed jobs are retryable from persisted state.
 - Local setup can run with one documented Docker Compose command.
 - API, web, and worker containers build and start locally before production deployment.
-- Vercel dashboard can call the Coolify API with Clerk-authenticated requests.
+- Vercel dashboard can call the Coolify API with InsForge-authenticated requests.
 - Dry-run review fixture can validate the pipeline without posting to GitHub.
 - Unauthorized users cannot access workspace repository data.
 
@@ -109,8 +109,8 @@ Supporting production-planning docs:
 - Light-mode TypeScript/Tailwind dashboard with repositories, repository detail/configuration, pull requests, review runs, findings, CI failures, rules/policies, settings, billing, GitHub App setup, and raw/redacted artifacts.
 - Explicit Admin and Developer dashboard entry routes with distinct role-specific layouts: `/dashboard/admin` focuses Admins on workspace settings, billing, members, and global controls, while `/dashboard/developer` uses a developer-focused PR Review workspace for GitHub setup, repository automation, review readiness, and review activity.
 - GitHub App install entry point, installation status, and repository metadata sync controls that are functional or explicitly disabled until backend support exists.
-- Clerk-backed sign-in, user menu, default Firmcode AI organization membership for signups, optional organization switching where explicitly enabled, personal workspace fallback for local development, and billing portal. New users must not be forced through Clerk organization creation during the default signup flow.
-- Clerk session-token verification for every dashboard API; production APIs must never trust client-provided user identity headers or environment-provided dashboard user IDs as authentication.
+- InsForge-backed sign-in, user menu, default Firmcode AI organization membership for signups, optional organization switching where explicitly enabled, personal workspace fallback for local development, and billing portal. New users must not be forced through InsForge organization creation during the default signup flow.
+- InsForge session-token verification for every dashboard API; production APIs must never trust client-provided user identity headers or environment-provided dashboard user IDs as authentication.
 - Webhook idempotency, superseded-run protection, and delivery replay handling.
 - Large-PR handling with prioritized and summary-only modes.
 - Configurable data retention and raw artifact redaction.
@@ -142,7 +142,7 @@ Required implemented pages and flows:
 - CI Failures: queue/detail view for failed workflows, failed jobs, root cause summaries, suggested fixes, and redacted log excerpts.
 - Rules / Policies: workspace and repository review policies, comment limits, severity thresholds, ignored paths, prompt instructions, and Semgrep/analysis toggles.
 - Settings: General, GitHub App, Members, API Keys, Data Retention, and Notifications.
-- Billing: Clerk-managed billing status, usage placeholders or counters, and a role-gated Manage Subscription entry point.
+- Billing: InsForge-managed billing status, usage placeholders or counters, and a role-gated Manage Subscription entry point.
 - GitHub App setup: connect/install entry point, installation callback/status, installation list, repository sync, and clear error/retry states.
 
 Until a required flow is implemented, the dashboard must not present it as an active link or button.
@@ -432,7 +432,7 @@ docs/
 - `GET /api/settings`: workspace settings.
 - `PATCH /api/settings/retention`: update retention policy with elevated role.
 - `POST /api/settings/api-keys`: create/manage API keys when implemented.
-- `GET /api/billing`: role-gated Clerk-managed billing context.
+- `GET /api/billing`: role-gated InsForge-managed billing context.
 
 ### GitHub App API
 
