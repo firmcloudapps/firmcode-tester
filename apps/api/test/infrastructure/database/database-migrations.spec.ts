@@ -182,7 +182,8 @@ ORDER BY table_name
       "013_generalize_identity_columns",
       "014_database_managed_auth",
       "015_admin_developer_roles_only",
-      "016_remove_legacy_identity_columns"
+      "016_remove_legacy_identity_columns",
+      "017_database_auth_constraints"
     ]);
     expect(secondRunMigrationIds).toEqual([]);
     expect(tables.rows.map((row) => row.table_name)).toEqual(EXPECTED_TABLES);
@@ -202,7 +203,8 @@ ORDER BY table_name
       { id: "013_generalize_identity_columns" },
       { id: "014_database_managed_auth" },
       { id: "015_admin_developer_roles_only" },
-      { id: "016_remove_legacy_identity_columns" }
+      { id: "016_remove_legacy_identity_columns" },
+      { id: "017_database_auth_constraints" }
     ]);
   });
 
@@ -244,6 +246,52 @@ WHERE wm.workspace_id = $1
       { role: "admin" },
       { role: "developer" }
     ]);
+  });
+
+  it("enforces InsForge profile identity and workspace role relationships", async () => {
+    await runDatabaseMigrations(pool);
+
+    await pool.query(
+      `
+INSERT INTO user_profiles (id, identity_provider, provider_user_id)
+VALUES ('usr_valid', 'insforge', 'usr_valid');
+
+INSERT INTO workspaces (id, identity_provider, identity_provider_org_id, name)
+VALUES ('00000000-0000-4000-8000-000000000102', 'insforge', NULL, 'Personal workspace');
+`
+    );
+
+    await expect(
+      pool.query(
+        "INSERT INTO user_profiles (id, identity_provider, provider_user_id) VALUES ('usr_bad_provider', 'external', 'usr_bad_provider')"
+      )
+    ).rejects.toThrow();
+    await expect(
+      pool.query(
+        "INSERT INTO user_profiles (id, identity_provider, provider_user_id) VALUES ('usr_bad_provider_id', 'insforge', 'provider_user')"
+      )
+    ).rejects.toThrow();
+    await expect(
+      pool.query(
+        "INSERT INTO workspace_roles (role, display_name, description) VALUES ('viewer', 'Viewer', 'Not allowed')"
+      )
+    ).rejects.toThrow();
+    await expect(
+      pool.query(
+        "INSERT INTO workspace_memberships (workspace_id, user_id, role, active) VALUES ('00000000-0000-4000-8000-000000000102', 'usr_missing', 'developer', true)"
+      )
+    ).rejects.toThrow();
+    await expect(
+      pool.query(
+        "INSERT INTO workspace_memberships (workspace_id, user_id, role, active) VALUES ('00000000-0000-4000-8000-000000000102', 'usr_valid', 'viewer', true)"
+      )
+    ).rejects.toThrow();
+
+    await expect(
+      pool.query(
+        "INSERT INTO workspace_memberships (workspace_id, user_id, role, active) VALUES ('00000000-0000-4000-8000-000000000102', 'usr_valid', 'developer', true)"
+      )
+    ).resolves.toMatchObject({ rows: [] });
   });
 
   it("stores dry-run comment bodies for dashboard inspection", async () => {

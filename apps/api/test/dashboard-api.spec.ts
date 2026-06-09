@@ -382,6 +382,8 @@ function dashboardAuth(
     role: "developer",
     capabilities: ["retry_review_run", "trigger_codebase_scan", "manage_codebase_scan_findings"],
     billingCapabilities: [],
+    email: null,
+    emailVerified: false,
     provider: "insforge",
     ...overrides
   };

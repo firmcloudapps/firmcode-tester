@@ -1,8 +1,6 @@
 # Authentication And Authorization
 
-Firmcode uses InsForge for identity and sessions. Firmcode owns application authorization, workspace membership, roles, GitHub OAuth connection state, GitHub installation access rules, and audit events in its PostgreSQL database.
-
-InsForge has been removed from the active auth path. Remaining `insforge_*` column names are compatibility aliases for historical data and should not be used as the source of truth for new authorization logic.
+Firmcode uses InsForge for identity and sessions. Firmcode owns application authorization, user profiles, workspace membership, roles, GitHub OAuth connection state, GitHub installation access rules, and audit events in its PostgreSQL database.
 
 ## Request Flow
 
@@ -24,12 +22,13 @@ Dashboard APIs must reject caller-provided user identity. `x-firmcode-user-id` i
 
 The database-owned auth model is:
 
-- `user_profiles`: one row per authenticated InsForge user. The primary key is the canonical `user_id` from the verified token. The resolver refreshes email, verification state, provider, metadata, and `last_seen_at` on authenticated requests.
+- `auth.users`: InsForge-owned identity table. Firmcode does not mutate it directly.
+- `user_profiles`: one row per authenticated InsForge user. The primary key is the InsForge `auth.users.id`, and `provider_user_id` must equal that same value. The resolver refreshes email, verification state, provider metadata, and `last_seen_at` on authenticated requests.
 - `workspace_roles`: the allowed workspace roles and their capability metadata.
 - `workspace_memberships`: the tenant membership and role assignment table. `user_id` is required and references the authenticated user profile. `role` references `workspace_roles`.
 - `workspace_audit_events`: records elevated role grants/removals and other security-sensitive workspace changes using canonical `actor_user_id` and `target_user_id`.
 
-Compatibility columns such as `workspace_memberships.user_id`, `workspaces.identity_provider_org_id`, and `workspace_audit_events.actor_user_id` may remain nullable while historical queries are cleaned up. New code should write and read the generic `user_id`, `orgId`, and `provider` fields.
+New code must write and read the generic `user_id`, `orgId`, and `provider` fields. Provider-specific identity columns are migration compatibility only and must not be reintroduced.
 
 ## Role Rules
 
@@ -40,7 +39,7 @@ Firmcode currently supports these workspace roles:
 | `admin` | Manages workspace settings, billing context, GitHub installations, sensitive policies, and member access. |
 | `developer` | Runs review workflows, manages repository-level configuration, triggers scans, and triages findings. |
 
-Roles are database-owned. InsForge token role metadata may seed a newly created membership when explicitly handled by the resolver, but an existing `workspace_memberships.role` row must not be silently overwritten by token claims. Admin promotion, demotion, suspension, or restore should happen through a trusted settings/support/admin path and must write audit events.
+Roles are database-owned. New self-signup or OAuth-created memberships default to `developer`; InsForge token metadata must not promote users to `admin`. Admin promotion, demotion, suspension, or restore should happen through a trusted settings/support/admin path and must write audit events.
 
 The removed InsForge-era roles are normalized during migration: `owner` becomes `admin`, and `viewer` becomes `developer`. New rows must use only `admin` or `developer`.
 

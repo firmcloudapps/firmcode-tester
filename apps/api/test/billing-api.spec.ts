@@ -78,6 +78,8 @@ function dashboardAuth(overrides: Partial<DashboardRequestContext> = {}): Dashbo
     role: "developer",
     capabilities: ["retry_review_run"],
     billingCapabilities: [],
+    email: null,
+    emailVerified: false,
     provider: "insforge",
     ...overrides
   };

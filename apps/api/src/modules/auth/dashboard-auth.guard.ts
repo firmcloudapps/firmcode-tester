@@ -54,6 +54,8 @@ export class DashboardAuthGuard implements CanActivate {
       role: workspace.role,
       capabilities,
       billingCapabilities: workspace.billingCapabilities,
+      email: verified.email ?? null,
+      emailVerified: verified.emailVerified ?? false,
       provider: verified.provider
     };
 

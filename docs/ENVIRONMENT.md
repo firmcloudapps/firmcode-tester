@@ -70,16 +70,17 @@ REDIS_URL=redis://redis:6379
 | `FIRMCODE_DEFAULT_WORKSPACE_ID` | api | Optional default workspace ID for InsForge-authenticated users. Leave empty to create/resolve personal workspaces. |
 | `FIRMCODE_DEFAULT_WORKSPACE_NAME` | api | Display name for the default workspace. Defaults to `Firmcode AI`. |
 
-InsForge owns SaaS sign-in, sign-up, sessions, user profile, OAuth, and email verification. Firmcode validates InsForge JWTs in the API, maps InsForge user/org IDs to internal workspaces, and caches only the metadata needed for authorization and display.
+InsForge owns SaaS sign-in, sign-up, sessions, OAuth, email verification, and the canonical `auth.users` identity row. Firmcode validates InsForge sessions in the API, maps InsForge user IDs to `user_profiles`, maps users to workspace memberships, and keeps role assignment in the database.
 
 The production dashboard authentication flow is:
 
-1. The browser signs in with the InsForge SDK and receives an access token.
-2. The web app stores the access token in the `insforge_access_token` cookie for Next.js route handlers and server components.
+1. The browser submits sign-in/sign-up/OAuth actions to Next.js auth route handlers.
+2. Next.js uses `@insforge/sdk/ssr` to set `insforge_access_token` and httpOnly `insforge_refresh_token` cookies.
 3. Web-to-API calls send `Authorization: Bearer <InsForge access token>`.
-4. The NestJS API verifies the InsForge token, derives the user/org claims, resolves the Firmcode workspace/membership, and then applies role/capability checks.
-5. After successful sign-in or sign-up, the browser goes to `/auth/redirect`, which calls `/api/settings` with the bearer token and routes Admins to `/dashboard/admin` and Developers to `/dashboard/developer`.
-6. The API must ignore client-provided user identity headers. Web tests may use `FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN` as an isolated bearer-token fixture, but production and normal local development must use InsForge sessions. Any legacy workspace/user shortcut is gated to `NODE_ENV=test` for direct controller tests only; setting `FIRMCODE_DASHBOARD_*` or sending `x-firmcode-user-id` is not a supported runtime authentication path.
+4. The NestJS API verifies the bearer token through InsForge, upserts `user_profiles`, resolves the Firmcode workspace/membership, and then applies database role/capability checks.
+5. `GET /api/auth/me` returns the verified user, profile relationship, workspace role, and derived capabilities.
+6. After successful sign-in or sign-up, the browser goes to `/auth/redirect`, which calls `/api/settings` with the bearer token and routes Admins to `/dashboard/admin` and Developers to `/dashboard/developer`.
+7. The API must ignore client-provided user identity headers. Web tests may use `FIRMCODE_TEST_DASHBOARD_SESSION_TOKEN` as an isolated bearer-token fixture, but production and normal local development must use InsForge sessions. Any legacy workspace/user shortcut is gated to `NODE_ENV=test` for direct controller tests only; setting `FIRMCODE_DASHBOARD_*` or sending `x-firmcode-user-id` is not a supported runtime authentication path.
 
 Required InsForge dashboard configuration:
 
@@ -87,7 +88,7 @@ Required InsForge dashboard configuration:
 - Email/password authentication is enabled.
 - Google OAuth is enabled if the dashboard should show the Google sign-in action.
 - Link-based email verification redirect URLs include `/sign-in`.
-- User profiles and workspace roles are stored in the Firmcode database. Token metadata may help seed a brand-new membership, but existing roles must be changed through the database-backed settings/support/admin path.
+- User profiles and workspace roles are stored in the Firmcode database. Brand-new memberships default to `developer`; `admin` must be assigned through the database-backed settings/support/admin path.
 
 ## GitHub App
 

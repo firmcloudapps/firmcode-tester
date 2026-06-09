@@ -96,7 +96,7 @@ GitHub Webhook
 - Configure production and preview allowed redirect URLs for the Vercel dashboard in InsForge.
 - Enable email/password auth and Google OAuth if the Google button should be available.
 - Provide `NEXT_PUBLIC_INSFORGE_BASE_URL`, `NEXT_PUBLIC_INSFORGE_URL`, and `NEXT_PUBLIC_INSFORGE_ANON_KEY` to the web app.
-- Provide `INSFORGE_BASE_URL` and `INSFORGE_ANON_KEY` to web server runtimes that validate sessions during redirects/server rendering.
+- Provide `INSFORGE_BASE_URL` and `INSFORGE_ANON_KEY` to web server route handlers that create, refresh, and exchange InsForge sessions.
 - Provide `AUTH_PROVIDER=insforge` to the API and web runtimes.
 
 ### Redis

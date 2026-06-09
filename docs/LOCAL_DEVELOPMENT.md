@@ -62,8 +62,8 @@ The expected local auth flow is:
 1. Visit `http://localhost:3000`.
 2. The root holding page renders with dashboard entry points.
 3. Sign in or sign up through InsForge.
-4. The browser stores the InsForge access token and goes to `/auth/redirect`.
-5. `/auth/redirect` calls the API with the InsForge bearer token, then the API creates or resolves the matching Firmcode workspace.
+4. Next.js stores the InsForge access token and httpOnly refresh token cookies, then sends the browser to `/auth/redirect`.
+5. `/auth/redirect` calls the API with the InsForge bearer token, then the API creates or resolves the matching Firmcode profile and workspace membership.
 6. `/auth/redirect` sends Admins to `/dashboard/admin` and Developers to `/dashboard/developer`.
 7. Web server requests to the API include an InsForge bearer token.
 8. API dashboard endpoints reject requests without a valid InsForge token.
@@ -228,7 +228,7 @@ docker compose run --rm worker pytest
 
 - If webhook verification fails, confirm raw body handling and `GITHUB_WEBHOOK_SECRET`.
 - If InsForge auth fails in the web app, confirm `NEXT_PUBLIC_INSFORGE_BASE_URL`, `NEXT_PUBLIC_INSFORGE_URL`, `NEXT_PUBLIC_INSFORGE_ANON_KEY`, after-auth URLs, and allowed redirect URLs.
-- If `/auth/redirect` sends a signed-in user back to `/sign-in`, confirm the server runtime has `INSFORGE_BASE_URL` and `INSFORGE_ANON_KEY` so Next.js can validate the `insforge_access_token` cookie.
+- If `/auth/redirect` sends a signed-in user back to `/sign-in`, confirm the web server runtime has `INSFORGE_BASE_URL` and `INSFORGE_ANON_KEY`, and confirm the browser has a fresh `insforge_access_token` cookie from the Next.js auth routes.
 - If protected API calls return `401`, confirm the web route handler is sending `Authorization: Bearer <InsForge access token>` and the API is running with `AUTH_PROVIDER=insforge`.
 - If protected API calls return `403`, confirm the InsForge user is mapped to an active workspace membership with the required role.
 - If cross-workspace data appears, stop and fix workspace ownership checks before continuing; this is a release blocker.

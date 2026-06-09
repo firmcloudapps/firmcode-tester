@@ -28,6 +28,8 @@ export interface DashboardRequestContext {
   readonly role: DashboardRole;
   readonly capabilities: readonly DashboardCapability[];
   readonly billingCapabilities: readonly string[];
+  readonly email: string | null;
+  readonly emailVerified: boolean;
   readonly provider: string;
 }
 

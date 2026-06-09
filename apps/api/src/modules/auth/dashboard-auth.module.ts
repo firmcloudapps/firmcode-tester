@@ -2,6 +2,7 @@ import { Global, Module } from "@nestjs/common";
 import { Pool } from "pg";
 import type { ApiRuntimeConfig } from "@firmcode/shared";
 import { API_RUNTIME_CONFIG, apiRuntimeConfigProvider } from "../../config/api-config.provider";
+import { DashboardAuthController } from "./dashboard-auth.controller";
 import { DashboardAuthGuard } from "./dashboard-auth.guard";
 import { InsForgeTokenVerifier } from "./insforge-token-verifier";
 import { TOKEN_VERIFIER } from "./token-verifier";
@@ -13,6 +14,7 @@ import {
 
 @Global()
 @Module({
+  controllers: [DashboardAuthController],
   providers: [
     apiRuntimeConfigProvider,
     {

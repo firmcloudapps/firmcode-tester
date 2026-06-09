@@ -164,7 +164,9 @@ function hasMembershipCapability(
       sessionId: null,
       role: membership.role,
       capabilities: [],
-      billingCapabilities: []
+      billingCapabilities: [],
+      email: null,
+      emailVerified: false
     },
     capability
   );

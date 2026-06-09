@@ -73,8 +73,8 @@ export class PostgresDashboardWorkspaceResolver implements DashboardWorkspaceRes
       const membership = await this.ensureMembership({
         workspaceId,
         userId,
-        role: resolveOrganizationRole(input.token),
-        source: resolveOrganizationRoleSource(input.token),
+        role: DEFAULT_SIGNUP_ROLE,
+        source: "organization_first_login",
         syncExistingRole: false,
         metadata: {
           orgId,
@@ -397,31 +397,15 @@ export class EmptyDashboardWorkspaceResolver implements DashboardWorkspaceResolv
 }
 
 function resolvePersonalRole(token: VerifiedToken): DashboardRole {
-  return normalizeFirmcodeRole(token.firmcodeRole) ?? "developer";
+  return DEFAULT_SIGNUP_ROLE;
 }
 
 function resolvePersonalRoleSource(token: VerifiedToken): string {
-  return hasExplicitFirmcodeRole(token) ? "token_firmcode_role_metadata" : "personal_first_login";
-}
-
-function resolveOrganizationRole(token: VerifiedToken): DashboardRole {
-  return normalizeOrganizationRole(token.orgRole) ?? normalizeFirmcodeRole(token.firmcodeRole) ?? "developer";
+  return "personal_first_login";
 }
 
 function resolveConfiguredOrganizationRole(role: string): DashboardRole {
   return normalizeOrganizationRole(role) ?? normalizeFirmcodeRole(role) ?? "developer";
-}
-
-function resolveOrganizationRoleSource(token: VerifiedToken): string {
-  if (normalizeOrganizationRole(token.orgRole) !== null) {
-    return "organization_role";
-  }
-
-  return normalizeFirmcodeRole(token.firmcodeRole) !== null ? "token_firmcode_role_metadata" : "default_developer";
-}
-
-function hasExplicitFirmcodeRole(token: VerifiedToken): boolean {
-  return normalizeFirmcodeRole(token.firmcodeRole) !== null;
 }
 
 function normalizeOrganizationRole(role: string | null): DashboardRole | null {
@@ -451,6 +435,8 @@ function normalizeFirmcodeRole(role: string | null): DashboardRole | null {
 function isElevatedRole(role: DashboardRole | null): boolean {
   return role === "admin";
 }
+
+const DEFAULT_SIGNUP_ROLE: DashboardRole = "developer";
 
 function toResolvedWorkspace(token: VerifiedToken, membership: MembershipRow): ResolvedDashboardWorkspace {
   const userId = membership.user_id ?? token.userId;

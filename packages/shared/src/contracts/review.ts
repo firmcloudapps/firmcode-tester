@@ -757,6 +757,28 @@ export interface UpdateWorkspaceMemberStatusRequest {
   active: boolean;
 }
 
+export interface DashboardAuthMeResponse {
+  user: {
+    id: string;
+    email: string | null;
+    emailVerified: boolean;
+    provider: "insforge";
+  };
+  profile: {
+    id: string;
+    identityProvider: "insforge";
+    providerUserId: string;
+    email: string | null;
+    emailVerified: boolean;
+  };
+  workspace: {
+    id: string;
+    identityWorkspaceId: string | null;
+    role: DashboardWorkspaceRole;
+  };
+  capabilities: string[];
+}
+
 export interface WorkspaceRetentionPolicy {
   artifactRetentionDays: number;
   changedFilePatchDays: number;

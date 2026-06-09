@@ -5,15 +5,6 @@ import { insforge } from "../lib/insforge";
 
 const ACCESS_TOKEN_COOKIE = "insforge_access_token";
 
-function persistAccessToken(token: string): void {
-  const secure = window.location.protocol === "https:" ? "; Secure" : "";
-  document.cookie = `${ACCESS_TOKEN_COOKIE}=${token}; path=/; SameSite=Lax; max-age=3600${secure}`;
-}
-
-function clearAccessToken(): void {
-  document.cookie = `${ACCESS_TOKEN_COOKIE}=; path=/; max-age=0`;
-}
-
 interface InsForgeUser {
   id: string;
   email: string;
@@ -81,10 +72,6 @@ export function InsForgeProviderBoundary({
 
         if (data?.user) {
           setUser(data.user as InsForgeUser);
-          const tokenInMemory = (insforge as any).tokenManager?.getSession()?.accessToken as string | undefined;
-          if (tokenInMemory) {
-            persistAccessToken(tokenInMemory);
-          }
         }
 
         if (configResult.data) {
@@ -104,54 +91,40 @@ export function InsForgeProviderBoundary({
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    const { data, error } = await insforge.auth.signInWithPassword({
+    const data = await postAuthJson<{
+      user?: InsForgeUser;
+    }>("/api/auth/sign-in", {
       email,
       password
     });
 
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    if (data?.user && data.accessToken) {
+    if (data.user) {
       setUser(data.user as InsForgeUser);
-      persistAccessToken(data.accessToken);
       window.location.href = afterSignInUrl;
       return { status: "signed_in" } satisfies AuthCompletionResult;
-    }
-
-    if (data?.user && (data.user.emailVerified === false || authConfig?.requireEmailVerification === true)) {
-      return {
-        status: "needs_email_verification",
-        email: data.user.email,
-        method: authConfig?.verifyEmailMethod ?? "code"
-      } satisfies AuthCompletionResult;
     }
 
     throw new Error("Sign-in did not complete successfully.");
   };
 
   const signUp = async (email: string, password: string, name?: string) => {
-    const { data, error } = await insforge.auth.signUp({
+    const data = await postAuthJson<{
+      user?: InsForgeUser | null;
+      requireEmailVerification?: boolean;
+    }>("/api/auth/sign-up", {
       email,
       password,
-      name,
-      redirectTo: window.location.origin + signInUrl
+      name
     });
 
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    if (data?.user && data.accessToken) {
+    if (data.user && data.requireEmailVerification !== true) {
       setUser(data.user as InsForgeUser);
-      persistAccessToken(data.accessToken);
       window.location.href = afterSignUpUrl;
       return { status: "signed_in" } satisfies AuthCompletionResult;
     }
 
     const verificationMethod = authConfig?.verifyEmailMethod ?? "code";
-    if (data?.requireEmailVerification || (data?.user && !data.accessToken)) {
+    if (data.requireEmailVerification === true || data.user) {
       return {
         status: "needs_email_verification",
         email,
@@ -159,75 +132,57 @@ export function InsForgeProviderBoundary({
       } satisfies AuthCompletionResult;
     }
 
-    if (data?.user) {
-      setUser(data.user as InsForgeUser);
-      if (data.accessToken) persistAccessToken(data.accessToken);
-      window.location.href = afterSignUpUrl;
-      return { status: "signed_in" } satisfies AuthCompletionResult;
-    }
-
     throw new Error("Sign-up did not complete successfully.");
   };
 
   const signInWithGoogle = async () => {
-    const redirectTo = new URL("/auth/callback", window.location.origin).toString();
-    const { error } = await insforge.auth.signInWithOAuth("google", { redirectTo });
-
-    if (error) {
-      throw new Error(error.message);
-    }
+    window.location.href = "/api/auth/google";
   };
 
   const verifyEmail = async (email: string, otp: string, intent: "sign-in" | "sign-up" = "sign-up") => {
-    const { data, error } = await insforge.auth.verifyEmail({
+    const data = await postAuthJson<{
+      user?: InsForgeUser;
+    }>("/api/auth/verify-email", {
       email,
       otp
     });
 
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    if (!data?.user) {
+    if (!data.user) {
       throw new Error("Verification did not return an authenticated session.");
     }
 
     setUser(data.user as InsForgeUser);
-    const verifyToken = (data as any)?.accessToken as string | undefined;
-    if (verifyToken) persistAccessToken(verifyToken);
     window.location.href = intent === "sign-in" ? afterSignInUrl : afterSignUpUrl;
   };
 
   const resendVerificationEmail = async (email: string) => {
-    const { error } = await insforge.auth.resendVerificationEmail({
-      email,
-      redirectTo: window.location.origin + signInUrl
+    await postAuthJson("/api/auth/resend-verification", {
+      email
     });
-
-    if (error) {
-      throw new Error(error.message);
-    }
   };
 
   const signOut = async () => {
-    await insforge.auth.signOut();
-    clearAccessToken();
+    await fetch("/api/auth/sign-out", {
+      method: "POST",
+      credentials: "same-origin"
+    });
+    insforge.setAccessToken(null);
     setUser(null);
     window.location.href = signInUrl;
   };
 
   const getToken = async (): Promise<string | null> => {
-    const fromMemory = (insforge as any).tokenManager?.getSession()?.accessToken as string | undefined;
-    if (fromMemory) {
-      persistAccessToken(fromMemory);
-      return fromMemory;
+    const token = readCookie(ACCESS_TOKEN_COOKIE);
+
+    if (token !== null) {
+      return token;
     }
-    const { data } = await insforge.auth.refreshSession();
-    if (data?.accessToken) {
-      persistAccessToken(data.accessToken);
-      return data.accessToken;
-    }
-    return null;
+
+    await fetch("/api/auth/refresh", {
+      method: "POST",
+      credentials: "same-origin"
+    });
+    return readCookie(ACCESS_TOKEN_COOKIE);
   };
 
   const value: InsForgeAuthContextValue = {
@@ -249,4 +204,42 @@ export function InsForgeProviderBoundary({
       {children}
     </InsForgeAuthContext.Provider>
   );
+}
+
+async function postAuthJson<T = unknown>(path: string, body: unknown): Promise<T> {
+  const response = await fetch(path, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json"
+    },
+    body: JSON.stringify(body),
+    credentials: "same-origin"
+  });
+  const payload = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    const message = readErrorMessage(payload) ?? "Authentication request failed.";
+    throw new Error(message);
+  }
+
+  return payload as T;
+}
+
+function readErrorMessage(payload: unknown): string | null {
+  if (payload === null || typeof payload !== "object") {
+    return null;
+  }
+
+  const message = (payload as Record<string, unknown>).message;
+  return typeof message === "string" && message.trim() !== "" ? message : null;
+}
+
+function readCookie(name: string): string | null {
+  const prefix = `${name}=`;
+  const cookie = document.cookie
+    .split(";")
+    .map((entry) => entry.trim())
+    .find((entry) => entry.startsWith(prefix));
+
+  return cookie === undefined ? null : decodeURIComponent(cookie.slice(prefix.length));
 }

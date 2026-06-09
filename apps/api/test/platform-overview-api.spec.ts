@@ -66,6 +66,8 @@ function dashboardAuth(overrides: Partial<DashboardRequestContext> = {}): Dashbo
     role: "admin",
     capabilities: ["manage_sensitive_settings", "manage_billing", "manage_github_installations", "manage_review_policies"],
     billingCapabilities: [],
+    email: null,
+    emailVerified: false,
     provider: "insforge",
     ...overrides
   };

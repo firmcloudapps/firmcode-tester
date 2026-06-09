@@ -14,6 +14,7 @@ import { generalizeIdentityColumnsMigration } from "./migrations/013_generalize_
 import { databaseManagedAuthMigration } from "./migrations/014_database_managed_auth";
 import { adminDeveloperRolesOnlyMigration } from "./migrations/015_admin_developer_roles_only";
 import { removeLegacyIdentityColumnsMigration } from "./migrations/016_remove_legacy_identity_columns";
+import { databaseAuthConstraintsMigration } from "./migrations/017_database_auth_constraints";
 
 export interface DatabaseQueryResult<Row = unknown> {
   readonly rows: Row[];
@@ -45,7 +46,8 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigration[] = [
   generalizeIdentityColumnsMigration,
   databaseManagedAuthMigration,
   adminDeveloperRolesOnlyMigration,
-  removeLegacyIdentityColumnsMigration
+  removeLegacyIdentityColumnsMigration,
+  databaseAuthConstraintsMigration
 ];
 
 interface AppliedMigrationRow {

@@ -15,7 +15,7 @@ export function loadWebInsForgeAuthRenderConfig(
     env.NEXT_PUBLIC_INSFORGE_URL ||
     env.INSFORGE_BASE_URL ||
     "https://h35yzuga.eu-central.insforge.app";
-  const anonKey = env.NEXT_PUBLIC_INSFORGE_ANON_KEY || env.INSFORGE_ANON_KEY || "";
+  const anonKey = env.NEXT_PUBLIC_INSFORGE_ANON_KEY || env.INSFORGE_ANON_KEY || (env.NODE_ENV === "test" ? "test-anon-key" : "");
   const signInUrl = env.NEXT_PUBLIC_INSFORGE_SIGN_IN_URL || "/sign-in";
   const signUpUrl = env.NEXT_PUBLIC_INSFORGE_SIGN_UP_URL || "/sign-up";
   const afterSignInUrl = env.NEXT_PUBLIC_INSFORGE_AFTER_SIGN_IN_URL || "/auth/redirect";

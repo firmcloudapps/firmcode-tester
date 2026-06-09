@@ -1,12 +1,8 @@
 import type { NextFetchEvent, NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { isProtectedDashboardPath, PROTECTED_DASHBOARD_ROUTES } from "./lib/protected-routes";
 
-// Simple middleware that allows all requests
-// Authentication is handled client-side by InsForge SDK
 export default async function middleware(request: NextRequest, _event: NextFetchEvent): Promise<Response> {
-  // Allow all requests - auth is handled client-side
-  return NextResponse.next();
+  return NextResponse.next({ request });
 }
 
 export const config = {

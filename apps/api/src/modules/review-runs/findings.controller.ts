@@ -51,6 +51,8 @@ export class FindingsController {
           role: membership.role,
           capabilities: [],
           billingCapabilities: [],
+          email: null,
+          emailVerified: false,
           provider: "insforge"
         },
         "manage_codebase_scan_findings"

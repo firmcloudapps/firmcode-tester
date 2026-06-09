@@ -146,7 +146,7 @@ describe("PostgresDashboardWorkspaceResolver", () => {
     expect(second).toMatchObject({
       workspaceId: first.workspaceId,
       orgId: "org_firmcode",
-      role: "admin"
+      role: "developer"
     });
     expect(workspaces.rows).toEqual([{ id: first.workspaceId, identity_provider_org_id: "org_firmcode" }]);
   });
@@ -197,7 +197,7 @@ describe("PostgresDashboardWorkspaceResolver", () => {
     });
   });
 
-  it("uses provider organization roles only to seed new database memberships", async () => {
+  it("ignores provider and token role metadata when seeding new database memberships", async () => {
     const member = await resolver.resolve({
       token: createToken({
         userId: "user_metadata_member",
@@ -218,10 +218,10 @@ describe("PostgresDashboardWorkspaceResolver", () => {
     });
 
     expect(member.role).toBe("developer");
-    expect(fallbackAdmin.role).toBe("admin");
+    expect(fallbackAdmin.role).toBe("developer");
   });
 
-  it("maps provider organization Admins to Admin and Developers to Developer", async () => {
+  it("seeds provider organization users as Developer regardless of provider organization role", async () => {
     const admin = await resolver.resolve({
       token: createToken({
         userId: "user_admin",
@@ -239,7 +239,7 @@ describe("PostgresDashboardWorkspaceResolver", () => {
       selectedWorkspaceId: null
     });
 
-    expect(admin.role).toBe("admin");
+    expect(admin.role).toBe("developer");
     expect(developer.role).toBe("developer");
   });
 
@@ -303,7 +303,7 @@ describe("PostgresDashboardWorkspaceResolver", () => {
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
-  it("writes audit events for elevated initial database role grants", async () => {
+  it("does not write elevated audit events from token-only role metadata", async () => {
     await insertWorkspace("00000000-0000-4000-8000-000000000401", "org_audit", "Audit org");
 
     await resolver.resolve({
@@ -339,15 +339,7 @@ ORDER BY created_at, id
       ["00000000-0000-4000-8000-000000000401"]
     );
 
-    expect(audits.rows).toEqual([
-      {
-        actor_user_id: "user_audit",
-        target_user_id: "user_audit",
-        previous_role: null,
-        next_role: "admin",
-        source: "organization_role"
-      }
-    ]);
+    expect(audits.rows).toEqual([]);
   });
 
   async function insertWorkspace(id: string, orgId: string | null, name: string): Promise<void> {

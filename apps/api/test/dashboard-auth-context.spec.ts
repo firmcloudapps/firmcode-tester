@@ -41,6 +41,8 @@ describe("dashboard auth context helpers", () => {
       role: "developer",
       capabilities: [],
       billingCapabilities: [],
+      email: null,
+      emailVerified: false,
       provider: "insforge"
     };
 

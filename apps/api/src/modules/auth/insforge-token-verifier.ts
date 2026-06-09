@@ -5,53 +5,64 @@ import type { TokenVerifier, VerifiedToken } from "./token-verifier";
 
 export const INSFORGE_TOKEN_VERIFIER = Symbol("INSFORGE_TOKEN_VERIFIER");
 
-interface InsForgeJwtPayload {
-  sub: string;
-  email?: string;
-  email_verified?: boolean;
-  role?: string;
-  session_id?: string;
-  org_id?: string;
-  org_role?: string;
-  permissions?: string[];
-  metadata?: Record<string, unknown>;
-  iat: number;
-  exp: number;
+type Fetcher = typeof fetch;
+
+interface InsForgeCurrentSessionResponse {
+  readonly user?: InsForgeUser | null;
 }
 
-/**
- * InsForge JWT Token Verifier
- * 
- * Verifies JWT tokens issued by InsForge authentication service.
- * Note: Full cryptographic verification requires JWKS from InsForge.
- * For now, this validates the token structure and claims.
- */
+interface InsForgeUser {
+  readonly id?: unknown;
+  readonly email?: unknown;
+  readonly emailVerified?: unknown;
+  readonly metadata?: unknown;
+  readonly profile?: unknown;
+}
+
 @Injectable()
 export class InsForgeTokenVerifier implements TokenVerifier {
-  constructor(@Inject(API_RUNTIME_CONFIG) private readonly config: ApiRuntimeConfig) {}
+  constructor(
+    @Inject(API_RUNTIME_CONFIG) private readonly config: ApiRuntimeConfig,
+    private readonly fetcher: Fetcher = fetch
+  ) {}
 
   async verify(token: string): Promise<VerifiedToken> {
+    const authConfig = this.config.auth.insforge;
+
+    if (authConfig === null) {
+      throw new UnauthorizedException("InsForge auth is not configured");
+    }
+
     try {
-      const payload = this.decodeToken(token);
-      
-      if (!payload.sub) {
-        throw new UnauthorizedException("InsForge token is missing subject");
+      const response = await this.fetcher(new URL("/api/auth/sessions/current", authConfig.baseUrl), {
+        headers: {
+          authorization: `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new UnauthorizedException("InsForge token is invalid");
       }
 
-      // Check expiration
-      if (payload.exp && payload.exp * 1000 < Date.now()) {
-        throw new UnauthorizedException("Token has expired");
+      const payload = (await response.json()) as InsForgeCurrentSessionResponse;
+      const user = payload.user;
+      const userId = typeof user?.id === "string" && user.id.trim() !== "" ? user.id : null;
+
+      if (userId === null) {
+        throw new UnauthorizedException("InsForge token is missing a user");
       }
+
+      const metadata = readMetadata(user?.metadata);
 
       return {
-        userId: payload.sub,
-        orgId: payload.org_id ?? null,
-        sessionId: payload.session_id ?? null,
-        orgRole: payload.org_role ?? null,
-        firmcodeRole: this.extractFirmcodeRole(payload),
-        billingCapabilities: payload.permissions ?? [],
-        email: payload.email ?? null,
-        emailVerified: payload.email_verified ?? false,
+        userId,
+        orgId: readString(metadata, "org_id"),
+        sessionId: readString(metadata, "session_id"),
+        orgRole: readString(metadata, "org_role"),
+        firmcodeRole: null,
+        billingCapabilities: [],
+        email: readNullableString(user?.email),
+        emailVerified: user?.emailVerified === true,
         provider: "insforge"
       };
     } catch (error) {
@@ -61,38 +72,18 @@ export class InsForgeTokenVerifier implements TokenVerifier {
       throw new UnauthorizedException("InsForge token is invalid");
     }
   }
-
-  private decodeToken(token: string): InsForgeJwtPayload {
-    const parts = token.split(".");
-    if (parts.length !== 3) {
-      throw new UnauthorizedException("Invalid token format");
-    }
-
-    try {
-      const payload = base64UrlDecode(parts[1]);
-      return JSON.parse(payload) as InsForgeJwtPayload;
-    } catch {
-      throw new UnauthorizedException("Invalid token payload");
-    }
-  }
-
-  private extractFirmcodeRole(payload: InsForgeJwtPayload): string | null {
-    if (payload.metadata) {
-      const firmcode = payload.metadata.firmcode;
-      if (firmcode && typeof firmcode === "object") {
-        const role = (firmcode as Record<string, unknown>).role;
-        if (typeof role === "string") return role;
-      }
-      const firmcodeRole = payload.metadata.firmcode_role;
-      if (typeof firmcodeRole === "string") return firmcodeRole;
-    }
-    return null;
-  }
 }
 
-function base64UrlDecode(str: string): string {
-  // Add padding if needed
-  const padding = "=".repeat((4 - (str.length % 4)) % 4);
-  const base64 = str.replace(/-/g, "+").replace(/_/g, "/") + padding;
-  return Buffer.from(base64, "base64").toString("utf8");
+function readMetadata(value: unknown): Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+}
+
+function readString(record: Record<string, unknown>, key: string): string | null {
+  return readNullableString(record[key]);
+}
+
+function readNullableString(value: unknown): string | null {
+  return typeof value === "string" && value.trim() !== "" ? value : null;
 }

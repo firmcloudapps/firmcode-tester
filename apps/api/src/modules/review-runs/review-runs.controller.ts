@@ -157,6 +157,8 @@ function hasMembershipCapability(
       role: membership.role,
       capabilities: [],
       billingCapabilities: [],
+      email: null,
+      emailVerified: false,
       provider: "insforge"
     },
     capability
